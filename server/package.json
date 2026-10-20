@@ -1,7 +1,7 @@
 {
   "name": "valdrada-server",
   "productName": "Valdrada",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Valdrada simulation server: the digital twin as a CARLA-style server, driven over TCP by the valdrada Python API",
   "main": "main.js",
   "private": true,

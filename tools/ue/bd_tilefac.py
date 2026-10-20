@@ -15,7 +15,7 @@ EXPORT = os.path.abspath(os.path.join(HERE, '..', '..', 'client', 'tools', 'ar34
 PROJECT = os.path.join(EXPORT, 'ue_project', 'BoundlessUE.uproject')
 UE_ROOT = os.environ.get('UE_ROOT', '/data0/projectnyc_aux/ue/UE_5.8')
 CELLCACHE = os.environ.get('CELLCACHE', '/data0/projectnyc_aux/cellcache')   # FAC42: the world's own cache (a private one too)
-VERSION = int(os.environ.get('BD_TILEFAC_V', '101'))   # FAC42: a diagnostic or new master is a new version, never an in-place rebuild
+VERSION = int(os.environ.get('BD_TILEFAC_V', '108'))   # FAC42: a diagnostic or new master is a new version, never an in-place rebuild (FP18 107: the glass layer)
 HLSL = os.environ.get('BD_TILEFAC_HLSL', 'bd_tilefac.hlsl')
 # RG44: the kit's glass sets too (BD_TILEFAC_GLASS=1): in the page they are the facade shader's windows (rooms, blinds, lit
 # rooms); their own export record, a smooth dark pane, mirrored the sky as bright as the wall round it at a grazing view

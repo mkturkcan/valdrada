@@ -2262,7 +2262,7 @@ export const TREE_SPECIES = [
   // s = relative stature (height). TC13 adds w = relative crown SPREAD and c13,
   // the canopy colour; absolute metres live in TREE_ARCH above. `c`/`c13` are an
   // instanceColor MULTIPLIER on the leaf map, i.e. decoded sRGB -> linear before
-  // they are applied. MEASURED: our canopy runs yellow-olive against the Earth
+  // they are applied. MEASURED: our canopy runs yellow-olive against the reference
   // stills (mean foliage G-B 33 where Bedford Ave reads 13) because the r12 `c`
   // column crushes blue to a QUARTER of green in linear. c13 lifts blue only
   // (+0x0b..0x0d) and green a touch (+0x02), at constant luminance — the canopy

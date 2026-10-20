@@ -7,9 +7,11 @@
 #include "ValdradaClient.h"
 #include "ValdradaLink.h"
 #include "ValdradaFrames.h"
+#include "ValdradaPathTraceExt.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "TextureResource.h"
+#include "RenderingThread.h"
 #include "Materials/MaterialInstanceDynamic.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogValdradaCapture, Log, All);
@@ -40,7 +42,7 @@ void AValdradaClient::OnCapture(const TSharedPtr<FJsonObject>& C)
 	J.HFovDeg = Valdrada::HFov(Fov, Aspect);
 	J.Far = Far;
 	for (const FString& O : J.Outputs)
-		if (O != TEXT("rgb") && O != TEXT("depth") && !(O == TEXT("semantic") && SemanticMat))
+		if (O != TEXT("rgb") && O != TEXT("depth") && O != TEXT("albedo") && O != TEXT("normal") && !(O == TEXT("semantic") && SemanticMat))
 		{
 			Fail(J, TEXT("unsupported_output"), FString::Printf(TEXT("this renderer does not serve %s yet"), *O));
 			return;
@@ -49,7 +51,14 @@ void AValdradaClient::OnCapture(const TSharedPtr<FJsonObject>& C)
 	FString Sensors;
 	const TArray<TSharedPtr<FJsonValue>>* S = nullptr;
 	if (C->TryGetArrayField(TEXT("sensors"), S)) for (const TSharedPtr<FJsonValue>& Id : *S) Sensors += FString::Printf(TEXT("%d,"), int32(Id->AsNumber()));
-	J.Key = FString::Printf(TEXT("%s%dx%d"), *Sensors, J.Width, J.Height);
+	// the capture mode (a replay of a take: render.capture `mode`, `spp`, `warm`, `burst`, fields the core does not send)
+	C->TryGetStringField(TEXT("mode"), J.Mode);
+	if (J.Mode != TEXT("pathtrace")) J.Mode = TEXT("lumen");
+	double Spp = 1;
+	if (C->TryGetNumberField(TEXT("spp"), Spp)) J.Spp = FMath::Clamp(int32(Spp), 1, 4096);
+	C->TryGetBoolField(TEXT("burst"), J.bBurst);
+	C->TryGetBoolField(TEXT("denoise"), J.bDenoise);
+	J.Key = FString::Printf(TEXT("%s%dx%d%s"), *Sensors, J.Width, J.Height, *J.Mode);
 	const TSharedPtr<FJsonObject>* Ex = nullptr;
 	if (C->TryGetObjectField(TEXT("exposure"), Ex))
 	{
@@ -62,6 +71,10 @@ void AValdradaClient::OnCapture(const TSharedPtr<FJsonObject>& C)
 	const bool bCut = !K.bUsed || FVector::Dist(K.Last.GetLocation(), J.Pose.GetLocation()) > 300.0
 		|| K.Last.GetRotation().AngularDistance(J.Pose.GetRotation()) > FMath::DegreesToRadians(10.0);
 	J.WarmLeft = J.Outputs.Contains(TEXT("rgb")) ? (bCut ? WarmFramesOnCut : WarmFrames) : 0;
+	double Warm = -1;
+	if (C->TryGetNumberField(TEXT("warm"), Warm) && Warm >= 0) J.WarmLeft = int32(Warm);
+	// the path tracer adds one sample a render and denoises the last: spp - 1 renders before the one read
+	if (J.Mode == TEXT("pathtrace")) J.WarmLeft = J.Outputs.Contains(TEXT("rgb")) ? J.Spp - 1 : 0;
 	J.bCut = bCut;
 	J.T0 = FPlatformTime::Seconds();
 	if (Link) Link->NotePending(J.Id, true);
@@ -71,12 +84,15 @@ void AValdradaClient::OnCapture(const TSharedPtr<FJsonObject>& C)
 AValdradaClient::FCam& AValdradaClient::CamFor(const FCaptureJob& J)
 {
 	FCam& K = Cams.FindOrAdd(J.Key);
-	auto Make = [&](ESceneCaptureSource Src, EPixelFormat Fmt, TObjectPtr<UTextureRenderTarget2D>& RT) -> USceneCaptureComponent2D*
+	// (bLinear: the target stores what the renderer writes; otherwise it is an sRGB target, the final colour encoded as a
+	// display's (Movie Render Queue's frames are; with a linear target the RGB came back unencoded, about 2 EV dark in the
+	// mid-tones, the shade crushed, the hues saturated)
+	auto Make = [&](ESceneCaptureSource Src, EPixelFormat Fmt, TObjectPtr<UTextureRenderTarget2D>& RT, bool bLinear = true) -> USceneCaptureComponent2D*
 	{
 		RT = NewObject<UTextureRenderTarget2D>(this);
 		RT->bAutoGenerateMips = false;
 		RT->ClearColor = FLinearColor::Black;
-		RT->InitCustomFormat(J.Width, J.Height, Fmt, true);
+		RT->InitCustomFormat(J.Width, J.Height, Fmt, bLinear);
 		RT->UpdateResourceImmediate(true);
 		KeepAlive.Add(RT);
 		USceneCaptureComponent2D* C = NewObject<USceneCaptureComponent2D>(this);
@@ -91,7 +107,7 @@ AValdradaClient::FCam& AValdradaClient::CamFor(const FCaptureJob& J)
 	};
 	if (!K.Rgb && J.Outputs.Contains(TEXT("rgb")))
 	{
-		K.Rgb = Make(SCS_FinalColorLDR, PF_B8G8R8A8, K.RgbRT);
+		K.Rgb = Make(SCS_FinalColorLDR, PF_B8G8R8A8, K.RgbRT, false);
 		K.Rgb->bAlwaysPersistRenderingState = true;
 		K.Rgb->bUseRayTracingIfEnabled = true;
 		// a scene capture turns Lumen off unless its own settings ask for it (SceneCaptureRendering.cpp): the world's GI and
@@ -101,6 +117,15 @@ AValdradaClient::FCam& AValdradaClient::CamFor(const FCaptureJob& J)
 		PS.bOverride_ReflectionMethod = true; PS.ReflectionMethod = EReflectionMethod::Lumen;
 		PS.bOverride_LumenSurfaceCacheResolution = true; PS.LumenSurfaceCacheResolution = 1.f;
 		K.Rgb->PostProcessBlendWeight = 1.f;
+		if (J.Mode == TEXT("pathtrace"))
+		{
+			// Unreal's path tracer in place of the raster frame: 3 bounces, the denoiser (NNEDenoiser) on the last sample;
+			// the accumulation starts again whenever the camera or the scene moved
+			K.Rgb->ShowFlags.SetPathTracing(true);
+			PS.bOverride_PathTracingMaxBounces = true; PS.PathTracingMaxBounces = 3;
+			PS.bOverride_PathTracingSamplesPerPixel = true; PS.PathTracingSamplesPerPixel = J.Spp;
+			PS.bOverride_PathTracingEnableDenoiser = true; PS.PathTracingEnableDenoiser = true;
+		}
 		// its own film look (the world's, M_bx_film, blended over at full weight), so its exposure is its own
 		if (FilmMID)
 		{
@@ -123,6 +148,20 @@ AValdradaClient::FCam& AValdradaClient::CamFor(const FCaptureJob& J)
 		K.Sem->ShowFlags.SetBloom(false);
 		K.Sem->ShowFlags.SetDynamicShadows(false);
 	}
+	// the denoiser's guides for a path-traced frame denoised outside (tools/core/oidn_worker.py): the surfaces' base colour
+	// and their world normals from the raster passes, without temporal jitter
+	if (!K.Alb && J.Outputs.Contains(TEXT("albedo")))
+	{
+		K.Alb = Make(SCS_BaseColor, PF_B8G8R8A8, K.AlbRT);
+		K.Alb->ShowFlags.SetAntiAliasing(false);
+		K.Alb->ShowFlags.SetTemporalAA(false);
+	}
+	if (!K.Nrm && J.Outputs.Contains(TEXT("normal")))
+	{
+		K.Nrm = Make(SCS_Normal, PF_FloatRGBA, K.NrmRT);
+		K.Nrm->ShowFlags.SetAntiAliasing(false);
+		K.Nrm->ShowFlags.SetTemporalAA(false);
+	}
 	// (semantic reads the depth too: the sky is where nothing is drawn)
 	if (!K.Depth && (J.Outputs.Contains(TEXT("depth")) || J.Outputs.Contains(TEXT("semantic"))))
 	{
@@ -141,14 +180,30 @@ void AValdradaClient::StepCaptures()
 	if (Captures.Num() == 0) return;
 	FCaptureJob& J = Captures[0];
 	FCam& K = CamFor(J);
-	for (USceneCaptureComponent2D* C : { K.Rgb.Get(), K.Depth.Get(), K.Sem.Get() })
+	for (USceneCaptureComponent2D* C : { K.Rgb.Get(), K.Depth.Get(), K.Sem.Get(), K.Alb.Get(), K.Nrm.Get() })
 		if (C) { C->SetWorldLocationAndRotation(J.Pose.GetLocation(), J.Pose.GetRotation()); C->FOVAngle = J.HFovDeg; }
+	if (K.Rgb && J.Mode == TEXT("pathtrace"))
+	{
+		K.Rgb->PostProcessSettings.PathTracingSamplesPerPixel = J.Spp;
+		// (a new frame: its first render starts the accumulation; the remaining spp - 1 add to it, the last is denoised)
+		if (PathTraceExt && J.WarmLeft == J.Spp - 1) PathTraceExt->bResetNext = true;
+		K.Rgb->PostProcessSettings.PathTracingEnableDenoiser = J.bDenoise;
+	}
+	if (J.bBurst || J.Mode == TEXT("pathtrace"))
+	{
+		// every warm render in this tick: nothing moves between them
+		ApplyExposure(K, J);
+		if (J.TRender == 0) J.TRender = FPlatformTime::Seconds();
+		for (; J.WarmLeft > 0; --J.WarmLeft) if (K.Rgb) { K.Rgb->CaptureScene(); ++J.Renders; }
+	}
 	if (J.WarmLeft > 0)
 	{
 		if (K.Rgb)
 		{
 			ApplyExposure(K, J);
+			if (J.TRender == 0) J.TRender = FPlatformTime::Seconds();
 			K.Rgb->CaptureScene();
+			++J.Renders;
 			// after a cut (a new camera, a teleport) each warm frame is metered, so the image read is exposed for its
 			// own view; otherwise the last image's metering carries over (one tick behind, the view barely moved)
 			if (J.bAutoExposure && J.bCut)
@@ -197,21 +252,57 @@ void AValdradaClient::Finish(FCaptureJob& J)
 		TArray<uint8>& Out = Planes.AddDefaulted_GetRef();
 		if (O == TEXT("rgb") && K.Rgb)
 		{
+			if (J.TRender == 0) J.TRender = FPlatformTime::Seconds();
 			ApplyExposure(K, J);
 			K.Rgb->CaptureScene();
+			// (the breakdown: the frame's renders through the GPU, the path tracer's denoising included, then the
+			// read back and the copy into the reply)
+			FlushRenderingCommands();
+			const double T1 = FPlatformTime::Seconds();
 			TArray<FColor> Px;
 			FTextureRenderTargetResource* R = K.RgbRT->GameThread_GetRenderTargetResource();
 			if (!R || !R->ReadPixels(Px) || Px.Num() != NPx) { Fail(J, TEXT("internal"), TEXT("rgb read back failed")); return; }
+			const double T2 = FPlatformTime::Seconds();
 			Timing->SetNumberField(TEXT("exposure_ev"), (J.bAutoExposure ? K.EV : 0.f) + J.ExposureComp);
 			if (J.bAutoExposure) Meter(K, J, Px);
 			Out.SetNumUninitialized(NPx * 4);
 			for (int64 I = 0; I < NPx; ++I) { const FColor& C = Px[I]; uint8* D = Out.GetData() + I * 4; D[0] = C.R; D[1] = C.G; D[2] = C.B; D[3] = 255; }
+			Timing->SetNumberField(TEXT("render_ms"), (T1 - J.TRender) * 1000.0);
+			Timing->SetNumberField(TEXT("readback_ms"), (T2 - T1) * 1000.0);
+			Timing->SetNumberField(TEXT("convert_ms"), (FPlatformTime::Seconds() - T2) * 1000.0);
+			Timing->SetNumberField(TEXT("renders"), J.Renders + 1);
 			Timing->SetNumberField(TEXT("rgb_ms"), (FPlatformTime::Seconds() - T) * 1000.0);
 		}
 		else if (O == TEXT("depth") && Depth.Num() == NPx)
 		{
 			Out.SetNumUninitialized(NPx * 4);
 			FMemory::Memcpy(Out.GetData(), Depth.GetData(), NPx * 4);
+		}
+		else if (O == TEXT("albedo") && K.Alb)
+		{
+			K.Alb->CaptureScene();
+			TArray<FColor> Px;
+			FTextureRenderTargetResource* R = K.AlbRT->GameThread_GetRenderTargetResource();
+			if (!R || !R->ReadPixels(Px) || Px.Num() != NPx) { Fail(J, TEXT("internal"), TEXT("albedo read back failed")); return; }
+			Out.SetNumUninitialized(NPx * 4);
+			for (int64 I = 0; I < NPx; ++I) { const FColor& C = Px[I]; uint8* D = Out.GetData() + I * 4; D[0] = C.R; D[1] = C.G; D[2] = C.B; D[3] = 255; }
+			Timing->SetNumberField(TEXT("albedo_ms"), (FPlatformTime::Seconds() - T) * 1000.0);
+		}
+		else if (O == TEXT("normal") && K.Nrm)
+		{
+			// (world normals as rgba8: 0.5 + 0.5 n)
+			K.Nrm->CaptureScene();
+			TArray<FLinearColor> Px;
+			FTextureRenderTargetResource* R = K.NrmRT->GameThread_GetRenderTargetResource();
+			if (!R || !R->ReadLinearColorPixels(Px) || Px.Num() != NPx) { Fail(J, TEXT("internal"), TEXT("normal read back failed")); return; }
+			Out.SetNumUninitialized(NPx * 4);
+			for (int64 I = 0; I < NPx; ++I)
+			{
+				const FLinearColor& C = Px[I]; uint8* D = Out.GetData() + I * 4;
+				D[0] = uint8(FMath::Clamp(0.5f + 0.5f * C.R, 0.f, 1.f) * 255.f + 0.5f); D[1] = uint8(FMath::Clamp(0.5f + 0.5f * C.G, 0.f, 1.f) * 255.f + 0.5f);
+				D[2] = uint8(FMath::Clamp(0.5f + 0.5f * C.B, 0.f, 1.f) * 255.f + 0.5f); D[3] = 255;
+			}
+			Timing->SetNumberField(TEXT("normal_ms"), (FPlatformTime::Seconds() - T) * 1000.0);
 		}
 		else if (O == TEXT("semantic") && K.Sem)
 		{
@@ -284,7 +375,10 @@ void AValdradaClient::ApplyExposure(FCam& K, const FCaptureJob& J)
 {
 	if (!K.Film) return;
 	const float EV = (J.bAutoExposure ? K.EV : 0.f) + J.ExposureComp;
-	K.Film->SetScalarParameterValue(TEXT("Expo"), PresetExpo * FMath::Pow(2.f, EV));
+	const float Expo = PresetExpo * FMath::Pow(2.f, EV);
+	if (Expo == K.LastExpo) return;
+	K.LastExpo = Expo;
+	K.Film->SetScalarParameterValue(TEXT("Expo"), Expo);
 }
 
 void AValdradaClient::Meter(FCam& K, const FCaptureJob& J, const TArray<FColor>& Px)

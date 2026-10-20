@@ -65,7 +65,7 @@ python PythonAPI/examples/intersection_120_amsterdam.py
 ```
 npm install && (cd client && npm install)
 # binary banks (tiles, models, textures): download, or compile the tiles (BUILDING.md)
-hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.5.0 \
+hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.5.1 \
     --include "Content/tiles/*" --include "Content/models/*" --include "Content/textures/*" --local-dir .cache/hf
 mv .cache/hf/Content/tiles .cache/hf/Content/models .cache/hf/Content/textures client/public/
 cd client && npm run dev        # http://127.0.0.1:5219
@@ -126,7 +126,7 @@ The [guide](https://mkturkcan.github.io/valdrada/ue-client/) gives the requireme
 renderer serves so far; [building it from source](https://mkturkcan.github.io/valdrada/ue-client-build/) covers the
 engine, the city's content, cooking, chunking and publishing on Linux and Windows. The renderer is distributed under
 the Unreal Engine End User License Agreement; the repository's code stays MIT.
-Release 0.5.0 provides the Linux x86-64 build (29 files, 29.7 GB to download, 46.5 GB installed); the Windows x64
+Release 0.5.1 provides the Linux x86-64 build (32 files, 35.4 GB to download, 52.3 GB installed); the Windows x64
 build is made from source as the build guide describes.
 
 ## Coverage
@@ -196,7 +196,7 @@ rendered with it, please cite Valdrada itself:
   author  = {Turkcan, Mehmet Kerem},
   title   = {{Valdrada}: a real-data, real-time digital twin of New York City},
   year    = {2026},
-  version = {0.5.0},
+  version = {0.5.1},
   url     = {https://github.com/mkturkcan/valdrada}
 }
 ```

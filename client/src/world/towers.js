@@ -405,7 +405,7 @@ export function buildTower(buf, ring, cx, cz, y0, topY, b, opts = {}) {
   const crownFlags = FF.BLIND | FF.CROWN;       // coursed masonry crown, floodlit at night
   const obb = ringOBB(ring);
   const rectness = b.area / Math.max(1, obb.w * obb.h);
-  const kind = crownKind(b);
+  const kind = opts.kind || crownKind(b);   // FP18: a penthouse's roof takes the plain bulkhead (opts.kind 'flat')
   const r0 = hash1(cv * 617.3 + 1.7), r1 = hash1(cv * 311.7 + 5.3), r2 = hash1(cv * 907.1 + 11.9);
   const masonry = MASONRY.has(b.style);
   // FB38: the decks a piece can stand on, lowest first (the roof over the footprint, then each crown tier)
@@ -641,19 +641,22 @@ export function buildSetbacks(buf, ring, cx, cz, y0, topY, b, opts, extrudePrism
   const h = b.height;
   const cv = b.colorVar;
   const R = meanRadius(ring, cx, cz);
-  const tiers = h > 150 ? 4 : h > 90 ? 3 : 2;
+  // FP18: opts.pentY / pentStep, a pre-war tower's penthouse storey: two tiers, the street wall to pentY, then the
+  // penthouse set back pentStep metres (a true offset) on its terrace
+  const pent = opts.pentY > y0 && opts.pentY < topY;
+  const tiers = pent ? 2 : h > 150 ? 4 : h > 90 ? 3 : 2;
   const stepM = Math.max(1.6, Math.min(9, R * 0.19));
   // tier tops: the base block holds the street wall, the steps come fast, the
   // tower takes the top half
   const frac = tiers === 4 ? [0.34, 0.50, 0.63, 1.0] : tiers === 3 ? [0.38, 0.56, 1.0] : [0.46, 1.0];
   let cur = ring, prevY = y0, ringsOut = [];
   for (let t = 0; t < tiers; t++) {
-    const yT = t === tiers - 1 ? topY : y0 + h * frac[t];
+    const yT = t === tiers - 1 ? topY : pent ? opts.pentY : y0 + h * frac[t];
     if (t === 0) extrudePrism(buf, cur, opts.fndY, yT, b, opts);
     else extrudePrism(buf, cur, prevY, yT, b, { baseRef: y0, noStore: true });
     // terrace deck left by the step above
     if (t < tiers - 1) {
-      const next = insetM(cur, stepM * (0.85 + hash1(cv * 97 + t * 9.1) * 0.4), cx, cz, 0.26);
+      const next = pent ? insetFB(cur, opts.pentStep, cx, cz, 0.26) : insetM(cur, stepM * (0.85 + hash1(cv * 97 + t * 9.1) * 0.4), cx, cz, 0.26);
       // an inset of an L / U / notched footprint can flip a vertex outside the ring or fold the
       // polygon; extruded, that is a thin 250 m wall with a slab arm to the crown (critic r5, the
       // "needle over Midtown"). Every inset vertex must stay inside the tier below and the tier

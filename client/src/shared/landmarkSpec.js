@@ -8,7 +8,7 @@ export const LANDMARKS = [
   { id: 1,  key: 'lowLibrary',      name: 'Low Memorial Library',        lat: 40.80800, lon: -73.96188, mode: 'replace' },
   { id: 2,  key: 'butlerLibrary',   name: 'Butler Library',              lat: 40.80642, lon: -73.96319, mode: 'replace' },
   // CR24: was lon -73.96035, 55 m east of the chapel, inside Fayerweather Hall's footprint (the chapel replaced Fayerweather
-  // and the real chapel drew as a generic hall); this point is the chapel's own crossing (refs/earth/col_earth_north.png)
+  // and the real chapel drew as a generic hall); this point is the chapel's own crossing (the reference north view)
   { id: 3,  key: 'stPaulsChapel',   name: "St. Paul's Chapel (Columbia)",lat: 40.807854, lon: -73.960942, mode: 'replace' },
   { id: 4,  key: 'riversideChurch', name: 'Riverside Church',            lat: 40.81110, lon: -73.96420, mode: 'replace' },
   { id: 5,  key: 'grantsTomb',      name: "General Grant National Memorial", lat: 40.81340, lon: -73.96320, mode: 'replace' },
@@ -130,7 +130,7 @@ export const DISTRICTS = [
   { key: 'columbia', style: 'COLUMBIA_CAMPUS', // full Morningside superblock: 114th-120th, Broadway-Amsterdam (property lines, fit from CSCL)
     poly: [[-73.96465, 40.80674], [-73.9621, 40.80566], [-73.95945, 40.80929], [-73.96203, 40.81037]] },
   // Teachers College block (W 120th-121st, Amsterdam-Broadway): red brick + limestone Collegiate Gothic halls, no shops,
-  // no fire escapes, no wooden tanks (refs/earth/amst120_top.png, refs/streetview/amst120; owner 2026-09-15)
+  // no fire escapes, no wooden tanks (the reference views; owner 2026-09-15)
   { key: 'teachersCollege', style: 'TEACHERS_COLLEGE',
     poly: [[-73.95945, 40.80929], [-73.96203, 40.81037], [-73.96157, 40.81100], [-73.95899, 40.80992]] },
   { key: 'soho', style: 'CAST_IRON',
@@ -140,20 +140,20 @@ export const DISTRICTS = [
 ];
 
 // Per-building TRUTH overrides (owner 2026-09-15): a (lat, lon) inside the footprint plus the facade facts read off
-// reference imagery (refs/earth, refs/streetview — reference only, never shipped). The compiler applies them AFTER
+// reference imagery (reference only, never shipped). The compiler applies them AFTER
 // classify() and the district rules, so a campus building can escape the McKim copper-roof treatment when it is a
 // 1961 brick tower. Fields: style (STYLE key), color [r,g,b], roofKind shape (0 flat, 1 gable, 2 hip), floors,
 // floorH, winW, storeH, set/clear (BF flag names), wall (nycDress wall family, applied at read time only). Missing fields
 // keep the classifier's value.
 export const BUILDING_OVERRIDES = [
-  // ---- W 120th St & Amsterdam Ave, Morningside Heights (refs/earth/amst120_*.png, refs/streetview/amst120/*) ----
+  // ---- W 120th St & Amsterdam Ave, Morningside Heights (the reference views) ----
   { key: 'muddHall', name: 'Seeley W. Mudd Hall (Columbia Engineering, 1961)', lat: 40.80939, lon: -73.96005,
     // PROJECT_BRICK = red-brown brick, regular small windows, no cornice/sills/AC clutter: the closest style to a 1961
     // engineering tower (the critic read the PREWAR_APT version as an apartment block, docs/notes/amst120-critic.md)
     style: 'PROJECT_BRICK', color: [112, 60, 46], roofKind: 0, floors: 14, floorH: 4.6, winW: 1.8, storeH: 0,
     clear: ['CORNICE', 'WATERTOWER', 'STOREFRONT', 'SETBACKS', 'FIRE_ESCAPE'] },
   // CR24: the old point (40.80957, -73.96043) fell in a 32 m2 sliver between CEPSR and Mudd; this one is inside CEPSR, whose
-  // crown is a pale copper-green mansard with a flat top (refs/earth/col_earth_north.png)
+  // crown is a pale copper-green mansard with a flat top (the reference north view)
   { key: 'schapiroCepsr', name: 'Schapiro CEPSR (Columbia, 1992)', lat: 40.809604, lon: -73.960750,
     style: 'POSTWAR_BRICK', color: [150, 78, 58], roofKind: 2, storeH: 0, roof: { form: 'mansard', tone: 'pale', dormers: 0 },
     clear: ['CORNICE', 'WATERTOWER', 'STOREFRONT', 'SETBACKS'] },
@@ -164,9 +164,8 @@ export const BUILDING_OVERRIDES = [
     set: ['CORNICE'], clear: ['STOREFRONT', 'WATERTOWER', 'FIRE_ESCAPE'] },
   { key: 'tcLowWing', name: 'Teachers College low wing on W 120th', lat: 40.80983, lon: -73.95953,
     style: 'PREWAR_APT', color: [158, 74, 52], roofKind: 0, storeH: 0, clear: ['STOREFRONT', 'WATERTOWER'] },
-  // ---- COLUMBIA MORNINGSIDE CAMPUS ROOFS (CR24, owner 2026-09-24: "Columbia buildings' roofs are missing; look at Google
-  // Earth images etc. to see what they look like and implement them correctly"). Read off refs/earth/col_earth_{top,north,n,
-  // e,w}.png (reference only, never shipped). `roof` is runtime-only (tiledata.js -> assemble.js crPlan): form 'mansard'
+  // ---- COLUMBIA MORNINGSIDE CAMPUS ROOFS (CR24, owner 2026-09-24: "Columbia buildings' roofs are missing"). Read off the reference views (top, north, east and
+  // west; reference only, never shipped). `roof` is runtime-only (tiledata.js -> assemble.js crPlan): form 'mansard'
   // (steep copper holding the attic storey, flat top), 'hip' (to a ridge), 'dome', 'flat'; tone 'mint' (verdigris) or 'pale'
   // (the grey-green of Kent, Hamilton, Journalism, Havemeyer); dormers (row density, 0 = none); chimneys (count); domes
   // (observatory domes on the top). Points are the pole of inaccessibility of each compiled footprint.

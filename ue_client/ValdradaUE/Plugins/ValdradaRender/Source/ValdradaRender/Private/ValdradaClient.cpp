@@ -1,6 +1,7 @@
 #include "ValdradaClient.h"
 #include "ValdradaLink.h"
 #include "ValdradaFrames.h"
+#include "ValdradaPathTraceExt.h"
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
 #include "Components/DirectionalLightComponent.h"
@@ -10,8 +11,11 @@
 #include "Engine/DirectionalLight.h"
 #include "Engine/PostProcessVolume.h"
 #include "Engine/SkyLight.h"
+#include "Engine/ExponentialHeightFog.h"
+#include "Components/ExponentialHeightFogComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
+#include "Engine/GameViewportClient.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialParameterCollection.h"
@@ -20,6 +24,8 @@
 #include "Misc/Parse.h"
 #include "HAL/IConsoleManager.h"
 #include "Misc/FileHelper.h"
+#include "Serialization/JsonSerializer.h"
+#include "Serialization/JsonWriter.h"
 #include "Misc/Paths.h"
 #include "HAL/FileManager.h"
 #include "Materials/Material.h"
@@ -64,6 +70,13 @@ void AValdradaClient::BeginPlay()
 	if (FParse::Value(FCommandLine::Get(), TEXT("ValdradaPort="), P)) Port = P;
 	if (FParse::Value(FCommandLine::Get(), TEXT("ValdradaTier="), S)) Tier = S;
 	if (FParse::Value(FCommandLine::Get(), TEXT("ValdradaTables="), S)) TablesDir = S;
+	bNoView = FParse::Param(FCommandLine::Get(), TEXT("ValdradaNoView"));
+	// the runtime of the path tracer's denoiser (NNEDenoiser): -ValdradaDenoiser=cpu|gpu|rdg. On Linux only ORT's CPU runtime
+	// works (0.4-1.2 s a 2560x1440 frame by model and load): NNERuntimeRDGHlsl is not enabled for Vulkan, and with it enabled
+	// (bSupportsNNEShaders) its images were wrong
+	if (FParse::Value(FCommandLine::Get(), TEXT("ValdradaDenoiser="), S))
+		if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("NNEDenoiser.Runtime.Type")))
+			V->Set(S == TEXT("rdg") ? TEXT("2") : S == TEXT("gpu") ? TEXT("1") : TEXT("0"), ECVF_SetByCode);
 	if (FPaths::IsRelative(TablesDir)) TablesDir = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectDir(), TablesDir));
 	LoadCity();
 	// the streaming's per-frame budgets (ms, components), raised: a renderer that is loading draws nothing anyone reads, and
@@ -72,7 +85,9 @@ void AValdradaClient::BeginPlay()
 		{ TEXT("s.LevelStreamingActorsUpdateTimeLimit"), TEXT("50") }, { TEXT("s.PriorityLevelStreamingActorsUpdateExtraTime"), TEXT("50") },
 		{ TEXT("s.UnregisterComponentsTimeLimit"), TEXT("20") }, { TEXT("s.AsyncLoadingTimeLimit"), TEXT("50") },
 		{ TEXT("s.PriorityAsyncLoadingExtraTime"), TEXT("50") }, { TEXT("s.LevelStreamingComponentsRegistrationGranularity"), TEXT("500") },
-		{ TEXT("s.LevelStreamingComponentsUnregistrationGranularity"), TEXT("100") } })
+		{ TEXT("s.LevelStreamingComponentsUnregistrationGranularity"), TEXT("100") },
+		// (the path tracer's progress bar would be drawn into the captures)
+		{ TEXT("r.PathTracing.ProgressDisplay"), TEXT("0") } })
 		if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(CV.Key)) V->Set(CV.Value, ECVF_SetByCode);
 	SetupEnvironment();
 	SemanticMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Client/Materials/M_client_semantic.M_client_semantic"));
@@ -97,6 +112,7 @@ void AValdradaClient::BeginPlay()
 	Link = MakeUnique<FValdradaLink>(Host, Port);
 	Link->Start();
 	ExitWatch = MakeUnique<FValdradaExitWatch>(Link.Get(), 3.f);
+	PathTraceExt = FSceneViewExtensions::NewExtension<FValdradaPathTraceExt>();
 	Note(FString::Printf(TEXT("renderer client: core %s:%d, tier %s, tables %s, city %s"), *Host, Port, *Tier, *TablesDir, City.bOk ? TEXT("loaded") : TEXT("MISSING")));
 }
 
@@ -162,6 +178,8 @@ void AValdradaClient::Tick(float DeltaSeconds)
 	if (ViewCam)
 		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 			if (PC->GetViewTarget() != ViewCam) PC->SetViewTarget(ViewCam);
+	if (bNoView)
+		if (UGameViewportClient* GV = GetWorld()->GetGameViewport()) GV->bDisableWorldRendering = true;
 	if (Link && Link->TakeConnectedEdge()) SendHello();
 	FValdradaMessage M;
 	int32 N = 0;
@@ -332,7 +350,7 @@ void AValdradaClient::ApplyEnv(const TSharedPtr<FJsonObject>& Env)
 		if (SkyLight) SkyLight->GetLightComponent()->RecaptureSky();
 		UE_LOG(LogValdrada, Log, TEXT("time of day %s: sun %.0f / %.0f deg"), *Tod, T.Elev, T.Azim);
 	}
-	if (Night != NightValue)
+	if (FMath::Abs(Night - double(NightValue)) > 1e-4)   // (a float against the message's double: equal values compared unequal every state)
 	{
 		NightValue = float(Night);
 		// the night factor of world/sky.js: lit windows, lamps and headlamps in the city's materials (MPC_r1c.Night, as the
@@ -341,7 +359,10 @@ void AValdradaClient::ApplyEnv(const TSharedPtr<FJsonObject>& Env)
 			if (UMaterialParameterCollectionInstance* I = GetWorld()->GetParameterCollectionInstance(NightMPC))
 				I->SetScalarParameterValue(TEXT("Night"), NightValue);
 	}
+	ApplyEnvLook(Env, Tod != LastLookTod);
+	LastLookTod = Tod;
 }
+
 
 void AValdradaClient::ApplyView(const TSharedPtr<FJsonObject>& View)
 {
@@ -351,4 +372,108 @@ void AValdradaClient::ApplyView(const TSharedPtr<FJsonObject>& View)
 	View->TryGetNumberField(TEXT("aspect"), Aspect);
 	ViewCam->SetActorLocationAndRotation(Valdrada::Pos(P[0], P[1], P[2]), Valdrada::CameraRotation(Q[0], Q[1], Q[2], Q[3]));
 	ViewCam->GetCameraComponent()->SetFieldOfView(Valdrada::HFov(Fov, Aspect));
+}
+
+// A take's own light where the env names it (a replay of a recorded take: tools/core/replay.mjs reads the take's
+// harvest): `sun` {dir (toward the sun, the core's frame), intensity, color (linear)}, `film` (M_bx_film's parameters:
+// Expo and the grade), `aerial` {scale, start_km}. Applied over the time of day's preset, once each until they change.
+void AValdradaClient::ApplyEnvLook(const TSharedPtr<FJsonObject>& Env, bool bForce)
+{
+	// (once until it changes, or the time of day's preset was set again under it)
+	FString Key;
+	bool bRT = true;
+	if (Env->TryGetBoolField(TEXT("skylight_realtime"), bRT)) Key += bRT ? TEXT("rt1") : TEXT("rt0");
+	for (const TCHAR* F : { TEXT("sun"), TEXT("film"), TEXT("aerial"), TEXT("fog"), TEXT("atmosphere") })
+	{
+		const TSharedPtr<FJsonObject>* X = nullptr;
+		if (!Env->TryGetObjectField(F, X)) continue;
+		FString T;
+		FJsonSerializer::Serialize(X->ToSharedRef(), TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&T));
+		Key += T;
+	}
+	if (Key.IsEmpty() || (Key == LastLook && !bForce)) return;
+	LastLook = Key;
+	const TSharedPtr<FJsonObject>* O = nullptr;
+	if (Env->TryGetObjectField(TEXT("sun"), O) && Sun)
+	{
+		double D[3], C[3] = { 1, 1, 1 }, I = 0;
+		if (Valdrada::Num3(*O, TEXT("dir"), D, 3))
+		{
+			Sun->SetActorRotation(Valdrada::Dir(-D[0], -D[1], -D[2]).Rotation());
+			if (Moon) Moon->GetLightComponent()->SetVisibility(D[1] < -0.02);
+			Sun->GetLightComponent()->SetVisibility(D[1] > -0.02);
+		}
+		if ((*O)->TryGetNumberField(TEXT("intensity"), I)) Sun->GetLightComponent()->SetIntensity(float(I));
+		if (Valdrada::Num3(*O, TEXT("color"), C, 3)) Sun->GetLightComponent()->SetLightColor(FLinearColor(float(C[0]), float(C[1]), float(C[2])));
+	}
+	if (Env->TryGetObjectField(TEXT("film"), O) && FilmMID)
+	{
+		for (const auto& KV : (*O)->Values)
+		{
+			const FName P(*FString(*KV.Key));
+			const float V = float(KV.Value->AsNumber());
+			FilmMID->SetScalarParameterValue(P, V);
+			for (auto& C : Cams) if (C.Value.Film) C.Value.Film->SetScalarParameterValue(P, V);
+			if (P == FName(TEXT("Expo"))) PresetExpo = V;
+		}
+		for (auto& C : Cams) C.Value.LastExpo = -1.f;
+	}
+	if (Env->TryGetObjectField(TEXT("fog"), O))
+	{
+		// an exponential height fog at street level, as ue_light.py's cinematic preset sets it (density, falloff, cap,
+		// cutoff m, inscattering, the volumetric part within vol_distance m)
+		if (!Fog)
+		{
+			FActorSpawnParameters SP;
+			SP.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+			Fog = GetWorld()->SpawnActor<AExponentialHeightFog>(AExponentialHeightFog::StaticClass(), FTransform::Identity, SP);
+		}
+		if (UExponentialHeightFogComponent* F = Fog ? Fog->GetComponent() : nullptr)
+		{
+			double V = 0, C[3];
+			if ((*O)->TryGetNumberField(TEXT("density"), V)) F->FogDensity = float(V);
+			if ((*O)->TryGetNumberField(TEXT("falloff"), V)) F->FogHeightFalloff = float(V);
+			if ((*O)->TryGetNumberField(TEXT("max_opacity"), V)) F->FogMaxOpacity = float(V);
+			if ((*O)->TryGetNumberField(TEXT("cutoff_m"), V)) F->FogCutoffDistance = float(V * 100.0);
+			if (Valdrada::Num3(*O, TEXT("inscatter"), C, 3)) F->FogInscatteringLuminance = FLinearColor(float(C[0]), float(C[1]), float(C[2]));
+			bool B = false;
+			if ((*O)->TryGetBoolField(TEXT("volumetric"), B)) F->bEnableVolumetricFog = B;
+			if ((*O)->TryGetNumberField(TEXT("vol_distance_m"), V)) F->VolumetricFogDistance = float(V * 100.0);
+			F->StartDistance = 0.f;
+			F->VolumetricFogStartDistance = 0.f;
+			F->VolumetricFogScatteringDistribution = 0.6f;
+			F->VolumetricFogAlbedo = FColor(235, 235, 235);
+			F->VolumetricFogExtinctionScale = 1.f;
+			F->MarkRenderStateDirty();
+		}
+	}
+	bool bRealTime = true;
+	if (Env->TryGetBoolField(TEXT("skylight_realtime"), bRealTime) && SkyLight)
+	{
+		// (the path tracer restarts its accumulation whenever the sky light's capture changes: a real-time capture is
+		// taken once and kept for a path-traced replay)
+		USkyLightComponent* SL = SkyLight->GetLightComponent();
+		SL->SetRealTimeCapture(bRealTime);
+		SL->RecaptureSky();
+	}
+	if (Env->TryGetObjectField(TEXT("aerial"), O) && Atmosphere)
+	{
+		double V = 0;
+		if ((*O)->TryGetNumberField(TEXT("scale"), V)) Atmosphere->GetComponent()->SetAerialPespectiveViewDistanceScale(float(V));
+		if ((*O)->TryGetNumberField(TEXT("start_km"), V)) Atmosphere->GetComponent()->SetAerialPerspectiveStartDepth(float(V));
+	}
+	if (Env->TryGetObjectField(TEXT("atmosphere"), O) && Atmosphere)
+	{
+		// the sky atmosphere's scattering against the engine's defaults (scales), its planet's ground albedo (linear) and
+		// the raster's multiple-scattering factor: the path tracer's reference atmosphere takes them as its medium
+		USkyAtmosphereComponent* A = Atmosphere->GetComponent();
+		const USkyAtmosphereComponent* D = GetDefault<USkyAtmosphereComponent>();
+		double V = 0, C[3];
+		if ((*O)->TryGetNumberField(TEXT("rayleigh"), V)) A->SetRayleighScatteringScale(float(D->RayleighScatteringScale * V));
+		if ((*O)->TryGetNumberField(TEXT("mie"), V)) A->SetMieScatteringScale(float(D->MieScatteringScale * V));
+		if ((*O)->TryGetNumberField(TEXT("mie_absorption"), V)) A->SetMieAbsorptionScale(float(D->MieAbsorptionScale * V));
+		if ((*O)->TryGetNumberField(TEXT("mie_g"), V)) A->SetMieAnisotropy(float(V));
+		if ((*O)->TryGetNumberField(TEXT("multi_scattering"), V)) A->SetMultiScatteringFactor(float(V));
+		if (Valdrada::Num3(*O, TEXT("ground_albedo"), C, 3)) A->SetGroundAlbedo(FLinearColor(float(C[0]), float(C[1]), float(C[2])).ToFColor(true));
+	}
 }

@@ -14,7 +14,7 @@ import { LightProbeGenerator } from 'three/addons/lights/LightProbeGenerator.js'
 // PURE-BLACK half or box: the bloom mip chain spreads one NaN over whole blocks (NaN + colour = NaN, and bloom strength
 // 0 still adds 0 x NaN), and the TAA history keeps it. It is deterministic per pose, so no re-shoot cures it:
 // mMidtownSky frames 0/17/22/24/27/47/63/69 in both recording passes, all whole with the guard. Very likely the
-// round-15 "composer void" of wbEarthBroadway too (not re-rendered). NaN / Inf are tested by bit pattern, because FXC
+// round-15 "composer void" of wbBroadway too (not re-rendered). NaN / Inf are tested by bit pattern, because FXC
 // is allowed to fold isnan() and x != x away.
 const NF_GLSL = /* glsl */ `
   bool nfBad(float x) { return (floatBitsToUint(x) & 0x7F800000u) == 0x7F800000u; }
@@ -1391,8 +1391,8 @@ export class Engine {
       };
       this.renderer.setOpaqueSort(this._opaqueSortBS);
     }
-    // ?fov=<deg>: vertical field of view (default 66). The trailer's Google Earth <-> twin swipes render the twin with the
-    // Earth web camera's own 35 deg lens and pose so the wipe reveals the same framing (owner 2026-09-16).
+    // ?fov=<deg>: vertical field of view (default 66). The trailer's reference <-> twin swipes render the twin with the
+    // reference camera's own 35 deg lens and pose so the wipe reveals the same framing (owner 2026-09-16).
     const fovQ = typeof location !== 'undefined' ? parseFloat(new URLSearchParams(location.search).get('fov')) : NaN;
     this.camera = new THREE.PerspectiveCamera(fovQ > 5 && fovQ < 150 ? fovQ : 66, innerWidth / innerHeight, 0.4, 22000);
     this.camera.position.set(0, 120, 200);

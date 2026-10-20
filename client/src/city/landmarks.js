@@ -1024,7 +1024,7 @@ export const BUILDERS = {
     trim.add(box(W - 2.6, 0.35, Dp - 1.0, 0, { y: ATT, z: zC }));
     // CR24 (owner 2026-09-24, "Columbia buildings' roofs are missing"): the copper is the cornice and the parapet RING.
     // Both were solid slabs over the whole plan with a copper pyramid on them, so from above Butler was one green lid;
-    // Google Earth (refs/earth/col_earth_top.png, col_earth_n.png, reference only) shows a flat pale deck carrying the
+    // The reference views (top and north) show a flat pale deck carrying the
     // stack penthouse and its plant, with the copper only round the edge.
     const ring4 = (bn, w, d, t, h, y) => {
       bn.add(box(w, h, t, 0, { y, z: zC + d / 2 - t / 2 }));
@@ -1218,7 +1218,7 @@ export const BUILDERS = {
     brk.into(r, 0x8b4d3b, { rough: 0.94 });
     lime.into(r, 0xd2cbb6, { rough: 0.84 });
     gls.into(r, 0x252b31, { rough: 0.3, metal: 0.12, flat: false });
-    cop.into(r, 0x6a7a5c, { rough: 0.7, metal: 0.08, flat: true });   // CR24: olive, older than the halls' copper (col_earth_e.png)
+    cop.into(r, 0x6a7a5c, { rough: 0.7, metal: 0.08, flat: true });   // CR24: olive, older than the halls' copper (the east view)
     brz.into(r, 0x463c30, { rough: 0.5, metal: 0.5 });
     return fin(g, ctx, [{ w: W + 4, h: CORN + 1.2, d: D, y: (CORN + 1.2) / 2 },
       { w: dr * 2, h: DRT, d: dr * 2, y: DRT / 2 }]);

@@ -180,3 +180,8 @@ code above; the Unreal plugin implements the same messages over the socket.
   `train_kinds` and `formats`; `render.capture` `exposure` `{mode: "auto" | "manual", compensation}` from the group's RGB
   camera (its attributes `exposure_mode` and `exposure_compensation`, EV).
 - The Unreal renderer: `ue_client/ValdradaUE` (the plugin ValdradaRender; its notes are the plugin's sources).
+  Since 0.5.1 it also reads fields of `render.capture` that the core does not send, used by the replay of a recorded take
+  (`tools/core/replay.mjs`): `mode` (`lumen`, the default, or `pathtrace`, Unreal's path tracer in place of the raster
+  frame), `spp` (the path tracer's samples a frame), `denoise` (its denoiser on the last sample, default true), `warm`
+  (the frames rendered before the one read) and `burst` (those frames in one engine tick); and it serves two more
+  outputs, `albedo` and `normal`, the guides of a denoiser run outside the renderer (`tools/core/oidn_worker.py`).

@@ -296,7 +296,7 @@ function applyBuildingOverride(b, o, rnd) {
 // ---------------------------------------------------------------- CY12 courtyards
 // The DOITT/OSM footprint of a pre-war apartment block is a DONUT: poly[0] is the street
 // outline and poly[1..] are the enclosed light courts the block is built around
-// (refs/earth/amst120_top.png: four of them on the SE block of 120th & Amsterdam alone).
+// (the reference top view: four of them on the SE block of 120th & Amsterdam alone).
 // The loader below used to keep poly[0] and throw the rest away, so such a block extruded
 // as one solid slab. Courts are kept here and wound CW, opposite the CCW outer ring — one
 // choice that does two jobs: earcut gets the hole winding it wants, and assemble.js's
@@ -2220,7 +2220,7 @@ for (const b of buildings) {
   // CY12 — FIRE ESCAPES ON THE COURT WALLS. On a pre-war New York apartment house the light
   // court is not decoration: it is what gives the interior rooms their legally required light
   // and their second means of egress, so the court walls carry MORE fire escapes than the
-  // street front, not fewer (refs/earth/amst120_top.png; every court on that block has them).
+  // street front, not fewer (the reference top view; every court on that block has them).
   // Runs outside the `frontEdges` block on purpose — a court's escapes do not depend on the
   // building having any street frontage at all.
   if ((b.holes || []).length && (c.flags & BF.FIRE_ESCAPE) && (c.floors || 0) >= 4 && b.h >= 11.5
@@ -2264,6 +2264,7 @@ const FURN_LIFT = FLAT ? 0.28 : CURB; // furniture base = sidewalk top (flat: BA
 // faces; ANALYTIC_WALKS=1 restores the old emitters for comparison
 const CONTOUR_WALKS = !process.env.ANALYTIC_WALKS;
 // XW11 crosswalk depth (the marked width of the crossing, measured ALONG the road it crosses).
+// MEASURED on client/ref_lenox.png, the near-nadir aerial plate of 125th & Lenox —
 // the only reference steep enough to measure both axes (scale anchored on parked vehicles,
 // 8.2 px/m N-S, and on the 22.7 m carriageway+median span, 9.3 px/m E-W):
 //   crossing of W 125 ST  bar length 76.5 px -> 8.2 m (27 ft), ladder span 18.3 m = the CSCL width
@@ -2933,9 +2934,9 @@ for (const r of roads) {
             const [, , dxE, dzE] = alongPolyline(r.pts, dirSign > 0 ? Math.max(0.2, L - 0.5) : Math.min(L - 0.2, 0.5));
             const hx = dxE * dirSign, hz = dzE * dirSign;
             const ex = exitsAt(node, hx, hz);
-            // MK14 (critic r14 #4/#5; refs/earth/amst120_obl_n.png): NYC marks the LEFT-turn lane of a two-way avenue with
+            // MK14 (critic r14 #4/#5; the reference oblique): NYC marks the LEFT-turn lane of a two-way avenue with
             // the arrow and the word ONLY UPSTREAM of it — the driver reads ONLY first, then the arrow nearer the stop bar
-            // (refs/earth amst120, z_e_road.png: ONLY / arrow / ONLY / arrow up the lane); RIGHT-turn arrows
+            // (the amst120 reference, z_e_road.png: ONLY / arrow / ONLY / arrow up the lane); RIGHT-turn arrows
             // are rare — only where the through movement does not exist (a forced turn) or on a wide one-way (3+ lanes).
             // Two adjacent lanes hooking opposite ways, and a turn arrow inside a kerbside bus lane, were both wrong.
             const rightArrow = ex.right && (!ex.through || (r.oneway !== 0 && lanesDirM >= 3));
@@ -2963,7 +2964,7 @@ for (const r of roads) {
         }
         // NYC bike lanes (CSCL bike_lane class codes): only a CLASS I (protected / greenway) lane
         // gets the green surface. A Class II conventional lane is a white edge line on plain asphalt
-        // (Amsterdam Ave at W 120th, refs/streetview/amst120 + refs/earth/amst120_top.png, owner
+        // (Amsterdam Ave at W 120th, the reference views, owner
         // 2026-09-15: no green anywhere on the avenue), and Class III is sharrows — no lane at all.
         // CSCL codes: 1 = I, 2 = II, 3 = III, 4 = links, 5 = I+II, 6 = II+III, 8 = I+III, 9 = II+I.
         // codes 10 (III+II) and 11 (III+I) carry a lane too; 3 (III sharrows), 4 (links) and 7 (stairs) do not.
@@ -4615,8 +4616,8 @@ log(' subway:', addPoints('subway.csv', FURN.SUBWAY_ENTRANCE, { faceRoad: true }
 log(' bikeracks:', addPoints('bikeracks.geojson', FURN.BIKE_RACK, { faceRoad: true }));
 
 // ---------------------------------------------------------------- TC13 backyard trees
-// THE BLOCK INTERIORS ARE BARE. Every leaf-on Earth reference of the low fabric
-// — refs/earth/wburg_bedford_swipe.png, harlem_brownstones_w122.png — shows the
+// THE BLOCK INTERIORS ARE BARE. Every leaf-on aerial reference of the low fabric
+// (Bedford Ave, the brownstones of W 122nd St) shows the
 // inside of a rowhouse block as a near-continuous canopy of grown rear-yard
 // trees, and the r13 critic scored it twice: "Solid block interiors. No rear
 // yards, no extensions, no backyard trees" (Williamsburg tell 5) and "B's trees
@@ -4734,7 +4735,7 @@ log('backyard trees (TC13)');
           YSP[(rnd() * YSP.length) | 0], 5 + ((rnd() * 12) | 0))) st.second++;
       // …and 12 m of open ground behind a rowhouse rear wall is not a garden,
       // it is a VACANT LOT — the ailanthus/mulberry stand that grows in every
-      // one of them, which is the other thing the Earth stills are full of.
+      // one of them, which is the other thing the reference stills are full of.
       // (place() still has to clear it of footprints, roadway and sidewalk.)
       if (depth >= 12 && rnd() < 0.35
         && place(depth - 1.5 - rnd() * 3, (rnd() - 0.5) * 11, YSP[(rnd() * YSP.length) | 0], 8 + ((rnd() * 16) | 0))) st.vacant++;
@@ -5114,7 +5115,7 @@ if (HAVE_CAMPUS && BOROS.includes(1)) { // campus is Manhattan data: a partial n
     const w = p.ped === 1 ? 16.5 : p.width || (brick ? 3.4 : 2.7);
     // TL26: brick ways stay at 0.16, 2 cm over the road datum (the College Walk apron meets Amsterdam's asphalt, zfight.md L10).
     // Their ribbons run wider than the walks and over the lawn beds beside them (College Walk: two rows of lawn panels
-    // either side of a grey walk, red brick only at the edges, refs/earth/col_earth_top.png), so the beds sit 4 cm above
+    // either side of a grey walk, red brick only at the edges, the reference top view), so the beds sit 4 cm above
     // them (lawnPoly 0.20 below) and the grey footway layer wins its ties with the brick at runtime (materials.js zb).
     ribbon(p.pts, w, brick ? 'brick' : 'pathTris', brick ? 0.16 : 0.12, !brick);
     brick ? nBrick++ : nPath++;

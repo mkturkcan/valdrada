@@ -59,13 +59,13 @@ const PRESETS = {
   // LB13 — THE SHADOW BUDGET (docs/notes/light-r13.md). `?lb13=0` restores the row below verbatim
   // (DAY_R12). Four changes, all day-only, so golden/dusk/night are bit-identical:
   //   azim 215 -> 128. 215 is 6 deg off the AVENUE bearing (209) and 186 deg from the heading every
-  //     Google-Earth swipe preset uses (29) — i.e. the camera looked straight down-sun, every visible
+  //     reference swipe preset uses (29) — i.e. the camera looked straight down-sun, every visible
   //     wall was the maximally lit set (cos 6 deg) and every cast shadow hid behind its own caster.
   //     Measured on the lens-matched pairs: 6-9 % of frame below L 80 against the photograph's 22-35 %,
   //     and a uniform darkening to the photograph's mean only reaches 12.6 % because the frame needs
   //     shadow STRUCTURE, not gain. 128 cross-lights the grid (walls facing 119 lit, 209 at 0.16 fill,
   //     29/299 dead) and is a real solar position at this latitude: dec ~0, i.e. ~10:15 on 20 Sept,
-  //     which is what Google's NYC captures are (m_lenox_earth: E-facing walls lit L 112, SSW-facing
+  //     which is what the aerial references are (m_lenox: E-facing walls lit L 112, SSW-facing
   //     walls L 69 and sky-blue, street-tree shadows running WSW).
   //   bnc 3.4 -> 1.5 and a new `hemi` 0.48 -> 0.80. The urban bounce was 5.2x the sky hemi (1.01 vs
   //     0.19 irradiance) and it is a HemisphereLight with no falloff, so a roof at 150 m took the full
@@ -77,7 +77,7 @@ const PRESETS = {
   //     horizontal surface: a 2.4:1 sun/fill ratio where a clear midday is 6-10:1.
   //   expoK 0.72. The meter sat PINNED at its 0.70 clamp floor (meterAvg 0.310 vs target 0.20), so
   //     lowering the target did nothing under the old rig — but taking the fill out drops meterAvg to
-  //     0.174 (measured, wbEarthBedford A/B) and the meter would then unpin and hand ~24 % of the
+  //     0.174 (measured, wbBedford A/B) and the meter would then unpin and hand ~24 % of the
   //     darkening straight back. 0.72 puts the loop's equilibrium (want = 0.144/0.174 = 0.83) exactly
   //     where the measured plate sits, so the frame no longer drifts while the camera holds.
   //   warmK 0.35 trims the grade's shadow warm-push (+12.8 sRGB R / -7.7 B on every shaded pixel).
@@ -138,13 +138,13 @@ if (!LB13) Object.assign(PRESETS.day, DAY_R12);
 // `?lb14=0` restores DAY_LB13 verbatim. Every key here is read ONLY off `day`, so golden/dusk/night
 // are bit-identical by construction. Why each one:
 //   sun 2.5 -> 4.0 with hemi 0.80 -> 1.55 / bnc 1.5 -> 0.42: the r14 plates put 0.0-0.1 % of frame
-//     above L 200 against the Earth crops' 6.3-12.1 %, with p95 175-185 against 207-219. The live
+//     above L 200 against the reference crops' 6.3-12.1 %, with p95 175-185 against 207-219. The live
 //     rig tone-maps with **AgX** (public/settings/graphics.json overrides weather.js's ACES default
 //     at main.js:426, BEFORE `?gfx=`), whose base look is a flat 16.5-stop sigmoid worth ~25 sRGB per
 //     stop at the top; under the old grade (contrast 0.5, definition 0.32, sharpness 0.45) the post
 //     chain put the punch back, and `clean=1` — correctly — takes all three away. So the top end has
 //     to come from the LIGHT: a bigger key on a smaller fill, which is also the only thing that
-//     widens p5-p95 (117-126 against Earth's 152-175) without moving the mean.
+//     widens p5-p95 (117-126 against the reference's 152-175) without moving the mean.
 //   the fill is also RECOLOURED, not just cut: the r13 rig's hemi (cool, 0.32 irradiance) and urban
 //     bounce (warm, 0.45) summed to (0.554,0.504,0.490) — dead neutral, R over B — which is why the
 //     L30-70 band reads B-R -10..+5 against the photograph's +17..+29 and the shaded Amsterdam walk
@@ -162,9 +162,9 @@ if (!LB13) Object.assign(PRESETS.day, DAY_R12);
 //     real S-curve while the un-cleaned day preset keeps graphics.json's 0.5 untouched.
 //   hemiC deepens the day sky-fill colour (0x9db9de is B/R 2.17; 0x8fb6e4 is 2.82) — day only, so
 //     golden keeps 0x9db9de.
-// SWEEP 1 (docs/notes/lb14.md 19:25, wbEarthBedford, 12 variants in one page) settled three things:
+// SWEEP 1 (docs/notes/lb14.md 19:25, wbBedford, 12 variants in one page) settled three things:
 //   * L>200 tracks the KEY, not the grade: 0.6 / 2.5 / 5.3 % of frame at sun 3.2 / 4.0 / 4.8, against
-//     0.0 % on the shipped v19 plate and 10.1 % on the Earth crop. conFloor 0.10 -> 0.26 is worth
+//     0.0 % on the shipped v19 plate and 10.1 % on the reference crop. conFloor 0.10 -> 0.26 is worth
 //     +0.1 pp of that, i.e. a third of one sun step; it is a real but small part of the fix.
 //   * expoK 0.58 pins the meter at its 0.70 clamp floor (meterAvg 0.197-0.212 against a 0.116 target),
 //     so the key increase sticks and the rig stops drifting while a camera holds.
@@ -172,7 +172,7 @@ if (!LB13) Object.assign(PRESETS.day, DAY_R12);
 //     left the L30-70 band at B-R +1, identical to r13. By day the ambient is carried by the auto
 //     light PROBE (a cube capture of the scene, so it re-photographs a neutral city) and SSGI (bounce
 //     off warm brick) — hence probeK/giK below, and `coolSh` for the measured remainder.
-// SWEEP 2 then added the one that decided the shadow hue: on an Earth pose, setting probeK AND giK to
+// SWEEP 2 then added the one that decided the shadow hue: on a reference pose, setting probeK AND giK to
 // ZERO moves the L30-70 band from B-R +6 to +5. Not the hemi, not the bounce, not the probe, not SSGI.
 // The chroma is being eaten by **AgX's outset matrix** — the same rig renders a key whose LINEAR R/B
 // is 1.27 as a bright band at B-R -5, i.e. about a third of the chroma survives the tone map. So
@@ -204,7 +204,7 @@ export const DAY_LB14 = {
   // 54.0 (66.2), s120 56.4 -> 61.2 (77.2), s351 123.4 -> 123.6; fdb280 157.3 -> 159.1 (135.9) and the arch 88.0 -> 92.5
   // (81.8) the other way. `?st34=0` restores 0.22.
   sun: 5.0, hemi: 1.3, bnc: 1.5, env: ST34 ? 0.264 : 0.22, probeK: 0.34, giK: 1.0, expoK: 0.58,
-  // coolSh -0.010 (not 0): the aerial L30-70 band went Lenox +23 -> +10 / Bedford +13 -> +1 without it (c_earth) while
+  // coolSh -0.010 (not 0): the aerial L30-70 band went Lenox +23 -> +10 / Bedford +13 -> +1 without it (c_ref) while
   // the eye-level road needs <= +40; sweep4 prices the term at ~5 of road B-R per 0.014, so -0.010 buys the aerial ~+9.
   sunW: 0.26, conFloor: 0.34, satFloor: 0, coolSh: -0.010, hemiC: 0x9db9de,
   hazeDK: 1.0, hazeSunK: 0.45,

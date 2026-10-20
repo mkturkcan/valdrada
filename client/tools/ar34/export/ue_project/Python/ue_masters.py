@@ -1169,6 +1169,109 @@ MASTERS['curtain'] = (CURTAIN, [('WP', 'wp'), ('NW', 'nw'), ('Col', 'v', (0.21, 
                                 ('Mul', 'v', (1.52, 4.1, 0.15, 1.3))],   # (the first test, 0.35 / 0.07 m / 0.95 m, read as a uniform dark slab at 1.5 km)
                       [('Rough', 1), ('Metal', 1), ('Spec', 1), ('NormalOut', 3)], {'normal_ws': True})
 # CURTAIN45 end
+# FP18 (2026-10-18, the owner: the towers' glass "too simple"): M_bx_curtain2, M_bx_curtain as glass over a room. The pane
+# (the kit's own quad, UV 0 over it, or a cell of the world-space grid on a prism, as M_bx_curtain) is a mirror-smooth
+# dielectric at its family's reflectance and reflection tint (above Unreal's 0.08 specular ceiling partly metallic, as the
+# facade master's coated glass), its base colour the glass's own dirt; through it the room as light of its own (an open
+# floor three panes wide and Pane.z deep: ceiling, floor, core wall; daylight falling off from the glass, brighter on the
+# sun side, ceiling lights on in a share of the panes, roller blinds at the glass in another), filtered by the glass's
+# tint and its transmission (1 - Fresnel). A kit pane's identity is its own normal (tkBuild.js paneQ tilts every pane by
+# its seed), the grid's its cell; each grid pane tilted by its hash, every pane bowed a little where it spans pixels. The
+# sky atmosphere's sun sets the daylight (none below the horizon) and the side. Gl: F0, the room's daylight level, the
+# blinds' share, the lit share; Rt: the reflection's tint; Pane: the kit pane's width, height (m) and the room's depth.
+CURTAIN2 = r"""
+float3 P = WP * 0.01;
+float3 N0 = normalize(NW);
+float3 Vd = normalize(V);
+float sgn = dot(N0, Vd) > 0.0 ? -1.0 : 1.0;
+float3 Ng = N0 * sgn;
+float3 up = float3(0.0, 0.0, 1.0);
+float3 T0 = cross(up, N0); float tlen = length(T0);
+float wall = step(0.35, tlen);
+T0 = tlen > 1e-4 ? T0 / tlen : float3(1.0, 0.0, 0.0);
+float3 B0 = cross(N0, T0);
+float grid = Mul.x < 500.0 ? 1.0 : 0.0;
+float uu = dot(P, T0), vv = P.z;
+float2 f, cell, pw;
+if (grid > 0.5) {
+  float2 g2 = float2(uu / Mul.x, vv / Mul.y);
+  cell = floor(g2); f = frac(g2); pw = Mul.xy;
+  cell += floor(dot(N0, float3(3.1, 7.7, 0.0))) * 131.0;
+} else {
+  f = saturate(UV0); pw = Pane.xy;
+  float3 nq = floor(N0 * 4096.0 + 0.5);
+  cell = float2(nq.x * 1.37 + nq.z * 0.71, nq.y * 1.13 - nq.z * 0.53);
+}
+float3 p3 = frac(float3(cell.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33);
+float h1 = frac((p3.x + p3.y) * p3.z);
+float h2 = frac(h1 * 91.37 + 0.31), h3 = frac(h1 * 57.13 + 0.71), h4 = frac(h2 * 33.71 + 0.19), h5 = frac(h3 * 71.93 + 0.43), h6 = frac(h4 * 19.31 + 0.87);
+float mw = Mul.z / Mul.x;
+float mull = (1.0 - smoothstep(0.0, mw, f.x)) + smoothstep(1.0 - mw, 1.0, f.x);
+float span = 1.0 - smoothstep(Mul.w / Mul.y, Mul.w / Mul.y + 0.02, f.y);
+float frame = saturate(max(mull, span)) * wall * grid;
+// the room behind the pane, in the pane's frame (x along the wall, y up, z into the building), metres
+float3 Tv = cross(up, Ng); Tv = length(Tv) > 1e-4 ? normalize(Tv) : float3(1.0, 0.0, 0.0);
+float3 Bv = cross(Ng, Tv);
+float3 rd = float3(dot(Vd, Tv), dot(Vd, Bv), max(dot(Vd, -Ng), 0.03));
+float W = max(pw.x, 0.3), Hh = max(pw.y, 0.5), D = max(Pane.z, 1.0);
+float fxs = sgn > 0.0 ? f.x : 1.0 - f.x;
+float3 o = float3(fxs * W, f.y * Hh, 0.0);
+float tx = rd.x > 0.0 ? (2.0 * W - o.x) / max(rd.x, 1e-4) : (o.x + W) / max(-rd.x, 1e-4);
+float ty = rd.y > 0.0 ? (Hh - o.y) / max(rd.y, 1e-4) : (o.y + 0.08 * Hh) / max(-rd.y, 1e-4);
+float tz = D / rd.z;
+float t = min(tx, min(ty, tz));
+float3 q = o + rd * t;
+float3 sunW = normalize(AtS.xyz);
+float day = smoothstep(-0.03, 0.10, sunW.z);
+float sunIn = saturate(dot(Ng, sunW));
+float lit = step(1.0 - Gl.w, h3);
+float3 room; float ceilF = 0.0;
+if (t == tz) room = lerp(float3(0.46, 0.45, 0.42), float3(0.60, 0.58, 0.54), h4);
+else if (t == ty && rd.y > 0.0) { room = float3(0.78, 0.77, 0.74); ceilF = 1.0; }
+else if (t == ty) room = lerp(float3(0.17, 0.16, 0.15), float3(0.30, 0.25, 0.20), h5);
+else room = float3(0.55, 0.54, 0.51);
+float fall = 1.0 / (1.0 + q.z * 0.35);
+float3 roomL = room * Gl.y * day * (0.55 + 0.75 * sunIn) * fall;
+float3 lampC = lerp(float3(1.0, 0.93, 0.82), float3(0.92, 0.96, 1.0), h6);
+roomL += room * lampC * lit * (ceilF * 0.10 + 0.035) * (0.45 + 0.55 * (1.0 - day)) * (1.0 / (1.0 + q.z * 0.12));
+// a roller blind at the glass, its hem at its own height
+float blind = step(h5, Gl.z) * step(1.0 - lerp(0.12, 0.92, h2), f.y);
+float3 blindL = lerp(float3(0.62, 0.60, 0.56), float3(0.46, 0.47, 0.46), h4) * Gl.y * (day * (0.45 + 0.55 * sunIn) + lit * 0.05) * (0.8 + 0.2 * f.y);
+roomL = lerp(roomL, blindL, blind);
+// the glass: its tint and transmission
+float lumC = max(dot(Col.rgb, float3(0.2126, 0.7152, 0.0722)), 1e-4);
+float3 tintT = saturate(Col.rgb / lumC * 0.62);
+float cosV = saturate(dot(-Vd, Ng));
+float F = Gl.x + (1.0 - Gl.x) * pow(1.0 - cosV, 5.0);
+float3 em = roomL * tintT * (1.0 - F) * wall * (1.0 - frame);
+// the surface: the pane bowed where it spans pixels, a grid pane tilted by its hash
+float fw = max(fwidth(f.x), fwidth(f.y));
+float bowK = smoothstep(0.08, 0.02, fw);
+float2 tl = (f - 0.5) * 0.016 * bowK + (float2(h1, h2) - 0.5) * 0.024 * grid;
+float3 n = normalize(N0 + (T0 * tl.x + B0 * tl.y) * (1.0 - frame));
+NormalOut = n;
+float3 f3 = Gl.x * Rt.rgb;
+float fl = dot(f3, float3(0.2126, 0.7152, 0.0722));
+float3 gbase = Col.rgb * Tint.x * 0.18;
+float gmet = 0.0, gspec = saturate(fl / 0.08);
+if (fl > 0.08) {
+  float d = max(dot(gbase, float3(0.2126, 0.7152, 0.0722)), 1e-4);
+  float x = clamp(((d + fl) - sqrt(max((d + fl) * (d + fl) - 0.16 * d, 0.0))) / 0.08, 0.05, 1.0);
+  gmet = 1.0 - x; gspec = 0.5;
+  gbase = gmet > 1e-3 ? max((f3 - 0.04 * x) / gmet, 0.0) : gbase;
+}
+float3 fcol = lerp(float3(0.42, 0.43, 0.45), Col.xyz * 0.55, span);
+Rough = lerp(0.02 + 0.012 * h4, lerp(0.38, 0.3, span), frame);
+Metal = lerp(gmet, lerp(0.85, 0.35, span), frame);
+Spec = lerp(gspec, 0.5, frame);
+Glow = em;
+return lerp(gbase, fcol, frame);
+"""
+MASTERS['curtain2'] = (CURTAIN2, [('WP', 'wp'), ('NW', 'nw'), ('V', 'cam'), ('UV0', 'uv0'), ('AtS', 'atmsun'), ('Col', 'v', (0.21, 0.31, 0.39, 0)),
+                                  ('Tint', 'v', (0.6, 0, 0, 0)), ('Mul', 'v', (1.52, 4.1, 0.15, 1.3)), ('Gl', 'v', (0.06, 0.05, 0.4, 0.45)),
+                                  ('Rt', 'v', (1, 1, 1, 0)), ('Pane', 'v', (1.5, 3.6, 4.0, 0))],
+                       [('Rough', 1), ('Metal', 1), ('Spec', 1), ('NormalOut', 3), ('Glow', 3)], {'normal_ws': True})
+# FP18 end
 # WATER3 end
 # UELOOK10 (2026-10-08): M_bx_facade's panes show the rooms behind the glass as blender_windows.py (BX-WIN) draws them in
 # Cycles, in place of the flat lit glow (t3Drop's white checkerboard: UE's lit panes flat cream at L* 38, Cycles' rooms

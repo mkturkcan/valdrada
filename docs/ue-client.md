@@ -15,13 +15,13 @@ For building the application and its content from source, see [Building the Unre
 
 | Component | Requirement |
 |---|---|
-| Operating system | Linux x86-64 (tested on Ubuntu 22.04, kernel 6.8). Release 0.5.0 ships the Linux build only; on Windows 10/11 x64 the client is built from source as the [build guide](ue-client-build.md#windows) describes |
+| Operating system | Linux x86-64 (tested on Ubuntu 22.04, kernel 6.8). Release 0.5.1 ships the Linux build only; on Windows 10/11 x64 the client is built from source as the [build guide](ue-client-build.md#windows) describes |
 | GPU | A GPU with hardware ray tracing and 64-bit atomics for Nanite and Lumen: NVIDIA RTX (Turing or newer) or AMD Radeon RX 6000 or newer. Tested on NVIDIA RTX 6000 Ada (48 GB), where that run used 15.3 GB of GPU memory |
 | Driver | Linux: the NVIDIA proprietary driver with its Vulkan ICD (tested with 580.159.03). Windows: a current vendor driver with Direct3D 12 |
 | Memory | 16 GB or more: in a run at 1280 × 720 with two places loaded, the renderer held 13.1 GB and the core 0.8 GB |
-| Disk | Linux: 46.5 GB installed (the renderer's content 27.0 GB, the kit tables 15.5 GB, the core with the city's tiles 3.7 GB); the download is kept until the install has finished, and the script asks for 76 GB free |
+| Disk | Linux: 52.3 GB installed (the renderer's content 32.8 GB, the kit tables 15.5 GB, the core with the city's tiles 3.7 GB); the download is kept until the install has finished, and the script asks for 88 GB free |
 | Python | 3.8 or later for the `valdrada` package; `numpy` is optional and used by most examples |
-| Network | The download, 29.7 GB in 29 files for Linux; afterwards none, unless the core and the renderer run on different machines |
+| Network | The download, 35.4 GB in 32 files for Linux; afterwards none, unless the core and the renderer run on different machines |
 
 The core alone (`--core-only`) needs no GPU: it simulates, answers map queries and moves actors, and answers sensor
 requests with the error `needs_renderer` until a renderer is attached.
@@ -37,11 +37,11 @@ and unpacks the archives. It needs Python 3.8 or later and nothing else.
 ```bash
 curl -LO https://github.com/mkturkcan/valdrada/releases/latest/download/fetch_valdrada_ue.py
 python3 fetch_valdrada_ue.py                       # the latest release for this system, into ./ValdradaUE-<version>-<platform>
-python3 fetch_valdrada_ue.py --version 0.5.0 --dest ~/ValdradaUE
+python3 fetch_valdrada_ue.py --version 0.5.1 --dest ~/ValdradaUE
 python3 fetch_valdrada_ue.py --mirror huggingface  # from the Hugging Face copy
 ```
 
-On Windows, once a Windows build is published (release 0.5.0 has none; build it as the [build guide](ue-client-build.md#windows)
+On Windows, once a Windows build is published (release 0.5.1 has none; build it as the [build guide](ue-client-build.md#windows)
 describes), in PowerShell:
 
 ```powershell

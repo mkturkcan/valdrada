@@ -63,7 +63,7 @@ export async function upgradeTrees(instancer) {
       // billboards) — cut density, grow card size to keep canopy coverage
       // TC13: 0.32x count / 1.5x card was a SEE-THROUGH crown — the 3x zoom
       // shots/canopy-r13/v_wb_tree.png is branches with a few leaf clusters on
-      // them, and the twin measured 0.74 % vegetation against Earth's 6.10 %.
+      // them, and the twin measured 0.74 % vegetation against the reference's 6.10 %.
       // Coverage goes as count * size^2 but COST goes as count alone, so buy
       // most of it in the card: 2.15x card area for zero extra triangles, and
       // 1.44x count to close the gaps between cards. Net ~3.1x canopy coverage

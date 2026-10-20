@@ -268,6 +268,32 @@ TW_GLASS = {'one57cobalt': (0.0144, 0.0313, 0.088), 'one57sky': (0.044, 0.0728, 
             'twcClear': (0.0414, 0.0568, 0.0673), 'gmBlack': (0.0134, 0.0137, 0.016), 'cpwGold': (0.0784, 0.0499, 0.0182),
             'bronzeDark': (0.0318, 0.0207, 0.0128)}
 KIT_GLASS = {'fk:int_winglass': {'GlassF0': 0.2, 'GlassDirt': 0.3}, 'fk:int_shopglass': {'GlassF0': 0.07, 'GlassDirt': 0.22}}
+# FP18 (2026-10-18, the owner: the towers' glass "too simple"): every tower kit glass family (the landmark families above,
+# the curtain-wall families and the punched windows, which drew on the generic master as flat opaque colour) on
+# M_bx_curtain2 (ue_masters.py: mirror-smooth glass over a room of its own light): per family its reflectance at normal
+# incidence (a double-glazed unit's two panes about 0.07, the coated families more), the reflection's tint, the room's
+# daylight level, the blinds' and the lit ceilings' shares, and the pane (width, height, the room's depth; m)
+TK_GLASS2 = {'twcClear': (0.075, (0.96, 1.0, 1.04), 0.30, 0.15, 0.50), 'one57cobalt': (0.10, (0.78, 0.92, 1.14), 0.22, 0.12, 0.45),
+             'one57sky': (0.09, (0.86, 0.97, 1.10), 0.24, 0.12, 0.45), 'cptSilver': (0.12, (0.97, 1.0, 1.03), 0.22, 0.15, 0.45),
+             'gmBlack': (0.10, (1.0, 1.0, 1.0), 0.12, 0.10, 0.40), 'cpwGold': (0.20, (1.15, 0.95, 0.62), 0.20, 0.15, 0.45),
+             'bronzeDark': (0.12, (1.08, 0.95, 0.78), 0.18, 0.15, 0.45), 'blue': (0.09, (0.82, 0.96, 1.10), 0.24, 0.15, 0.45),
+             'bronze': (0.11, (1.08, 0.96, 0.80), 0.22, 0.15, 0.45), 'gold': (0.18, (1.15, 0.97, 0.66), 0.20, 0.15, 0.45),
+             'silver': (0.12, (0.97, 1.0, 1.03), 0.22, 0.15, 0.45), 'grey': (0.08, (1.0, 1.0, 1.0), 0.24, 0.15, 0.45),
+             'win': (0.07, (1.0, 1.0, 1.0), 0.30, 0.30, 0.30)}
+TK_PANE2 = {'win': (2.4, 2.9, 4.5)}   # (the kit's punched window; the curtain walls' panes about 1.45 x 3.6 m)
+
+
+def curtain2_params(tname, r):
+    """FP18: a tower kit glass record's M_bx_curtain2 parameters ({name: 4 floats}), or None"""
+    if not tname.startswith('tk:glass_'): return None
+    fam = ((r.get('userData') or {}).get('tkGlass')) or tname[len('tk:glass_'):]
+    if fam == 'window': fam = 'win'
+    if fam not in TK_GLASS2: return None
+    f0, rt, rk, bk, lk = TK_GLASS2[fam]
+    c_ = TW_GLASS.get(fam) or list(r.get('color') or [0.06, 0.07, 0.08])[:3]
+    pn = TK_PANE2.get(fam, (1.45, 3.6, 4.0))
+    return {'Col': (c_[0] / 0.6, c_[1] / 0.6, c_[2] / 0.6, 0.0), 'Mul': (1000.0, 1000.0, 0.001, -500.0), 'Gl': (f0, rk, bk, lk),
+            'Rt': tuple(rt) + (0.0,), 'Pane': tuple(pn) + (0.0,)}
 # the dresser's room fills (unlit): main.js dims the rooms to 0.3 after dark and keeps the shops at 0.85
 UNLIT_NIGHT = {'roomFill': 0.3, 'shopFill': 0.85}
 
@@ -644,6 +670,23 @@ def in_engine():
         if tname in hide or (gen_alpha and C.get('hide_generated_alpha')) or (r.get('type') == 'ShaderMaterial' and not tx):
             if hm is not None:
                 mel.set_material_instance_parent(mi, hm); mel.update_material_instance(mi); T['hidden'] += 1
+            continue
+        c2_ = curtain2_params(tname, r)
+        if c2_:
+            # FP18: the kit's glass on M_bx_curtain2 (TK_GLASS2 above; S125's M_bx_curtain for the landmark families below)
+            cm2 = eal.load_asset('/Game/Bx/M_bx_curtain2')
+            if cm2 is None:
+                if os.path.join(EXPORT, 'ue_project', 'Python') not in sys.path: sys.path.insert(0, os.path.join(EXPORT, 'ue_project', 'Python'))
+                import ue_masters
+                ue_masters.build('curtain2', ue_masters.MASTERS['curtain2'], ue_masters.defaults())
+                cm2 = eal.load_asset('/Game/Bx/M_bx_curtain2')
+                for u in ('MATUSAGE_NANITE', 'MATUSAGE_STATIC_MESH', 'MATUSAGE_INSTANCED_STATIC_MESHES'):
+                    try: mel.set_material_usage(cm2, getattr(unreal.MaterialUsage, u))
+                    except Exception: pass
+                mel.recompile_material(cm2); eal.save_loaded_asset(cm2)
+            mel.set_material_instance_parent(mi, cm2); mel.clear_all_material_instance_parameters(mi)
+            for pn_, pv_ in c2_.items(): mel.set_material_instance_vector_parameter_value(mi, pn_, unreal.LinearColor(*[float(x) for x in pv_]))
+            mel.update_material_instance(mi); T['tk_glass2'] = T.get('tk_glass2', 0) + 1
             continue
         if tname.startswith('tk:glass_') and tname[len('tk:glass_'):] in TW_GLASS:
             # S125 (2026-10-16, the owner: the towers the aerial passes "too basic", their tiling distracting): the tower kit's

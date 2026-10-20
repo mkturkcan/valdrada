@@ -124,7 +124,7 @@ export const ENV = {
   // The round-13 street calibration is ONE warm vec3 (1.94,1.70,1.47) on road + walk + terrain, and
   // it is the only warmth in a sunlit frame (the day sun saturates to neutral 0xfffcf7 at elev 42).
   // That structure cannot be right in both places at once: it warms the SHADE as well, which is why
-  // the L30-70 band reads B-R -10..+5 against the Earth crops' +17..+29 and the shaded Amsterdam
+  // the L30-70 band reads B-R -10..+5 against the reference crops' +17..+29 and the shaded Amsterdam
   // walk renders olive. LB14 splits it in three, neutralises the hue and puts the warmth back in the
   // SUN (sky.js PRESETS.day.sunW), so a frame can read R>B in sun and B>R in shade at the same time.
   //   lb14StCal  road (0/11/12) + terrain filler (7)      — luminance held at the r13 value
@@ -168,7 +168,7 @@ export const LB14_DAY = {
   // to fight a blue ambient and is R/B 1.89 on its own. (1.20,1.33,1.64) -> effective (0.191,0.188,
   // 0.138), R/B 1.385 and 0.75x the r13 luminance: sunlit walk R/B ~1.65 (the reference sunlit
   // concrete, 229,214,192, is 1.49 — deliberately on the warm side of it), shaded walk B > R, and
-  // walk-minus-road +26 -> ~+7 luma (measured on amst120N_day: walk L 104 / road L 78, Earth +6..+7).
+  // walk-minus-road +26 -> ~+7 luma (measured on amst120N_day: walk L 104 / road L 78, reference +6..+7).
   walk: [1.02, 1.04, 1.12],    // LB14c: near-neutral, a touch of blue. Sweep4 row D at 1.30: walk L 100 vs road 83 (+17); at 1.18 the c_street plate read 84,101,107 L 98 vs road 79 (+19, greenish) against the pano walk 67,87,105 L 78 — one more step down and bluer
   // thermoplastic never took the street lift at all: m 3/4 fell through every branch of the r13
   // calibration, so intact white film sat at 1.5x the road's effective albedo where a real crossing is
@@ -397,7 +397,7 @@ export function applyCityAO(mat) {
         // LB14 (docs/notes/lb14.md): that exemption also fired on the STREET PLANE ITSELF (n.y = 1),
         // so a sidewalk tucked against a 20-storey wall took exactly the same sky fill as the middle
         // of the avenue — which is most of critic r14 #3 (sidewalk 27-52 luma over the road in shade
-        // against the Earth crop's +6..+7) and part of why the shade has no depth. The height ramp
+        // against the reference crop's +6..+7) and part of why the shade has no depth. The height ramp
         // above already hands a roof its sky back by 46 m, so the exemption only has to start ABOVE
         // the street. lb14Gao is 0 outside the day preset, so golden/dusk/night are bit-identical.
         cao = mix(cao, 1.0, smoothstep(0.55, 0.8, vCAOn.y) * mix(1.0, smoothstep(1.2, 5.0, caoHgt), lb14Gao));
@@ -577,9 +577,9 @@ export const WB13 = !(typeof location !== 'undefined' && new URLSearchParams(loc
 
 // ------------------------------------------------------ GROUND TONE (r13, GT13)
 // docs/notes/ground-r13.md. The round-13 critic ranked "city-wide asphalt" and
-// "road/sidewalk/kerb tone inversion" 1 and 7; measured against the Google Earth
+// "road/sidewalk/kerb tone inversion" 1 and 7; measured against the aerial reference
 // crops on MATCHED, paint-free surfaces the level and the order are already right
-// (walk 190/182, road 143/136, walk-minus-road +47/+46 — ours/Earth). What the
+// (walk 190/182, road 143/136, walk-minus-road +47/+46 — ours/reference). What the
 // same crops DO show is that our carriageway is a rectangular TILING: the
 // mill-and-pave lot field is a fixed 78 x 26 m pitch on the two grid axes, so a
 // street running on the short axis gets a new pour every 26 m and a longitudinal
@@ -1464,7 +1464,7 @@ export function makeFacadeMaterial({ hideTex = null } = {}) {
             // so a session can sweep it live (window.__ENV.lbRoof.value); 1.0 under ?lb13=0.
             // LB14: the LEVEL of this membrane is right and its SPREAD is a fifth of the photograph's.
             // Same rect, same roof block, lens-matched Lenox pair: ours p50 184 / p95 193 (span 9),
-            // the Earth capture p50 178 / p95 231 (span 53). Dropping lbRoof to 0.70 (LB13's open
+            // the reference capture p50 178 / p95 231 (span 53). Dropping lbRoof to 0.70 (LB13's open
             // item 3) would land the p50 and take the p95 to ~193 — i.e. make critic r14 #1 (no top
             // end) strictly worse. Widen the coating blotch about its own midpoint instead, and give
             // each roof its own value (rVal) and its own granule scale (rScl). mix(x, y, 0) is exact,
@@ -5002,7 +5002,7 @@ export function makeGroundMaterial() {
                    // (15) under paths, brick and beds, the terrain grid (7) under everything
                    : matId == 15.0 ? -4.0 : matId == 7.0 ? -8.0
                    // ...and campus brick (10) yields its ties: the College Walk brick ribbons run under the grey walk
-                   // and the lawn beds either side of it (refs/earth/col_earth_top.png)
+                   // and the lawn beds either side of it (the reference top view)
                    : matId == 10.0 ? -2.0 : 0.0;
           // CPZ34 (owner 2026-10-01: "z fighting heavily in aerial shots of central park"): the park's walks are drawn over
           // its lawn, not cut out of it, 8 mm above it after the relief (centralPark.js reliefApply), and one LSB at the
@@ -5136,8 +5136,8 @@ export function makeGroundMaterial() {
           // road in the whole city has the right asphalt"). AVERAGING FOUR decorrelated
           // draws of the same lot halves the standard deviation and leaves the MEAN
           // EXACTLY where it was — which matters, because the mean is already on the
-          // Earth crop (ground-r13.md: our sunlit carriageway 143 / walk 190 against the
-          // Earth's 136 / 182) and must not move. It also turns a flat uniform draw into
+          // reference crop (ground-r13.md: our sunlit carriageway 143 / walk 190 against the
+          // reference's 136 / 182) and must not move. It also turns a flat uniform draw into
           // a bell, so most block faces sit near the city's asphalt and the odd one is
           // a fresh or a bleached pour, which is what a block face actually is.
           ${GT13 ? `float lotH = (hash12(lotId + 3.3) + hash12(lotId + 11.7)
@@ -5189,7 +5189,7 @@ export function makeGroundMaterial() {
             // 136-188, streets-audit.md; the critic compared it against a SHADED pano value), the
             // VARIETY is not: a block face draws one lotAge, so inside one block the only aperiodic
             // term is this mosaic. Its draw is zero-meaned by GT13, so scaling it widens the span
-            // without moving the mean the Earth crop is already calibrated on. lb14Road is 0 outside
+            // without moving the mean the reference crop is already calibrated on. lb14Road is 0 outside
             // the day preset, and mix/multiply by 1.0 is exact, so golden/dusk/night are identical.
             albedo *= 1.0 + skin * (${GT13 ? '0.46 * hash12(floor(pw * 0.135) + 5.0) - 0.23'
                                            : '0.34 * hash12(floor(pw * 0.135) + 5.0) - 0.13'}) * gMid * (1.0 + lb14Road);
@@ -6514,7 +6514,7 @@ ${GP31_SURF_GLSL}
         // (sky.js PRESETS.day.sunW). ?lb14=0 restores (1.94,1.70,1.47) on road+walk and 1.0 on paint.
         //   road/terrain: same luminance (1.734), R/B 1.32 -> 1.08
         //   walk:  0.79x luminance and neutral — it measured 27-52 luma OVER the road in shade
-        //          against the Earth crop's +6..+7, and rendered olive-green (98,107,104) where the
+        //          against the reference crop's +6..+7, and rendered olive-green (98,107,104) where the
         //          reference is blue-grey (67,87,105)
         //   paint: thermoplastic never took the street lift at all (m 3/4 fell through every branch),
         //          so intact white film sat at only 1.5x the road's effective albedo where a real
@@ -6895,6 +6895,7 @@ export function makeWaterMaterial() {
         float rvK = rv35 * (1.0 - smoothstep(0.0, 0.05, night));
         float shore = (1.0 - smoothstep(0.012, 0.085, Rw.y)) * rvK;
         skyRef = mix(skyRef, horizonC * 0.42, shore * 0.8);
+        // the East and Harlem Rivers are turbid tidal water: an olive-teal body (the aerial references read (54, 88, 92) off
         // Gantry Plaza), and the ripples blur and grey the sky they mirror
         deep = mix(deep, mix(vec3(0.028, 0.052, 0.046), vec3(0.055, 0.090, 0.078), hC), rvK);
         skyRef = mix(skyRef, vec3(dot(skyRef, vec3(0.2126, 0.7152, 0.0722))), 0.5 * rvK);

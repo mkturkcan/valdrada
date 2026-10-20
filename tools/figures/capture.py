@@ -30,7 +30,7 @@ SHOTS = {
     "hero_harlem":   dict(cam=(1650, -4450, 430), look=(-700, 2600), pitch=-0.20, fov=62, time="golden"),
     "hero_crowns":   dict(cam=(-1011, 3938, 210), look=(-1011, 3278), pitch=0.02, fov=70, time="golden"),
     "hero_esb":      dict(cam=(-779, 4301, 250), look=(-1222, 3856), pitch=0.10, fov=60, time="dusk"),
-    # the pipeline figure: 125th St & Lenox Ave, Google-Earth-style oblique
+    # the pipeline figure: 125th St & Lenox Ave, high oblique
     "lenox_oblique": dict(cam=(2094, -2609, 150), look=(2167, -2740), pitch=-0.78, fov=58, time="day", labels=True),
     # the sensor figure: the pole camera of PythonAPI/examples/intersection_120_amsterdam.py
     "sensors":       dict(geo=(40.80955, -73.95905), offset=(-14, -14, 6.5), yaw=45, pitch_deg=-20, fov=90, time="day",

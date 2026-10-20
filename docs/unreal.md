@@ -80,7 +80,7 @@ export BXTREES_ASSETS=$PWD/.cache/hf/Blender/bxtrees2
 The tree set comes from the dataset, as in the Cycles guide:
 
 ```bash
-hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.5.0 --include "Blender/bxtrees2/*" --local-dir .cache/hf
+hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.5.1 --include "Blender/bxtrees2/*" --local-dir .cache/hf
 ```
 
 ## Fetch the CC0 material sets

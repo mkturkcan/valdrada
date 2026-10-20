@@ -299,7 +299,7 @@ export function createWeather(scene, camera, engine) {
       // `pOn` above is deliberately NOT scaled by probeK: the hemi/bounce give-back stays at the full
       // 0.4/0.35, i.e. by day the rig now takes slightly MORE ambient out than the probe puts back.
       // That conservative direction is the measured one (sky.js raises `hemi` 0.48 -> 0.80 over it);
-      // do not "fix" it without re-running the wbEarthBedford A/B in docs/notes/light-r13.md.
+      // do not "fix" it without re-running the wbBedford A/B in docs/notes/light-r13.md.
       if (engine.probe) { engine.probeGoal = GFX.probe; engine.probe.intensity = GFX.probe * (engine.probeOn ?? 0) * (engine.probeK ?? 1); }
       engine.hemi.intensity = (engine.hemiBase ?? baseHemi) * GFX.hemiScale * (1 + 0.35 * w + 0.3 * cl) * (1 - 0.4 * pOn) + flash * 6.0;
       // urban bounce dies with the sun that feeds it: rain/overcast kill the
@@ -333,7 +333,7 @@ export function createWeather(scene, camera, engine) {
       ENV.fogDensity.value = baseFog * (GFX.fogDensity / 0.00011) * (1 + w * 2.2 + s * 3.0 + cl * 1.2);
       engine.grade.uniforms.uVig.value = G.vignette;
       // LB14: a day-only FLOOR, like conFloor. AgX's outset matrix desaturates by construction — it is
-      // why our L>160 band reads a dead-neutral 177,177,177 where the Earth crops read 196,192,183 —
+      // why our L>160 band reads a dead-neutral 177,177,177 where the reference crops read 196,192,183 —
       // and `clean=1` removes graphics.json's 1.3 compensation. Floor, so the un-cleaned day preset and
       // every non-day preset are untouched.
       engine.grade.uniforms.uSat.value = Math.max(G.saturation, engine.satFloor ?? 0) * (1 - 0.18 * cl - 0.12 * s);
@@ -348,7 +348,7 @@ export function createWeather(scene, camera, engine) {
       // the grade's split-tone already targets exactly the band this round has to fix (shW =
       // 1 - smoothstep(0.10, 0.72, luma), i.e. shadows and lower mids, highlights untouched), and the
       // measurement says the r13 rig's warm push is pointed the wrong way for a DAY frame — real NYC
-      // shade is sky-filled and therefore blue (Earth crops: L30-70 band B-R +17..+29; ours +1).
+      // shade is sky-filled and therefore blue (reference crops: L30-70 band B-R +17..+29; ours +1).
       // Sweep 1 proved the physical route alone cannot get there (see docs/notes/lb14.md 19:25): hemi
       // 0.32 -> 0.63, bounce 0.45 -> 0.12 and a bluer hemi colour moved the band by ZERO, because by
       // day the ambient is carried by the auto light probe + SSGI + the env bake. `coolSh` is the

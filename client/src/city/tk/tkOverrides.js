@@ -10,7 +10,7 @@ export const TW_TOWERS = [
   { key: 'essexHouse', name: 'Essex House, 160 Central Park South (1931): buff brick, Art Deco piers', lat: 40.766180, lon: -73.978513, color: [186, 160, 132],
     P: { arch: 'deco', wallSet: 'brick_tan', hex: '#bba085', trimSet: 'cast_stone', piers: true } },   // -2_3:37
   { key: 'hampshireHouse', name: 'Hampshire House, 150 Central Park South (1937): pale brick', lat: 40.766061, lon: -73.977898, color: [222, 216, 204],
-    P: { arch: 'masonry', wallSet: 'brick_white_glazed', hex: '#ddd7cb', trimSet: 'stone_lime', cornice: 0 } },   // -2_3:50
+    P: { arch: 'masonry', wallSet: 'brick_white_glazed', hex: '#ddd7cb', trimSet: 'stone_lime', cornice: 0, fpCornice: 0 } },   // -2_3:50
   { key: 'parkLane', name: 'Park Lane Hotel, 36 Central Park South (1971): white brick slab', lat: 40.764861, lon: -73.975382, color: [222, 218, 208],
     P: { arch: 'slab', wallSet: 'brick_white_glazed', hex: '#dedad0', finish: 'alu_clear' } },   // -1_3:15
   { key: 'trumpParc', name: '112 Central Park South (1930): tan brick', lat: 40.765721, lon: -73.977057, color: [196, 160, 124],

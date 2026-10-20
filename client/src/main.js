@@ -508,7 +508,7 @@ async function boot() {
   }
   if (Q.get('time')) sky.apply(Q.get('time'));
   // bridges
-  if (Q.get('bridges') !== '0') try {   // ?bridges=0: diagnostic (2026-09-22, the wbEarthBroadway void half)
+  if (Q.get('bridges') !== '0') try {   // ?bridges=0: diagnostic (2026-09-22, the wbBroadway void half)
     const { buildBridges } = await import('./city/bridgeKit.js');
     buildBridges(streamer.bridges, engine.scene, streamer);
   } catch (e) { console.warn('bridges unavailable', e); }

@@ -7,7 +7,7 @@
 # from the prep, the pre-roll) and a Movie Render Queue manifest on the world's level; then one -game process renders.
 #   python3 tools/ue/r1c_actors.py --world-level /Game/R1C/W_cplake/L_cplake --shot scLakeGolden --template <root.usda>
 #       --layers cam.usda,mov.usdc,peds.usdc,looks.usdc,geo.usdc --run <run.json> --out <dir> [--frames a-b] [--norender]
-import json, os, re, subprocess, sys, time
+import json, os, re, shutil, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 EXPORT = os.path.abspath(os.path.join(HERE, '..', '..', 'client', 'tools', 'ar34', 'export'))
@@ -135,7 +135,9 @@ def in_engine():
         try: T['focus'] = ue_light.key_focus(ls, cam, side, run)
         except Exception as e: T['focus_error'] = str(e)[:160]
     tq = time.time()
-    try: T['preroll'] = ue_take.preroll(unreal, ls, root_seq, run)
+    # (speed, 2026-10-19: the pre-roll starts its warm-up frames before THIS take's range, not before frame 0: a range at
+    # 1423 warmed up through 1,487 frames, 670 s of a 5,190 s render)
+    try: T['preroll'] = ue_take.preroll(unreal, ls, root_seq, dict(run, ranges=[C['frames']]) if C.get('frames') else run)
     except Exception as e: T['preroll_error'] = f'{type(e).__name__}: {e}'
     T['preroll_s'] = round(time.time() - tq, 1)
     tq = time.time()
@@ -226,9 +228,32 @@ def main():
             if os.path.lexists(dst) or nm.endswith(('.usda', '.usdc', '.usd')): continue
             os.symlink(src, dst)
     if first <= 1:
+        # (speed, 2026-10-19: the prep depends only on the shot's root (its layers and origin), the layers and ue_prep.py,
+        # not on the take's range or preset, and took 300 s of every 800 s take: kept once per content key, the first take
+        # of a shot builds it under a lock, the others link it)
+        import fcntl, hashlib
         t = time.time()
-        code = subprocess.call(['uv', 'run', '--no-project', '--with', 'usd-core', '--with', 'numpy', '--with', 'pillow', '--with', 'scipy', 'python',
-                                os.path.join(EXPORT, 'ue_prep.py'), '--usd', root, '--out', prep], stdout=open(os.path.join(out, 'prep.log'), 'w'), stderr=subprocess.STDOUT)
+        hk = hashlib.sha1(open(root, 'rb').read())
+        for x in layers + [os.path.abspath(a.template), os.path.join(EXPORT, 'ue_prep.py')]:
+            st_ = os.stat(x); hk.update(f'{x}|{st_.st_size}|{int(st_.st_mtime)}'.encode())
+        cache = os.path.join(os.environ.get('UE_ACTPREP_CACHE', '/data0/projectnyc_aux/ue_cache/actprep'), f'{a.shot}_{hk.hexdigest()[:16]}')
+        os.makedirs(os.path.dirname(cache), exist_ok=True)
+        lk = open(cache + '.lock', 'w'); fcntl.flock(lk, fcntl.LOCK_EX)
+        try:
+            code = 0
+            if not os.path.exists(os.path.join(cache, 'DONE')):
+                shutil.rmtree(cache, ignore_errors=True)
+                code = subprocess.call(['uv', 'run', '--no-project', '--with', 'usd-core', '--with', 'numpy', '--with', 'pillow', '--with', 'scipy', 'python',
+                                        os.path.join(EXPORT, 'ue_prep.py'), '--usd', root, '--out', cache], stdout=open(os.path.join(out, 'prep.log'), 'w'), stderr=subprocess.STDOUT)
+                if code == 0: open(os.path.join(cache, 'DONE'), 'w').write(time.ctime())
+                rec['prep_cache'] = 'built'
+            else:
+                rec['prep_cache'] = 'hit'
+        finally:
+            fcntl.flock(lk, fcntl.LOCK_UN); lk.close()
+        if os.path.islink(prep) or os.path.isfile(prep): os.remove(prep)
+        elif os.path.isdir(prep): shutil.rmtree(prep)
+        if code == 0: os.symlink(cache, prep)
         rec['prep_s'] = round(time.time() - t, 1); rec['prep_exit'] = code
         if code != 0: json.dump(rec, open(os.path.join(out, 'actors.json'), 'w'), indent=1); sys.exit('prep failed')
     side = os.path.join(prep, f'ue_{a.shot}.json')
@@ -255,7 +280,7 @@ def main():
     rel = json.load(open(C['result']))['mrq']['manifest']
     W, H = a.res.split('x')
     env2 = dict(env); env2.pop('R1C_ACT_CFG', None); env2['DRI_PRIME'] = f'pci-0000_{a.gpu_pci}_00_0'
-    import fcntl, shutil
+    import fcntl
     shutil.rmtree(C['out'], ignore_errors=True); os.makedirs(C['out'], exist_ok=True)
     gl = open(os.path.join('/data0/projectnyc_aux/tmp/ue_gpu_locks', f"pci-0000_{a.gpu_pci}_00_0.lock"), 'a+')
     tw = time.time(); fcntl.flock(gl, fcntl.LOCK_EX); rec['gpu_wait_s'] = round(time.time() - tw, 1)

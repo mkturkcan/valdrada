@@ -229,6 +229,82 @@ const TC13 = !(typeof location !== 'undefined' && new URLSearchParams(location.s
 // strip, so `sectionY('grass')` is non-null and the test is false by construction — and
 // the `fd14` flag handed to roofEngine for the vent-field density.
 const FD14 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('fd14') === '0');
+// FP18 (?fp18=0 restores the flat-topped towers): a pre-war apartment tower's PENTHOUSE STOREY. From the air the Upper
+// West Side's 12-16 storey blocks step back at the top: a terrace behind the street parapet, a penthouse storey set back
+// 2.6-4.4 m with its own parapet, the lift and stair bulkhead and the tank on it. Ours ended in one flat deck at the
+// cornice. Two thirds of the masonry towers of 45-90 m on a near-rectangular plan take one (towers.js buildSetbacks
+// pentY); the street wall stops 0.45 m over a floor line, so its last row of windows and the penthouse's row both fit the
+// facade grid (tkBuild.js draws the penthouse as the kit's last tier and the cornice on the street wall's).
+const FP18 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('fp18') === '0');
+function fp18Pent(b, ring, y0) {
+  if (!FP18 || !(b.style === STYLE.PREWAR_APT || b.style === STYLE.CIVIC_STONE || b.style === STYLE.DECO_MASONRY || b.style === STYLE.TENEMENT)) return null;
+  if (b.height > 90 || ((b.colorVar * 29.7) % 1) > 0.65) return null;
+  const o = ringOBB(ring);
+  const step = 2.6 + ((b.colorVar * 41.3) % 1) * 1.8;
+  if (o.h < 14 || o.w < 16 || (o.w - 2 * step) * (o.h - 2 * step) < 0.35 * o.w * o.h) return null;
+  if (b.area / Math.max(1, o.w * o.h) < 0.6) return null;
+  const fH = Math.max(2.5, b.floorH || 3.4), H = b.height;
+  const yv = Math.floor((H - 3.6) / fH) * fH + 0.45;
+  if (yv < H * 0.7) return null;
+  return { y: y0 + yv, step };
+}
+// FP18: and the PENTHOUSE STOREY of a 25-45 m pre-war apartment block (the dresser's buildings): half of those on a
+// near-rectangular plan with no light court carry one storey set back 2.4-4 m on the roof. The tile draws it under the
+// unhideable bid (CY_BID), so it stands on the dresser's roof as on its own: walls on the shader's window grid counted from
+// the roof, its roof and its own parapet and coping, and the rooftop engine's plant on it.
+function fp18PentLow(b, ring, topY) {
+  if (!FP18 || !(b.style === STYLE.PREWAR_APT || b.style === STYLE.CIVIC_STONE || b.style === STYLE.DECO_MASONRY)) return null;
+  if (b.height < 25 || b.height > TOWER_H || b.area < 450 || ((b.colorVar * 29.7) % 1) > 0.5) return null;
+  const o = ringOBB(ring);
+  if (o.h < 15 || o.w < 17 || b.area / Math.max(1, o.w * o.h) < 0.6) return null;
+  // the plan set back 2.4-4 m (a true offset, its every vertex inside the plan, a third to nine tenths of it); else a plain
+  // box, the plan's oriented rectangle set back as far and up to 1.5 m more, its outline inside the plan (sampled each
+  // metre, so it cannot cross a notch) and at least a quarter of it
+  const inside = (x, z) => {
+    let c = false;
+    for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+      const [xi, zi] = ring[i], [xj, zj] = ring[j];
+      if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c;
+    }
+    return c;
+  };
+  const fH = Math.max(2.5, b.floorH || 3.2), top = topY + 0.88 * fH + 0.85;
+  const step0 = 2.4 + ((b.colorVar * 41.3) % 1) * 1.6;
+  const shoe = (r) => {   // signed area (shoelace)
+    let a = 0;
+    for (let i = 0; i < r.length; i++) { const p = r[i], q = r[(i + 1) % r.length]; a += p[0] * q[1] - q[0] * p[1]; }
+    return a / 2;
+  };
+  for (const st of [step0, step0 * 0.8]) {
+    const off = ringOffsetMiter(ring, st);
+    if (!off || off.length < 3) continue;
+    const aO = Math.abs(shoe(off)), aR = Math.abs(shoe(ring));
+    if (aO >= aR * 0.3 && aO <= aR * 0.9 && off.every(([x, z]) => inside(x, z))) return { ring: off, top, areaF: aO / Math.max(1, b.area) };
+  }
+  const ca = Math.cos(o.ang), sa = Math.sin(o.ang), [mx, mz] = o.centerW;
+  for (const st of [step0, step0 + 0.75, step0 + 1.5]) {
+    const hw = o.w / 2 - st, hh = o.h / 2 - st;
+    if (hw < 4 || hh < 3.5 || 4 * hw * hh < 0.25 * b.area) break;
+    // corners counter-clockwise in (x, z) as the footprint rings run (shoelace-positive)
+    const pr = [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([u, v]) => [mx + u * ca - v * sa, mz + u * sa + v * ca]);
+    let ok = true;
+    for (let i = 0; ok && i < 4; i++) {
+      const [ax, az] = pr[i], [bx, bz] = pr[(i + 1) % 4], L = Math.hypot(bx - ax, bz - az), m = Math.max(1, Math.ceil(L));
+      for (let k = 0; ok && k < m; k++) ok = inside(ax + ((bx - ax) * k) / m, az + ((bz - az) * k) / m);
+    }
+    if (!ok) continue;
+    return { ring: shoe(pr) > 0 ? pr : pr.reverse(), top, areaF: (4 * hw * hh) / Math.max(1, b.area) };
+  }
+  return null;
+}
+function fp18PentParapet(buf, ring, cx, cz, y, b, baseRef) {
+  const ph = 0.9, inner = ringInsetAbs(ring, 0.25, cx, cz);
+  extrudePrism(buf, ring, y, y + ph, b, { baseRef, noStore: true, blindMask: 0xffffffff, colScale: 0.83, faceH: ph });
+  extrudePrism(buf, inner.slice().reverse(), y, y + ph, b, { baseRef, noStore: true, blindMask: 0xffffffff, colScale: 0.66, faceH: ph, faceIn: true });
+  const cop = ringInsetAbs(ring, -0.045, cx, cz);
+  copingSkin(buf, cop, y + ph - 0.02, y + ph + 0.07, b, 4);
+  copingBand(buf, cop, inner, y + ph + 0.07, b, 4);
+}
 export function r12Deal(b, ch) {
   const d = b.__deal;
   if (!(d >= 0)) return -1;
@@ -529,7 +605,7 @@ const FAC8_MEMB = {
   // effort removing from the pre-war stock — and that is the point: the range
   // in a block comes from old roofs being dark, not from new ones being grey.
   newbuild: [0.62, 0.78, 0.88, 0.94, 1.0],
-  // WB13: the frame belt, counted off refs/earth/wburg_bedford_swipe.png. Williamsburg's
+  // WB13: the frame belt, counted off the Bedford Ave reference. Williamsburg's
   // roofs are visibly PALER than Harlem's in the matched pair — a 6 x 14 m deck over a
   // two-family house is one afternoon and one bucket of aluminium coating, so it gets
   // recoated on a cycle a 20 x 40 m pre-war block never sees, and the reference shows
@@ -582,10 +658,10 @@ function hipRoof(buf, ring, topY, b, col, cx, cz, scale = 0.92, riseK = 0.3, mem
 // COLUMBIA_CAMPUS hall roofKind 2, but the hip above only fires when the ring FILLS its OBB (rectness > 0.78), so
 // the L/U/E-plan McKim halls that ARE the campus — Schermerhorn (23-vertex ring, 1680 m2), Fayerweather, Avery,
 // Havemeyer — fell through to a flat white membrane, which is the "white slab with a bump" the critic read against
-// Google Earth's green copper hips (refs/earth/amst120_obl_n.png, reference only). A McKim hall is a set of
+// the reference oblique's green copper hips. A McKim hall is a set of
 // rectangular wings, each under its own hip: rasterise the footprint in its OBB frame (1.5 m cells), peel off
 // maximal all-inside rectangles greedily (histogram + stack per row), hip each one. Valleys where wings meet are
-// approximate — the hips interpenetrate — which from the 150 m Earth pose reads as the roof; the deck under them
+// approximate — the hips interpenetrate — which from the 150 m reference pose reads as the roof; the deck under them
 // stays the ordinary membrane. ?ch14=0 restores the flat deck. Returns the number of wings roofed.
 const CH14 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('ch14') === '0');
 // CH14b: compiler roofKind shape 3 = a STEEP SLATE hip (Teachers College's Collegiate Gothic halls, classify.mjs
@@ -639,13 +715,12 @@ function campusHipWings(buf, ring, topY, b, col, cx, cz, riseK = 0.3) {
   return wings;
 }
 // ---------------------------------------------------------------------------
-// CR24 — COLUMBIA CAMPUS ROOFS (owner 2026-09-24: "Columbia buildings' roofs are missing; look at Google Earth images
-// etc. to see what they look like and implement them correctly"). Two faults, in this order:
+// CR24 — COLUMBIA CAMPUS ROOFS (owner 2026-09-24: "Columbia buildings' roofs are missing"). Two faults, in this order:
 //   1. hipRoof() wound every slope and hip end INWARD (each quad's own cross product points into the roof). The facade
 //      material culls back faces, so from outside the hip did not draw and the flat deck under it did: the copper roofs
 //      were literally missing, and so was every generic church roof and every Teachers College slate hip.
 //   2. Where a hip did draw (seen from inside), it was a low pyramid in a near-black green under the membrane's sky
-//      sheen. Google Earth (refs/earth/col_earth_{top,north,n,e,w}.png, reference only) shows light verdigris copper
+//      sheen. The reference views (top, north, east and west) show light verdigris copper
 //      behind a limestone balustrade on the cornice: a steep MANSARD holding the attic storey, with a row of dormers
 //      and a flat top on the deep halls (Hartley, Wallach, John Jay, Furnald, Hamilton, Kent, Journalism, Havemeyer,
 //      Schermerhorn, Pupin, Dodge, CEPSR), a plain hip to a ridge on the narrow ones (Philosophy, Avery, Fayerweather,
@@ -654,7 +729,7 @@ function campusHipWings(buf, ring, topY, b, col, cx, cz, riseK = 0.3) {
 // the silhouette keeps its measured height. Per-building facts come from BUILDING_OVERRIDES `roof` (landmarkSpec.js,
 // applied at tile read); any other campus record (compiler roofKind 2) takes the defaults. ?cr24=0 restores round 14.
 const CR24 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('cr24') === '0');
-// patina bases (sRGB-ish, GeoBuf squares them), set against the Earth captures: sunlit verdigris reads about (100, 165, 145)
+// patina bases (sRGB-ish, GeoBuf squares them), set against the reference captures: sunlit verdigris reads about (100, 165, 145)
 const CR_TONE = { mint: [0.30, 0.52, 0.44], pale: [0.43, 0.50, 0.46], lead: [0.50, 0.55, 0.58], obs: [0.70, 0.71, 0.70], slate: [0.25, 0.26, 0.28] };
 const CR_STONE = [214, 205, 186], CR_GLASS = [0.10, 0.11, 0.12], CR_FRAME = [0.87, 0.86, 0.82], CR_BRICK = [0.56, 0.31, 0.23];
 const CR_MEMB = 7;        // materials.js roof branch 7: verdigris copper (vertex colour = patina base, uv = seam coords)
@@ -2021,6 +2096,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
   // old tile has no `bholes` section and gets an empty Map, so everything below stays solid.
   const cyMap = CY12 ? holesOf(tile) : new Map();
   let cyCourts = 0, cyDropped = 0;            // realised / dropped by a massing branch, reported on the tile record
+  let fpPents = 0;                            // FP18: penthouse storeys drawn (towers and the mid-rise), on the tile record
   for (const b of buildingsOf(tile)) {
     buf.curBid = b.i;
     b.greenRoof = !!(b.roofKind & 128);
@@ -2238,7 +2314,13 @@ export async function assembleTile(key, arrayBuf, ctx) {
           retailModern(buf, ring, cx, cz, fndY, y0, topY, b, opts);
         } else if (b.height > TOWER_H && !(lmId > 0) && !NO_TOWER) {   // TW: the tower kit's tier (the walls as ever; decorate landmarks too)
           const twT = [];
-          twTiers(twT, y0)(buf, ring, fndY, topY, b, opts);
+          // FP18: a pre-war tower's penthouse storey on its terrace (fp18Pent), the kit's last tier
+          b.__fpPent = null;
+          const pn = !lmId && !b.roofKind ? fp18Pent(b, ring, y0) : null;
+          if (pn) {
+            const set = buildSetbacks(buf, ring, cx, cz, y0, topY, b, { ...opts, fndY, pentY: pn.y, pentStep: pn.step }, twTiers(twT, y0));
+            if (set.top !== ring && twT.length === 2) { twT[1].pent = true; b.__fpPent = set.top; fpPents++; }
+          } else twTiers(twT, y0)(buf, ring, fndY, topY, b, opts);
           b.__twTiers = twT;
         } else extrudePrism(buf, ring, fndY, topY, b, opts);
         if (crP) {
@@ -2263,7 +2345,8 @@ export async function assembleTile(key, arrayBuf, ctx) {
           // lidded whatever we emitted here; towers.js belongs to the silhouette owner this
           // round, so this is a deliberate scope line, counted in `cyDropped`.
           cyDrop();
-          towerCap = buildTower(buf, ring, cx, cz, y0, topY, b);
+          towerCap = b.__fpPent ? buildTower(buf, b.__fpPent, cx, cz, y0, topY, b, { kind: 'flat' })   // FP18: the penthouse's roof
+            : buildTower(buf, ring, cx, cz, y0, topY, b);
           b.__roofRing = towerCap.roofRing;
         } else {
           // CY12 — THE COURT ITSELF. Walls first (they are the facade the deck's hole
@@ -2308,6 +2391,17 @@ export async function assembleTile(key, arrayBuf, ctx) {
             cy12CourtParapet(buf, holes, topY, b, y0, b.__parapetH, cy12CopingMemb(b));
             buf.curBid = b.i;
           }
+          // FP18: the penthouse storey (fp18PentLow), under the unhideable bid
+          b.__pentRoof = !holes.length && b.__parapetH > 0 ? fp18PentLow(b, ring, topY) : null;
+          if (b.__pentRoof) {
+            const pl = b.__pentRoof;
+            fpPents++;
+            buf.curBid = CY_BID;
+            extrudePrism(buf, pl.ring, topY, pl.top, b, { baseRef: topY, noStore: true });
+            roofFill(buf, pl.ring, pl.top, b);
+            fp18PentParapet(buf, pl.ring, cx, cz, pl.top, b, topY);
+            buf.curBid = b.i;
+          }
           b.__roofRing = ring;
         }
       }
@@ -2321,6 +2415,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
       // engine the REAL exposed area so a setback tower does not get a base-
       // sized tank farm on a 90 m² tower top
       if (towerCap) { roofRing = towerCap.roofRing; roofYt = towerCap.roofY; areaF = Math.min(1, towerCap.roofArea / Math.max(1, b.area)); }
+      else if (b.__pentRoof) { roofRing = b.__pentRoof.ring; roofYt = b.__pentRoof.top; areaF = b.__pentRoof.areaF; }   // FP18: on the penthouse
       else if (NO_TOWER && (b.flags & BF.SETBACKS) && convexish && b.height > 40 && b.area > 300) { roofRing = ringInset(ring, 0.52, cx, cz); areaF = 0.27; }
       // CY12: the same correction for a court. `b.area` is the OUTER ring's area — the
       // record never subtracted the hole — so a donut would be issued a tank farm sized
@@ -3168,6 +3263,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
     culledOnRoad,
     vgPits,                                  // VG36 (GROUND, world/vg36Pits.js)
     cyCourts,                                // CY12: light courts realised in this tile
+    fpPents,                                 // FP18: penthouse storeys drawn in this tile
     cyDropped,                               // CY12: …and dropped by a massing branch that cannot hold one
     strandedInRoad,
     dispose: (scene, instancer) => {

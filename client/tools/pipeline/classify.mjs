@@ -133,7 +133,7 @@ export function classify(b, rnd, ovr = {}) {
   //      good the average. 0.64 is the ONE number here with no dataset behind it: the
   //      typology gives cladding-profile weights and colour weights but never a
   //      re-clad rate. It is set so the Bedford & N 7th box lands near the quarter-to-
-  //      a-third of pale fronts refs/earth/wburg_bedford_swipe.png shows, and it is
+  //      a-third of pale fronts the Bedford Ave reference shows, and it is
   //      the first knob to turn if the critic calls the belt too sided or too brick.
   //      `r3` is drawn unconditionally at the top, so this costs no stream shift.
   //  (3) WB14 (dev29 verification, docs/notes/round14-fixes.md): once the borough tag was right, the belt behind
@@ -360,8 +360,8 @@ export function classify(b, rnd, ovr = {}) {
   } else if (b.district === 'TEACHERS_COLLEGE') {
     // Collegiate Gothic halls (1894-1924) in red brick with limestone trim: punched windows, cornice line, no storefronts,
     // no fire escapes (owner 2026-09-15). CH14b: the pre-1930 halls carry roofKind shape 3 = a STEEP SLATE HIP — the runtime
-    // (assemble.js campusHipWings) roofs each rectangular wing of an L/U/E-plan footprint, which is what Google Earth
-    // shows over Main Hall / Horace Mann / Macy (refs/earth/amst120_obl_n.png, reference only). Thorndike (1973) and
+    // (assemble.js campusHipWings) roofs each rectangular wing of an L/U/E-plan footprint, which is what the reference
+    // oblique shows over Main Hall / Horace Mann / Macy. Thorndike (1973) and
     // anything over 40 m stay flat; Whittier / the low wing keep their BUILDING_OVERRIDES roofKind 0 (applied after this).
     style = STYLE.PREWAR_APT; color = pick(r2, PAL.columbia); flags |= BF.CORNICE; flags &= ~(BF.FIRE_ESCAPE | BF.STOREFRONT);
     storeH = 0; roofKind = (year > 0 && year < 1930 && h < 40) ? 3 : 0;

@@ -776,8 +776,8 @@ export async function buildCampus(scene) {
       return false;
     };
     // LP26 (owner 2026-09-25: "fix the weird square pads above the tile pattern near the fountains, they don't exist in
-    // real life"). The compiled plaza already carries the real paving, red-brick squares nested on pale stone (Google
-    // Earth top view, refs/earth/col_earth_top.png); these kit panels were a misreading of it laid on top. `?lp26=0` keeps them.
+    // real life"). The compiled plaza already carries the real paving, red-brick squares nested on pale stone (the
+    // reference top view); these kit panels were a misreading of it laid on top. `?lp26=0` keeps them.
     if (!LP26) for (let r = 0; r < ROWS; r++) for (let k = 0; k < COLS; k++) {
       const a = aC + (r - (ROWS - 1) / 2) * PITCH;
       const c = (k - (COLS - 1) / 2) * PITCH;

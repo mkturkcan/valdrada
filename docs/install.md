@@ -20,9 +20,9 @@ The Python package has no required dependencies and runs on any machine that can
 
 ## Windows
 
-**Release.** Download `Valdrada-0.5.0-win64.zip` and `Valdrada-0.5.0-win64-tiles.zip` from the
+**Release.** Download `Valdrada-0.5.1-win64.zip` and `Valdrada-0.5.1-win64-tiles.zip` from the
 [releases page](https://github.com/mkturkcan/valdrada/releases) and extract both into the same place: both hold the
-folder `Valdrada_0.5.0_win64`, and the second only its `Content/tiles/`. The folder contains:
+folder `Valdrada_0.5.1_win64`, and the second only its `Content/tiles/`. The folder contains:
 
 | Path | Contents |
 |---|---|
@@ -62,7 +62,7 @@ cd valdrada
 (cd server && npm install)
 ls server/node_modules/electron/dist/electron        # the runtime; if missing: (cd server && node node_modules/electron/install.js)
 pip install -U "huggingface_hub>=1.0"
-hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.5.0 --include "Content/*" --local-dir .
+hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.5.1 --include "Content/*" --local-dir .
 cd server
 env -u ELECTRON_RUN_AS_NODE npx electron . --content ../Content
 ```

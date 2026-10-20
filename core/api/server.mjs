@@ -47,18 +47,32 @@ export function startServer({ port = 2000, host = '127.0.0.1', log = () => {}, v
     clients.set(cid, sock);
     sock.setNoDelay(true);
     log(`client #${cid} connected from ${sock.remoteAddress}:${sock.remotePort}`);
-    let buf = Buffer.alloc(0);
+    // incoming bytes as a list of chunks, joined once a whole frame is there (a renderer's image arrives in hundreds of
+    // chunks; joining at every chunk copied it quadratically)
+    const chunks = [];
+    let have = 0;
+    const take = (n) => {
+      const out = Buffer.allocUnsafe(n);
+      for (let o = 0; o < n;) {
+        const c = chunks[0], k = Math.min(c.length, n - o);
+        c.copy(out, o, 0, k); o += k;
+        if (k === c.length) chunks.shift(); else chunks[0] = c.subarray(k);
+      }
+      have -= n;
+      return out;
+    };
+    const head = () => { if (chunks[0].length < 5) { const b = take(have >= 5 ? 5 : have); chunks.unshift(b); have += b.length; } return chunks[0]; };
     // a request with `blobs: n` (a renderer client's render.result, docs/specs/render-protocol.md) is handled once its n
     // binary frames have arrived; they reach the session as msg._blobs
     let open = null;
     sock.on('data', (chunk) => {
-      buf = buf.length ? Buffer.concat([buf, chunk]) : chunk;
-      while (buf.length >= 5) {
-        const n = buf.readUInt32BE(0);
+      chunks.push(chunk); have += chunk.length;
+      while (have >= 5) {
+        const n = head().readUInt32BE(0);
         if (n < 1 || n > 1024 * 1024 * 1024) { sock.destroy(new Error('bad frame length')); return; }
-        if (buf.length < 4 + n) break;
-        const kind = buf[4], payload = Buffer.from(buf.subarray(5, 4 + n));
-        buf = buf.subarray(4 + n);
+        if (have < 4 + n) break;
+        const fr = take(4 + n);
+        const kind = fr[4], payload = fr.subarray(5);
         if (kind === KIND_BLOB) {
           if (!open) continue;   // a blob nobody announced
           open._blobs.push(payload);

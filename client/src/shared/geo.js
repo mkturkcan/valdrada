@@ -57,7 +57,7 @@ export const STYLE = {
   // walk-ups and 8 % A/B houses of 1880-1920, wood-frame or brick RE-CLAD in
   // vinyl or aluminium siding, flat roof behind a boxed cornice, low stoop, no
   // fire escape. Rendering them as Harlem red-brick TENEMENT is why the twin
-  // and refs/earth/wburg_bedford_swipe.png look like different cities.
+  // and the Bedford Ave reference look like different cities.
   // Companion: the post-2000 4-9 floor condo (class R/RM/D) that replaced the
   // lots between them — big windows, balcony slabs, panel-and-brick, roof deck.
   //

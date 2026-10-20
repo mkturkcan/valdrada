@@ -9,6 +9,9 @@
 // shader's hash of (bay, floor, wall seed, building seed).
 import { STYLE, BF } from '../../shared/geo.js';
 
+// FP18: ?fp18=0 draws the masonry towers without their stone base, courses and cornice, the slabs without balconies (A/B)
+const FP18 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('fp18') === '0');
+
 // the hide slot of a tower's kit-replaced walls in its tile's facade mask: TW_BID + the building's index (assemble.js)
 export const TW_BID = 4096;
 
@@ -199,6 +202,26 @@ export function towerParams(b, lr) {
     P.belts = arch === ARCH.MASONRY || arch === ARCH.DECO;
     P.piers = arch === ARCH.DECO;
     P.lobbySet = P.baseSet;
+    // FP18 (tkBuild.js masonryFaceF): the base, the courses and the cornice of a pre-war masonry tower. The stone is the
+    // trim's colour (limestone, cast stone or terra cotta; a little darker under a stone wall); the base runs two or three
+    // storeys; a fifth of the cornices were stripped (the plain band and parapet that replaced them), the rest stand
+    // 0.8-1.7 m proud by the height of the building. (Drawn last, so the draws above keep their values.)
+    if (FP18 && (arch === ARCH.MASONRY || arch === ARCH.DECO)) {
+      const tones = [[200, 190, 170], [210, 194, 166], [188, 182, 172], [216, 202, 176], [196, 178, 150]];
+      const t = tones[Math.min(tones.length - 1, Math.floor(r() * tones.length))];
+      const k = P.wallSet.startsWith('stone') ? 0.84 : 1;
+      P.fpStone = t.map((v) => v * k);
+      P.fpBase = (H > 60 || r() < 0.45 ? 3 : 2) * floorH;
+      const corn = arch === ARCH.MASONRY && r() < 0.82;   // (the compiler flags nearly every pre-war building BF.CORNICE)
+      P.fpCornice = corn ? Math.max(0.9, Math.min(1.5, 0.6 + H * 0.012)) * (0.9 + r() * 0.25) : 0;
+      P.fpTop = arch === ARCH.MASONRY ? 2 : 0;   // the string course under the top two storeys
+      // the capital: over a brick shaft, the top two storeys in the stone (three in five of the corniced ones)
+      P.fpCap = !!corn && !P.wallSet.startsWith('stone') && r() < 0.6;
+    }
+    // FP18: two thirds of the post-war apartment slabs carry balcony stacks (tkBuild.js fp18Balconies); NYCHA's do not
+    if (FP18 && arch === ARCH.SLAB && P.resi && style !== STYLE.PROJECT_BRICK && H > 30 && r() < 0.65) {
+      P.fpBalc = { period: 2 + Math.floor(r() * 3), phase: Math.floor(r() * 4), d: 1.2 + r() * 0.5, span: r() < 0.5 ? 2 : 1 };
+    }
   }
   // the base: a lobby where the record has no shopfront band (the tile keeps its shopfronts below storeH)
   P.lobbyH = storeH > 0 ? 0 : Math.min(H * 0.25, Math.max(4.2, floorH * 1.3));

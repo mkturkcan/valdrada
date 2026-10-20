@@ -38,7 +38,7 @@ const PRESETS = {
   rack125:     L(2139.7, -2748.5, 1.6, 2144, -2746, -0.16),  // north sidewalk of 125th, 5 m from a bike rack
   cars125:     L(2127, -2699, 1.5, 2134, -2694, -0.06),     // Lenox north of 125th, 8 m from the parked tesla / vw van
   traffic125:  L(2150, -2700, 22, 2168, -2742, -0.62),      // 125th & Lenox from 22 m, steep oblique: queues, lanes, turns
-  lenoxRef:    L(2094, -2609, 150, 2167, -2740, -0.78),    // Google-Earth-style oblique N along Lenox over 125th (matches ref_lenox.png)
+  lenoxRef:    L(2094, -2609, 150, 2167, -2740, -0.78),    // high oblique N along Lenox over 125th (matches ref_lenox.png)
   lenoxTop:    L(2167, -2740, 260, 2167, -2741, -1.55),    // plan view of 125th & Lenox, north up
   // round 9 (docs/notes/roofs-r9.md): 100 W 125th St, the 2017 big-box retail block on
   // the SW corner of 125th & Lenox (STYLE.RETAIL_MODERN). 26 m out in the 125th St
@@ -130,7 +130,7 @@ const PRESETS = {
   grandCentral:  L(-656, 3622, 9, -575, 3470, 0.22),       // on the PARK AVE west carriageway south of 40th (tile road piece), looking north at the viaduct + MetLife (critic r5: wedged between facades)
   timessqNorth:  L(-1233, 2834, 4, -1290, 2978, 0.20),     // on the 7 AVE centreline between 45th and 46th (tile road piece), looking SSW at One Times Square (critic r5: the lon/lat points sat inside footprints)
   columbiaLow:   P(-73.96208, 40.80732, 3, -0.02, 0.16),    // College Walk to Low Library
-  amst120Ref:    P(-73.96044, 40.80754, 150, -0.506, -0.78),   // Google-Earth-style oblique NNE up Amsterdam over W 120th (owner 2026-09-15; compare refs/earth/amst120_obl_n.png)
+  amst120Ref:    P(-73.96044, 40.80754, 150, -0.506, -0.78),   // high oblique NNE up Amsterdam over W 120th (owner 2026-09-15)
   amst120NE:     P(-73.95930, 40.80925, 1.7, -1.291, 0.05),   // SW corner (Mudd) looking NE across the intersection at Whittier Hall
   amst120W:      P(-73.95870, 40.80985, 1.7, 1.850, 0.06),    // NE corner looking WSW along W 120th at Teachers College and the campus edge
   amst120N:      P(-73.95945, 40.80890, 1.7, -0.506, 0.03),   // Amsterdam at W 119th looking N through the intersection
@@ -152,7 +152,7 @@ const PRESETS = {
   // `node client/tools/probe_courts.mjs <tilesDir> <x> <z> <radius>`.
   courtBlock:    L(2140, -5940, 130, 2205, -6015, -0.95),        // Harlem's densest courtyard cluster (24 courts inside 160 m, ~25 m parapets) from the SW
   courtTop:      L(2199, -6009, 230, 2199, -6010, -1.54),        // the same block in plan: the unambiguous before/after
-  amst120Court:  L(1060, -2800, 110, 1120, -2865, -0.90),        // the courted block SE of 120th & Amsterdam (refs/earth/amst120_top.png): 6 courts on 5 buildings
+  amst120Court:  L(1060, -2800, 110, 1120, -2865, -0.90),        // the courted block SE of 120th & Amsterdam: 6 courts on 5 buildings
   // ---- WILLIAMSBURG (owner focus area; refs/streetview/williamsburg) — 2026-09-15 lead baseline
   wbBedfordN7:   L(1197, 7303, 1.8, 1244, 7341, 0.03),          // N 7th St toward Bedford Ave (L station corner), on the compiled centreline
   wbBedfordN8:   L(1206, 7312, 1.8, 1189, 7274, 0.03),        // WB14: Bedford Ave looking NW toward N 8th — the dev29 tiles put FRAME_HOUSE (1192,7276) and CONDO_NEW (1187,7271) records on this block face
@@ -160,20 +160,20 @@ const PRESETS = {
   wbMarcy:       L(1185, 8165, 1.8, 1166, 8204, 0.04),          // Marcy Ave looking SSW toward Broadway (Marcy Av station)
   wbAir:         L(1100, 7450, 120, 1190, 7310, -0.70),        // oblique over Bedford Ave / N 7th
   wbS1st:        L(960, 7765, 1.8, 1038, 7803, 0.04),           // S 1st St toward Bedford (Grand St refs)
-  // ---- GOOGLE EARTH <-> TWIN SWIPES (owner 2026-09-16): the Earth web camera pose (target, 320 m, heading 29, tilt 62, fov 35)
-  amst120Earth:  L(873, -2670, 153.7, 1009.9, -2917.1, -0.470),   // matches refs/earth/amst120_obl_n.png; render with fov=35 (Earth's 35y is the VERTICAL fov — critic r13)
-  lenoxEarth:    L(2030, -2493, 153.6, 2167, -2740, -0.470),      // matches refs/earth/lenox_swipe.png; render with fov=35 (Earth's 35y is the VERTICAL fov — critic r13)
-  // ---- COLUMBIA ROOFS (owner 2026-09-24: "Columbia buildings' roofs are missing"): the Earth web poses of
-  // refs/earth/col_earth_{n,e,w,top}.png (target 40.807576,-73.96171 = world (800,-2720), 500 m, tilt 55; render fov=35)
-  colEarthN:     L(601.4, -2361.8, 290.3, 800, -2720, -0.611),   // heading 29: up the campus from over 114th St
-  colEarthE:     L(1158.2, -2521.4, 290.3, 800, -2720, -0.611),  // heading 299: across the campus from over Amsterdam Ave
-  colEarthW:     L(441.8, -2918.6, 290.3, 800, -2720, -0.611),   // heading 119: across the campus from over Broadway
-  colTop:        L(800, -2720, 700, 800.05, -2720.09, -1.55),     // plan view, avenues up the frame (Earth heading 29, tilt 0, 700 m)
+  // ---- REFERENCE <-> TWIN SWIPES (owner 2026-09-16): the reference camera pose (target, 320 m, heading 29, tilt 62, fov 35)
+  amst120Swipe:  L(873, -2670, 153.7, 1009.9, -2917.1, -0.470),   // render with fov=35 (the reference lens is 35 deg VERTICAL, critic r13)
+  lenoxSwipe:    L(2030, -2493, 153.6, 2167, -2740, -0.470),      // render with fov=35 (the reference lens is 35 deg VERTICAL, critic r13)
+  // ---- COLUMBIA ROOFS (owner 2026-09-24: "Columbia buildings' roofs are missing"): the reference poses
+  // (target 40.807576,-73.96171 = world (800,-2720), 500 m, tilt 55; render fov=35)
+  colObliqueN:     L(601.4, -2361.8, 290.3, 800, -2720, -0.611),   // heading 29: up the campus from over 114th St
+  colObliqueE:     L(1158.2, -2521.4, 290.3, 800, -2720, -0.611),  // heading 299: across the campus from over Amsterdam Ave
+  colObliqueW:     L(441.8, -2918.6, 290.3, 800, -2720, -0.611),   // heading 119: across the campus from over Broadway
+  colTop:        L(800, -2720, 700, 800.05, -2720.09, -1.55),     // plan view, avenues up the frame (heading 29, tilt 0, 700 m)
   colHalls:      L(700, -2560, 70, 760, -2660, -0.5),             // 70 m over 114th & Broadway looking NNE at the Furnald / Journalism / Lewisohn roofs
   colDorms:      L(700, -2630, 28, 800, -2620, -0.12),            // 28 m over South Lawn looking E at the Hamilton / Hartley mansards and dormers
   colEarl:       L(745, -2772, 22, 716, -2835, -0.10),            // 22 m over the lawn west of Low looking NNW at Earl Hall's dome
-  wbEarthBedford:  L(1043, 7571, 153.6, 1180, 7324, -0.470),      // Williamsburg: Bedford Ave & N 7th at the Earth swipe pose (refs/earth/wburg_bedford_swipe.png); fov=35 (vertical)
-  wbEarthBroadway: L(870, 8492, 153.6, 1007, 8245, -0.470),       // Williamsburg: Broadway & Havemeyer (compiled node 1007,8245 = 40.70891,-73.95925) under the JMZ el; fov=35 (vertical). The 09-16 first aim (1197,8213) was the BQE at Rodney.
+  wbBedford:  L(1043, 7571, 153.6, 1180, 7324, -0.470),      // Williamsburg: Bedford Ave & N 7th at the swipe pose; fov=35 (vertical)
+  wbBroadway: L(870, 8492, 153.6, 1007, 8245, -0.470),       // Williamsburg: Broadway & Havemeyer (compiled node 1007,8245 = 40.70891,-73.95925) under the JMZ el; fov=35 (vertical). The 09-16 first aim (1197,8213) was the BQE at Rodney.
   wbUnderEl:     L(1003, 8251, 1.7, 1046, 8210, 0.06),           // EL14: under the J/M/Z el on Broadway at Havemeyer, looking NE toward Marcy (refs/streetview Broadway & Havemeyer)
   rock30:        P(-73.97589, 40.75800, 6, 1.17, 0.47),     // 30 Rock down the Channel Gardens
   midtownSky:    P(-73.98039, 40.74077, 330, -0.05, -0.10), // Midtown skyline from 1.7 km south
@@ -444,7 +444,7 @@ try {
       }
       const gpu = await page.evaluate(() => { try { const c = document.createElement('canvas').getContext('webgl2'); const d = c.getExtension('WEBGL_debug_renderer_info'); return d ? c.getParameter(d.UNMASKED_RENDERER_WEBGL) : 'n/a'; } catch { return 'n/a'; } });
       let file = path.join(outDir, `${tag}${worldOk ? '' : '_INVALID'}.png`);
-      // IN-PAGE CAPTURE (2026-09-17): page.screenshot races the compositor — at heavy poses (wbEarthBroadway, 30 M tris,
+      // IN-PAGE CAPTURE (2026-09-17): page.screenshot races the compositor — at heavy poses (wbBroadway, 30 M tris,
       // fps 0.4) it returned a frame whose right 59 % was the clear colour, twice, and one of them reached a critic as
       // "pair 4". engine.capture (main.js window.__capture) reads the canvas right after composer.render, the same path
       // the film recorder switched to in ff0be1d. Falls back to the screenshot when the page has no __capture.
@@ -461,7 +461,6 @@ try {
       // EMPTY-FRAME FLOOR (round 10): a plate that is only sky and water, or a near-black frame, compresses to a fraction of a
       // city frame; the world-ready test passed such plates and flagged good ones. Under ~350 KB at 1760x990 is not a city.
       { const st = await fs.stat(file).catch(() => null); if (st && st.size < 350000 && !file.endsWith("_INVALID.png")) { const bad = file.replace(/.png$/, "_INVALID.png"); await fs.rename(file, bad).catch(() => {}); console.log(`INVALID FRAME: ${(st.size / 1024).toFixed(0)} KB — sky/water or black plate ->`, bad); } }
-      // VOID-CAPTURE GUARD (critic r14 FIX 0): final_v19/earth/wbEarthBroadway_day.png came back with 59 % of the frame a flat
       // rgb(11,15,22) — the screenshot fired before the canvas had finished — at 1.4 MB, above the size floor and without the
       // suffix, and a critic spent a pair on it. A city frame always carries structure at both edges: if the luma span of the
       // outermost 160 px columns on EITHER side is under 40, the capture is truncated and gets the suffix.

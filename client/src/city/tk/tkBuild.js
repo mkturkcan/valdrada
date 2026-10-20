@@ -11,7 +11,7 @@
 // Frames are face frames (fk/kitGeom.js edgeFrame): u along the wall from ring[i + 1] to ring[i], y up from the building's
 // base, w out of the wall. The shader's u runs the other way (from ring[i]), so a bay's index is counted from the far end.
 import * as THREE from 'three';
-import { Sink, edgeFrame, edgeMitres, quadW, quadU, quadY } from '../fk/kitGeom.js';
+import { Sink, edgeFrame, edgeMitres, quadW, quadU, quadY, poly } from '../fk/kitGeom.js';   // (FP18: poly)
 import { ARCH, hash12, GLASS_FAMS, shaderRoom } from './tkParams.js';
 import { cwGlassMat, winGlassMat, surfMat, partMat, tkFacadeMat, litWinMat } from './tkMats.js';
 
@@ -287,7 +287,8 @@ export function buildTowerKit(rec, P) {
         const uL = sideM + j * wW;                         // this bay's left edge in the face frame
         cols.push({ j, cU, a: uL + cx0 * wW, b: uL + cx1 * wW, uL });
       }
-      const fo = { L, e0, e1, vLo, vBase, vTop, rows, cols, ws, wsRaw, ti, store, blind, pane, finM, box, box0, i, rec, wallM, trimM, we };
+      const fo = { L, e0, e1, vLo, vBase, vTop, rows, cols, ws, wsRaw, ti, store, blind, pane, finM, box, box0, i, rec, wallM, trimM, we,
+        m0, m1, nb0: bl((i + 1) % n), nb1: bl((i - 1 + n) % n) };   // FP18: the corners' mitres and whether each neighbour is a lot line
       if (P.fac) {
         (P.glass ? curtainFaceF : masonryFaceF)(out, F, P, fo);
         // the shopfront band (the tile's is hidden with the walls): shops, or a plain wall on a lot line or a short face
@@ -505,18 +506,33 @@ function masonryFaceF(out, F, P, o) {
   const { L, e0, e1, vBase, vTop, rows, cols, box, rec } = o;
   const fm = tkFacadeMat(P.wallSet || 'stone_lime'), gm = tkFacadeMat('glass_vision_grey');
   const S = out.facSink(fm), G = out.facSink(gm);
-  const base = (rec.flags & 2) ? FF_CORNICE : 0;     // BF.CORNICE: the shader's cornice band at the top of the wall
+  const fp = fp18Plan(P, rec, o);                    // FP18: the stone base, the courses and the cornice (null: none)
+  // BF.CORNICE: the shader's cornice band at the top of the wall (FP18: not under a cornice drawn as geometry)
+  const base = (rec.flags & 2) && !(fp && fp.corn) ? FF_CORNICE : 0;
   const wallF = base | (o.blind ? FF_BLIND : 0);
-  S.wall(facWall(P, rec, o, wallF));
+  const wallSt = facWall(P, rec, o, wallF);
+  S.wall(wallSt);
   const u0 = -e0, u1 = L + e1, d = P.reveal;
   // (city v2, 2026-10-14: a lot-line face (BW28's windowed party wall) keeps to its own side of the line, 3 mm in, with no
   // trim proud of it: two neighbours each drew theirs 3 cm into the other, their windows on one bay grid, so a sill lay in
   // the neighbour's reveal and the overlap scan found the two towers' stone and brick in one plane)
   const W = o.blind ? -0.003 : OFF;
+  // FP18: below the base's top and over the top storeys' string course (floor lines, so never inside a row of windows)
+  // the wall is the stone's
+  const yB = fp ? fp.yB : 0, yC = fp ? fp.yC : 0, baseSt = fp && (yB > 0 || yC > 0) ? fp.st(wallF) : null;
+  const inStone = (v) => !!baseSt && ((yB > 0 && v < yB - 1e-3) || (yC > 0 && v > yC + 1e-3));
+  const stAt = (v) => (inStone(v) ? baseSt : wallSt);
   let vPrev = vBase;
-  const band = (va, vb) => { if (vb - va > 0.005) quadW(S, F, u0, u1, va, vb, W); };
+  const band = (va, vb) => {
+    if (vb - va <= 0.005) return;
+    const cuts = [va];
+    for (const y of [yB, yC]) if (y > va + 0.005 && y < vb - 0.005) cuts.push(y);
+    cuts.push(vb); cuts.sort((a, b) => a - b);
+    for (let k = 0; k + 1 < cuts.length; k++) { S.wall(stAt((cuts[k] + cuts[k + 1]) / 2)); quadW(S, F, u0, u1, cuts[k], cuts[k + 1], W); }
+  };
   for (const r of rows) {
     band(vPrev, r.s);
+    S.wall(stAt(r.s));
     if (cols.length) {
       let uPrev = u0;
       for (const c of cols) { if (c.a - uPrev > 0.005) quadW(S, F, uPrev, c.a, r.s, r.h, W); uPrev = c.b; }
@@ -525,8 +541,10 @@ function masonryFaceF(out, F, P, o) {
     vPrev = r.h;
   }
   band(vPrev, vTop);
+  S.wall(wallSt);
+  if (fp) fp18Trim(out, F, P, o, fp, S);
   if (!cols.length || !rows.length) return;
-  const rev = facWall(P, rec, o, base | FF_BLIND);
+  const rev = facWall(P, rec, o, base | FF_BLIND), revB = baseSt ? fp.st(base | FF_BLIND) : rev;
   const glassSt = facWall(P, rec, o, base);
   const trimM = o.trimM;
   const sillDeep = P.arch === ARCH.SLAB ? 0.03 : 0.06;
@@ -537,7 +555,7 @@ function masonryFaceF(out, F, P, o) {
     for (const c of cols) {
       // the reveal (the wall's own stone or brick, blind), the pane recessed in it (the shader's window: room, blinds,
       // curtains, sash, the lit rooms at night), the sill and lintel proud of the wall
-      S.wall(rev);
+      S.wall(inStone((r.s + r.h) / 2) ? revB : rev);   // (FP18: the base's and the top storeys' openings in their stone)
       quadU(S, F, c.a, r.s, r.h, -d, W, 1);
       quadU(S, F, c.b, r.s, r.h, -d, W, -1);
       quadY(S, F, c.a, c.b, r.h, -d, W, -1);
@@ -554,20 +572,126 @@ function masonryFaceF(out, F, P, o) {
         if (hh < acRate) out.put(box, acM, F, (c.a + c.b) / 2 + (hh * 9 % 1 - 0.5) * 0.25, r.s, -d * 0.4, 0.66, 0.44, d * 0.4 + 0.32, false);
       }
     }
-    S.wall(facWall(P, rec, o, wallF));
+    S.wall(wallSt);
   }
+  if (P.fpBalc && P.arch === ARCH.SLAB && !o.blind && !P.lite && cols.length >= 3 && rows.length >= 4) fp18Balconies(out, F, P, o);
   // deco: a proud pier between every pair of openings (blind, the wall's colour)
   if (P.piers && cols.length >= 2 && !o.blind) {
     S.wall(rev);
     const pw = Math.max(0.22, (cols[1].a - cols[0].b) * 0.72);
     for (let j = 0; j + 1 < cols.length; j++) {
       const um = (cols[j].b + cols[j + 1].a) / 2;
-      const ya = rows[0].s - 0.4, yb = rows[rows.length - 1].h + 0.5;
+      const ya = Math.max(rows[0].s - 0.4, baseSt ? yB + 0.45 : -1e9), yb = rows[rows.length - 1].h + 0.5;   // (FP18: from the base's belt)
       quadW(S, F, um - pw / 2, um + pw / 2, ya, yb, OFF + 0.11);
       quadU(S, F, um - pw / 2, ya, yb, OFF, OFF + 0.11, -1);
       quadU(S, F, um + pw / 2, ya, yb, OFF, OFF + 0.11, 1);
       quadY(S, F, um - pw / 2, um + pw / 2, yb, OFF, OFF + 0.11, 1);
     }
+  }
+}
+// ---------------------------------------------------------------- FP18: the base, the courses and the cornice
+// From the air a pre-war apartment or office block was a box with a window grid: one brick from the shopfront to the roof
+// and a knife edge against the sky. What reads at a few hundred metres is the division into base, shaft and top: a stone
+// base of two or three storeys under a belt course, a string course under the top storeys (over it, on three in five, the
+// top two storeys in the stone: the capital), and the cornice, its corona
+// 0.8-1.7 m proud of the wall on brackets over a bed moulding, a shadow line under the roof and a pale wash round it. All of
+// it is the facade shader's own wall in the stone's colour and a stone building's style (the ashlar), so no material is
+// added; the brackets are the kit's box in the trim's part material, as the sills are. A lot-line face carries none of it.
+// (towerParams: P.fpStone, fpBase, fpCornice, fpTop, fpCap)
+function fp18Plan(P, rec, o) {
+  if (!P.fpStone || o.blind || (P.arch !== ARCH.MASONRY && P.arch !== ARCH.DECO)) return null;
+  // the street wall's top tier takes the string course and the cornice (under a penthouse: the tier below it)
+  const T = o.rec.tiers, nT = T.length;
+  const last = o.ti === nT - 1 ? !T[o.ti].pent : o.ti === nT - 2 && !!T[nT - 1].pent;
+  const yB = o.ti === 0 && P.fpBase > o.vBase + 1.2 && P.fpBase < o.vTop * 0.4 ? P.fpBase : 0;
+  const corn = last && P.arch === ARCH.MASONRY && P.fpCornice > 0 && o.vTop > 12 ? P.fpCornice : 0;
+  // the top storeys in the stone too (the capital: P.fpCap), over the string course under them
+  const yC = last && P.fpCap && P.fpTop && o.rows.length >= 6 ? o.rows[o.rows.length - P.fpTop].k * P.floorH : 0;
+  const st = (flags, roof = false) => {
+    const s = facWall(P, rec, o, flags);
+    const k = flags & FF_BLIND ? 0.83 : 1, c = P.fpStone;
+    s.col = [c[0] / 255 * k, c[1] / 255 * k, c[2] / 255 * k];
+    // the style of a stone building (the shader's ashlar); a roof face (the wash on a course): the pale pavers' membrane
+    s.aux = [rec.floorH, rec.winW, roof ? 4 : rec.storeH || 0, 8];
+    if (roof) { s.aux2 = [s.aux2[0], s.aux2[1], s.aux2[2], flags | 4]; s.aux3 = [0, 0, 0]; }
+    return s;
+  };
+  return { yB, yC, corn, last, st };
+}
+function fp18Trim(out, F, P, o, fp, S) {
+  const { L, rows, vTop, vBase } = o;
+  const cl = (m) => Math.max(-1.5, Math.min(1.5, m));
+  // the ends: carried round a corner into the neighbouring face's course, or stopped with an end of their own at a lot line
+  const m0 = o.nb0 ? 0 : cl(o.m0), m1 = o.nb1 ? 0 : cl(o.m1);
+  const ext = (w) => [-w * m0, L + w * m1];
+  const stF = fp.st(FF_BLIND), stR = fp.st(FF_BLIND, true);
+  // a course from ya to yb standing p proud of the wall: its face, the soffit, the ends and the wash on top
+  const course = (ya, yb, p, top = true, wIn = OFF) => {
+    if (yb - ya < 0.04) return;
+    const w1 = OFF + p, [a0, a1] = ext(OFF), [b0, b1] = ext(w1);
+    S.wall(stF);
+    quadW(S, F, b0, b1, ya, yb, w1);
+    poly(S, F, [[a0, ya, OFF], [a1, ya, OFF], [b1, ya, w1], [b0, ya, w1]], 0, -1, 0, [0, ya]);
+    if (o.nb0) quadU(S, F, b0, ya, yb, wIn, w1, -1);
+    if (o.nb1) quadU(S, F, b1, ya, yb, wIn, w1, 1);
+    if (top) {
+      const [c0, c1] = ext(wIn);
+      S.wall(stR);
+      poly(S, F, [[c0, yb, wIn], [c1, yb, wIn], [b1, yb, w1], [b0, yb, w1]], 0, 1, 0, [0, yb]);
+    }
+  };
+  // clear of the sills over it and the lintels under it
+  const clear = (lo, hi, y) => {
+    for (const r of rows) { if (r.s > y) hi = Math.min(hi, r.s - 0.1); if (r.h < y) lo = Math.max(lo, r.h + 0.2); }
+    return [lo, hi];
+  };
+  // the belt over the base (over the shopfronts or the lobby where the base is the ground storey alone)
+  if (o.ti === 0) {
+    const y = fp.yB || vBase;
+    if (y > 2.5) { const [lo, hi] = clear(y - 0.12, y + 0.34, y); course(lo, hi, fp.yB ? 0.16 : 0.12); }
+  }
+  // the string course under the top storeys
+  if (fp.last && P.fpTop && rows.length >= 6) {
+    const y = rows[rows.length - P.fpTop].k * P.floorH;
+    const [lo, hi] = clear(y - 0.1, y + 0.22, y);
+    course(lo, hi, 0.09);
+  }
+  if (!fp.corn) return;
+  // the cornice: the bed moulding over the last lintel, the corona on it, its top over the roof's edge (the parapet stands
+  // behind it on the roof), the wash running back to the roof's edge and a face toward the roof. Under a penthouse it
+  // crowns the street wall, the terrace's own parapet standing behind it.
+  const Pc = fp.corn;
+  const headTop = rows.length ? rows[rows.length - 1].h + 0.2 : vTop - 1;
+  const bb = Math.max(headTop + 0.02, vTop - 0.8), cb = bb + 0.3, ct = Math.max(cb + 0.6, vTop + 0.3);
+  course(bb, cb, 0.28, false);
+  course(cb, ct, Pc, true, 0);
+  S.wall(stF);
+  quadW(S, F, 0, L, vTop, ct, 0, true);
+  // the brackets under the corona, about 0.85 m apart (the full level only)
+  if (P.lite) return;
+  const nB = Math.floor((L - 0.6) / 0.85);
+  if (nB < 1) return;
+  const sp = (L - 0.6) / nB;
+  for (let k = 0; k <= nB; k++) out.put(o.box, o.trimM, F, 0.3 + k * sp, bb + 0.02, OFF, 0.16, cb - bb - 0.02, Pc * 0.8, false);
+}
+// FP18: the balconies of a post-war apartment slab (the white- and tan-brick towers of 1950-80): a concrete slab at each
+// floor line on stacks of one or two bays, a metal railing round it; from the air the stacks are the striped columns
+// these towers are known by. Kit boxes in the trim's and the frame's part materials, as the sills are.
+function fp18Balconies(out, F, P, o) {
+  const { rows, cols, box, trimM, finM } = o;
+  const B = P.fpBalc, fH = P.floorH, sp = B.span * P.winW - 0.16;
+  for (let j = 0; j + B.span <= cols.length; j++) {
+    if ((j + B.phase) % B.period) continue;
+    const uC = cols[j].uL + (B.span * P.winW) / 2;
+    for (const r of rows) {
+      if (r === rows[0]) continue;
+      const y = r.k * fH;
+      out.put(box, trimM, F, uC, y - 0.18, OFF, sp, 0.18, B.d, true);
+      out.put(box, finM, F, uC, y, OFF + B.d - 0.05, sp, 1.0, 0.05, true);
+      out.put(box, finM, F, uC - sp / 2 + 0.025, y, OFF, 0.05, 1.0, B.d - 0.05, false);
+      out.put(box, finM, F, uC + sp / 2 - 0.025, y, OFF, 0.05, 1.0, B.d - 0.05, false);
+    }
+    j += B.span - 1;
   }
 }
 function curtainFaceF(out, F, P, o) {

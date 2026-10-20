@@ -819,7 +819,7 @@ export class HeroFacades {
         // WB13: ...and on the post-2000 condo, where a projecting balcony slab with a
         // glass or cable rail is not decoration but the type's defining silhouette —
         // docs/notes/wburg-r13.md, and every post-2000 building in
-        // refs/earth/wburg_bedford_swipe.png has them. Same geometry, same budget, one
+        // the Bedford Ave reference has them. Same geometry, same budget, one
         // style id added; `capH > 12` already restricts it to 4 floors and up.
         if (!HSKIP.has('balc') && (S === STYLE.POSTWAR_BRICK || (WB13 && S === STYLE.CONDO_NEW)) && i === 0 && !glassy && capH > 12) {
           const bayNb = Math.floor((len - 0.44) / ww);

@@ -63,6 +63,9 @@ float FAC_dbg = 0.0; float3 FAC_dbgV = float3(0.0, 0.0, 0.0); float3 FAC_grainV 
 float3 FAC_glassF = float3(0.045, 0.55, 0.5); float3 FAC_reflTint = float3(1.0, 1.0, 1.0); float FAC_spand = 0.0;
 float FAC_sunK = 1.0; float FAC_metal = 0.0;
 float UE_glass = 0.0, UE_f0 = 0.04;
+// FP18 (v105): the glass layer (end of the program): the share of the pixel that is pane (UE_gm: the window less its sash,
+// reveal, painted mullions, spandrel and AC unit), the spandrel glass's share, the pane's pixel footprint, its cell and seed
+float UE_gm = 0.0, UE_sp = 0.0, UE_aa = 1.0, UE_pU = 0.0, UE_pV = 0.0, UE_pS = 0.0, UE_fx = 0.5, UE_fy = 0.5, UE_gs = 0.0;
 float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
 // ---- the page's colour block
       {
@@ -332,6 +335,7 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
             winMask *= 1.0 - br;
           }
           float tiny = smoothstep(0.28, 0.62, max(aaU, aaV));
+          UE_aa = max(aaU, aaV); UE_pU = cellU; UE_pV = cellV; UE_pS = cvI + wallSeed * 37.0; UE_fx = fx; UE_fy = fy; UE_gs = glassStyle ? 1.0 : 0.0;
           bool inWin = winMask > 0.5 && tiny < 0.9;
           float winFade = 1.0 - tiny;
           if (store && v < storeH) {
@@ -528,6 +532,7 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
             }
           } else if (inWin) {
             FAC_dbg = 1.0;
+            UE_gm = 1.0;
             float span = 2.0 + step(0.55, H.hash12(float2(floor(cellUS / 2.0), cellV + cvar * 7.0)));
             float roomI = floor(cellU / span);
             float roomK = roomI + wallSeed * 53.0;
@@ -805,11 +810,13 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
                 sashC = lerp(sashC, wlRepC, 0.75);
                 FAC_rough = lerp(FAC_rough, 0.30, sashM);
               }
+              UE_gm *= 1.0 - sashM;
               if (sashM > 0.003) {
                 albedo = lerp(albedo, sashC, sashM);
                 FAC_emis *= 1.0 - sashM * 0.92;
               }
             }
+            UE_gm *= 1.0 - revealM;
             if (revealM > 0.003) {
               float dL2 = -pu, dR2 = pu - Wp, dB2 = -pv, dT2 = pv - Hp;
               float mV = max(max(dL2, dR2), max(dB2, dT2));
@@ -828,7 +835,8 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
               albedo = lerp(mullCol, albedo, mullA);
               FAC_emis *= mullA;
               FAC_rough = lerp(0.55, FAC_rough, mullA);
-              if (fy < 0.3 && fy > 0.05 && style > 2.5 && style < 3.5) { albedo = diffuseColor.rgb * 0.55; FAC_emis = ((float3)(0.0)); FAC_rough = 0.4; }
+              UE_gm *= mullA;
+              if (fy < 0.3 && fy > 0.05 && style > 2.5 && style < 3.5) { albedo = diffuseColor.rgb * 0.55; FAC_emis = ((float3)(0.0)); FAC_rough = 0.4; UE_gm = 0.0; UE_sp = 1.0; }
               {
                 float fin = 1.0 - tiny;
                 float litF = smoothstep(0.955 - aaU, 0.955 + aaU, fx) * (1.0 - smoothstep(0.985 - aaU, 0.985 + aaU, fx));
@@ -838,10 +846,12 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
                 if (style > 10.5 && style < 11.5 && fy > 0.05 && fy < 0.17) {
                   float spM = fin * smoothstep(0.05, 0.05 + aaV, fy) * (1.0 - smoothstep(0.17 - aaV, 0.17, fy));
                   albedo = lerp(albedo, diffuseColor.rgb * 0.62, spM); FAC_emis *= 1.0 - spM; FAC_rough = lerp(FAC_rough, 0.45, spM);
+                  UE_gm *= 1.0 - spM; UE_sp = max(UE_sp, spM);
                 }
               }
               float3 cwAvg = lerp(diffuseColor.rgb * 0.5, float3(0.10, 0.125, 0.14), 0.55);
               albedo = lerp(albedo, cwAvg, tiny);
+              UE_gm = lerp(UE_gm, 0.8, tiny);
               FAC_emis *= (1.0 - tiny * 0.7);
               if (doorPack >= 8.0 && cellU == doorCell && v < 3.9 && tiny < 0.8) {
                 float inP = H.pcov(cuC, 0.5 - 0.38, 0.5 + 0.38, aaU * 1.25) * (1.0 - smoothstep(3.35, 3.6, v));
@@ -862,6 +872,7 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
               float fill = (x1 - x0) * (y1 - y0);
               float3 punchAvg = lerp(diffuseColor.rgb * 0.98, float3(0.06, 0.07, 0.08), fill * 0.85);
               albedo = lerp(albedo, punchAvg, tiny);
+              UE_gm *= 1.0 - tiny;
               FAC_emis *= max(winFade, 0.25);
               FAC_rough = lerp(FAC_rough, 0.85, tiny);
               albedo *= lerp(1.0, 0.62, smoothstep(y1 - 0.14 - aaV, y1 - 0.14 + aaV, fy) * (1.0 - tiny));
@@ -885,12 +896,14 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
                 acM *= winMask * (1.0 - tiny) * smoothstep(0.24, 0.07, aaU);
                 float3 acCol = float3(0.60, 0.61, 0.60) * acTint * (0.82 + 0.26 * sin(fy * 92.0));
                 albedo = lerp(albedo, acCol, acM);
+                UE_gm *= 1.0 - acM;
                 FAC_emis *= 1.0 - acM * 0.9;
                 FAC_rough = lerp(FAC_rough, 0.55, acM);
               }
             }
             albedo = lerp(diffuseColor.rgb * 0.92, albedo, winMask);
             FAC_emis *= winMask;
+            UE_gm *= winMask;
             FAC_rough = lerp(0.9, FAC_rough, winMask);
           } else {
             FAC_dbg = 0.0;
@@ -1250,6 +1263,7 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
                 FAC_rough = lerp(FAC_rough, 0.34, sp * bandVis * 0.7);
                 FAC_emis *= 1.0 - sp * bandVis * 0.85;
                 FAC_spand = sp * bandVis;
+                UE_gm *= 1.0 - FAC_spand; UE_sp = max(UE_sp, FAC_spand);
               } else if (!store) {
                 float sp = 1.0 - H.pcov(fl, yb0, yb1, aaF * 1.25);
                 float inCol = H.pcov(cuC, xb0, xb1, aaU * 1.25);
@@ -1304,6 +1318,7 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
                         * F * 20.0 * uRefl * kR * (1.0 - night);
               FAC_rough = min(FAC_rough, lerp(0.9, FAC_glassF.y, kR));
               UE_glass = max(UE_glass, kR); UE_f0 = FAC_glassF.x;
+              if (!inWin) UE_gm = max(UE_gm, 0.8 * cwF * (1.0 - FAC_spand) * smoothstep(0.5, 0.9, tiny));   // (FP18: a far curtain wall, its grid below a pixel)
             }
           }
           if (cornice && sidingS) {
@@ -1698,7 +1713,47 @@ float3 normal = normalize(vNormal);
         }
         diffuseColor.rgb *= FAC_grainV;
 
-// (three's geometric specular AA, applySpecAA: sigma2 0.25, kappa 0.14)
+// ---- FP18 (v105): the glass layer. A pane is glass over a room: what is seen through it is the room's own light, not the
+// sun on the pane (the room painted as the base colour lit as a flat panel in the sun, black in the shade); its surface is
+// mirror smooth (between 0.1 and Lumen's 0.6 the traced reflections are stochastic, and the curtain walls' panes flipped
+// from frame to frame on a moving lens) and each pane sits at its own small tilt (hashed from its cell: the same every
+// frame), bowed a little where it spans pixels, so the reflections break pane to pane as real glazing does
+{
+  float gm = saturate(UE_gm);
+  if (gm > 0.0) {
+    float3 Vv = normalize(vViewPosition);
+    float3 Ng = normalize(vNormal); if (dot(Ng, Vv) < 0.0) Ng = -Ng;
+    float cosV = saturate(dot(Ng, Vv));
+    // (v106: the room's range compressed (the blinds and lit rooms a checkerboard of beige panes at v105), its ambient
+    // daylight as light of its own, and the sun that enters it as a dim diffuse share of the pane, so a shadow across a
+    // glass wall still reads, softened, as it does on real glazing)
+    float3 aI = diffuseColor.rgb / (1.0 + 2.5 * dot(diffuseColor.rgb, float3(0.2126, 0.7152, 0.0722)));
+    float kIn = 0.14 * (1.0 - 0.85 * night);
+    float tr = 1.0 - H.fresnelR(cosV, 0.06);
+    FAC_emis += aI * kIn * tr * gm;
+    diffuseColor.rgb = lerp(diffuseColor.rgb, aI * 0.22 * tr + 0.003, gm);
+    // (v108: the pane's footprint decides how sharp its mirror can be: a pane a few pixels across reflects through a
+    // lobe wide enough that its neighbours' tilts and a moving lens do not flip it; mirror only where it spans many)
+    float rG = lerp(0.018, 0.30, smoothstep(0.03, 0.35, UE_aa));
+    roughnessFactor = lerp(roughnessFactor, rG, gm);
+    // (v107: a punched window's two sashes, above and below its meeting rail, each at its own tilt)
+    float pV2 = UE_pV * 2.0 + (1.0 - UE_gs) * step(0.6, UE_fy);
+    float h1 = H.hash12(float2(UE_pU * 1.731 + UE_pS * 0.37, pV2 * 2.113 + 4.1)) - 0.5;
+    float h2 = H.hash12(float2(pV2 * 3.917 + UE_pS * 0.11, UE_pU * 1.373 + 9.7)) - 0.5;
+    float3 upv = normalize(H.V3(float3(0.0, 1.0, 0.0)));
+    float3 Tt = cross(Ng, upv); Tt = dot(Tt, Tt) > 1e-6 ? normalize(Tt) : float3(1.0, 0.0, 0.0);
+    float3 Bt = normalize(cross(Tt, Ng));
+    // (v107: a punched window's old glass sits less true than a curtain wall's (+-0.02 rad against +-0.012), and one in
+    // twenty is a hopper left open, its pane leaning back 0.06-0.14 rad to the sky)
+    float h3 = H.hash12(float2(UE_pU * 5.171 + UE_pS * 0.23, UE_pV * 7.713 + 1.9));
+    float2 tl = float2(h1, h2) * lerp(0.04, 0.024, UE_gs) * smoothstep(0.30, 0.06, UE_aa) + float2(UE_fx - 0.5, UE_fy - 0.5) * 0.02 * smoothstep(0.12, 0.03, UE_aa);
+    tl.y += (1.0 - UE_gs) * step(h3, 0.05) * lerp(0.06, 0.14, frac(h3 * 37.0)) * smoothstep(0.30, 0.06, UE_aa);
+    normal = normalize(lerp(normal, normalize(normal + Tt * tl.x + Bt * tl.y), gm));
+  }
+  // (the curtain walls' spandrel glass: the same glass on an opaque backing)
+  roughnessFactor = lerp(roughnessFactor, 0.07, saturate(UE_sp) * 0.85);
+}
+// (three's geometric specular AA, applySpecAA: sigma2 0.25, kappa 0.14; v108: after the glass layer, so it sees the panes' tilts)
 {
   float3 ndx = ddx(normal), ndy = ddy(normal);
   float variance = 0.25 * (dot(ndx, ndx) + dot(ndy, ndy));

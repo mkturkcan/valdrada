@@ -49,7 +49,7 @@ def mat_sig():
     sig = {n: fsha(os.path.join(HERE, n)) for n in MAT_TOOLS}
     if os.environ.get('BD_TILEFAC') == '1':
         h = os.environ.get('BD_TILEFAC_HLSL', 'bd_tilefac.hlsl')
-        sig['bd_tilefac_master'] = f"{os.environ.get('BD_TILEFAC_V', '101')}|glass{os.environ.get('BD_TILEFAC_GLASS', '1')}|{h}|{fsha(os.path.join(HERE, h)) if os.path.exists(os.path.join(HERE, h)) else 'missing'}"
+        sig['bd_tilefac_master'] = f"{os.environ.get('BD_TILEFAC_V', '108')}|glass{os.environ.get('BD_TILEFAC_GLASS', '1')}|{h}|{fsha(os.path.join(HERE, h)) if os.path.exists(os.path.join(HERE, h)) else 'missing'}"
     return sig
 
 
@@ -829,6 +829,9 @@ def take_no_peds(shot):
     return os.path.exists(f) and shot in open(f).read().split()
 
 
+TAKE_RANGE = None   # (speed, 2026-10-19: 'a-b' of the render: the take's pre-roll warms up before a, not before frame 0)
+
+
 def build_take(I, W, tkey, tdir, settings, logf):
     """the take in one editor session: its level (a new map holding the world's levels), lane D's actor layers through
     ue_prep into a sublevel, their materials, the sequence with the pre-roll, the take's light pass, the manifest"""
@@ -844,7 +847,8 @@ def build_take(I, W, tkey, tdir, settings, logf):
     code, S['actors_light_s'] = run(uvpy('usd-core', 'numpy') + [os.path.join(HERE, 'r1c_actors.py'), '--norender', '--world-level', level, '--shot', shot, '--tag', tag,
                                                                 '--new-level-with', ','.join(W['levels']), '--light-harvest', I['harvest'],
                                                                 *(['--cell-tables', _tables_json(W, tdir)] if W.get('tables') else []),
-                                                                '--template', os.path.join(usd, f'{shot}.usda'), '--layers', layers, '--run', settings, '--out', act], logf)
+                                                                '--template', os.path.join(usd, f'{shot}.usda'), '--layers', layers, '--run', settings, '--out', act,
+                                                                *(['--frames', TAKE_RANGE] if TAKE_RANGE else [])], logf)
     side = os.path.join(act, 'prep', f'ue_{shot}.json')
     try: imp = json.load(open(os.path.join(act, 'act_import.json')))
     except Exception: imp = None
@@ -889,7 +893,7 @@ def main():
     ap.add_argument('--rebuild-world', action='store_true'); ap.add_argument('--rebuild-take', action='store_true'); ap.add_argument('--keep-raw', action='store_true')
     ap.add_argument('--no-xgate', action='store_true', help='skip the cross-renderer gate')
     ap.add_argument('--settings', default=os.path.join(HERE, 'render_take.json'))
-    ap.add_argument('--preset', default='', choices=('', 'cine', 'cine2', 'cine2c', 'cine2d', 'cine2e', 'cine2f', 'cine2g', 'cine2h', 'pt'), help='cine: the trailer\'s cinematic settings (render_take_cine.json); pt: path traced (render_take_pt.json)')
+    ap.add_argument('--preset', default='', choices=('', 'cine', 'cine2', 'cine2c', 'cine2d', 'cine2e', 'cine2f', 'cine2g', 'cine2h', 'cine2t', 'pt'), help='cine: the trailer\'s cinematic settings (render_take_cine.json); pt: path traced (render_take_pt.json)')
     ap.add_argument('--group', default='', help='shots a,b,c whose load sets make one world (the union of their cells, chunks and landmarks): built once, every shot of the group renders in it')
     ap.add_argument('--prebuild', default='', help='GB43: shots a,b,c (the shot argument is ignored): the union of their cells through the cell cache in one pass (pack, dedupe, import, bind; up to BATCHES editors on large batches), so their renders find every cell built; nothing rendered')
     a = ap.parse_args()
@@ -919,6 +923,7 @@ def main():
     if a.group: I = group_world(I, [x for x in a.group.split(',') if x])
     if a.frames:
         fa, fb = [int(x) for x in a.frames.split('-')]; fb = min(fb, I['frames']); tag = f'f{fa}-{fb}'
+        globals()['TAKE_RANGE'] = f'{fa}-{fb - 1}'   # (speed: the take's pre-roll before this range)
     else:
         fa, fb, tag = 0, I['frames'], 'all'
     if fb <= fa: log('inputs: empty frame range'); sys.exit(2)

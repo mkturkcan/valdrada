@@ -75,8 +75,10 @@ private:
 	// ---- the link
 	TUniquePtr<FValdradaLink> Link;
 	TUniquePtr<class FValdradaExitWatch> ExitWatch;
+	TSharedPtr<class FValdradaPathTraceExt, ESPMode::ThreadSafe> PathTraceExt;
 	int32 NextId = 1;
 	bool bHelloSent = false;
+	bool bNoView = false;   // -ValdradaNoView: the offscreen window draws no world (captures only)
 	void SendHello();
 	void Dispatch(FValdradaMessage& M);
 	int32 SendRequest(const FString& Method, const TSharedRef<FJsonObject>& Params, const TArray<TArrayView<const uint8>>& Blobs = TArray<TArrayView<const uint8>>());
@@ -87,6 +89,7 @@ private:
 	UPROPERTY() TObjectPtr<ASkyLight> SkyLight;
 	UPROPERTY() TObjectPtr<ASkyAtmosphere> Atmosphere;
 	UPROPERTY() TObjectPtr<AVolumetricCloud> Clouds;
+	UPROPERTY() TObjectPtr<class AExponentialHeightFog> Fog;
 	UPROPERTY() TObjectPtr<APostProcessVolume> Film;
 	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> FilmMID;
 	UPROPERTY() TObjectPtr<UMaterialParameterCollection> NightMPC;
@@ -95,6 +98,8 @@ private:
 	float PresetExpo = 1.f;   // the time of day's fixed exposure (the film look's Expo)
 	void SetupEnvironment();
 	void ApplyEnv(const TSharedPtr<FJsonObject>& Env);
+	void ApplyEnvLook(const TSharedPtr<FJsonObject>& Env, bool bForce);
+	FString LastLook, LastLookTod;
 
 	// ---- the view (the server window's camera: the primary sensor, else the spectator)
 	UPROPERTY() TObjectPtr<ACameraActor> ViewCam;
@@ -181,16 +186,23 @@ private:
 		bool bAutoExposure = true;   // the sensor's exposure_mode
 		float ExposureComp = 0.f;    // its exposure_compensation, EV
 		bool bCut = false;
+		FString Mode = TEXT("lumen");  // the request's capture mode: lumen, or pathtrace (Unreal's path tracer, Spp samples)
+		int32 Spp = 1;
+		bool bBurst = false;           // its warm frames in one engine tick (a replay: the state does not change between them)
+		bool bDenoise = true;          // the path tracer's denoiser on the last sample
+		double TRender = 0;            // its first render submitted (timing)
+		int32 Renders = 0;
 	};
 	TArray<FCaptureJob> Captures;
 	struct FCam
 	{
-		TObjectPtr<USceneCaptureComponent2D> Rgb, Depth, Sem;
-		TObjectPtr<UTextureRenderTarget2D> RgbRT, DepthRT, SemRT;
+		TObjectPtr<USceneCaptureComponent2D> Rgb, Depth, Sem, Alb, Nrm;
+		TObjectPtr<UTextureRenderTarget2D> RgbRT, DepthRT, SemRT, AlbRT, NrmRT;
 		FTransform Last;
 		bool bUsed = false;
 		TObjectPtr<UMaterialInstanceDynamic> Film;   // this camera's film look (its own exposure)
 		float EV = 0.f;                              // its metered exposure over the time of day's, EV
+		float LastExpo = -1.f;                       // the film's Expo as last set (a path tracer restarts on a change)
 	};
 	TMap<FString, FCam> Cams;
 	UPROPERTY() TArray<TObjectPtr<UObject>> KeepAlive;
