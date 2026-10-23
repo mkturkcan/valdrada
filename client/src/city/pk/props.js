@@ -11,6 +11,7 @@
 // The signal lenses and pedestrian heads run on the traffic clock (sim/signals.js signalState / walkTimeLeft, the clock
 // window.__TRAFFIC.time that the cars and the walkers use), by the axis each head serves. The benches and the shelters'
 // seats are seats for the crowd (seats()).
+import { HA_ON, haLift } from '../../world/haAnchor.js';   // P1 TERRAIN (`?terrain=p1`)
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { FURN } from '../../shared/geo.js';
@@ -347,8 +348,9 @@ function groundY(ctx, x, z, onWalk) {
   const y = ctx.padYNear(x, z);
   // the compiled roadway reaches ~1.25 m past the real kerb here: a kerbside piece standing on that strip stands on
   // the sidewalk's datum (the street part lays the real kerb)
-  if (onWalk && (y === null || y < SIDEWALK_Y - 0.05)) return SIDEWALK_Y;
-  return y ?? SIDEWALK_Y;
+  const sw = HA_ON ? SIDEWALK_Y + haLift(x, z) : SIDEWALK_Y;   // P1 TERRAIN: the walk's datum lifted with the ground
+  if (onWalk && (y === null || y < sw - 0.05)) return sw;
+  return y ?? sw;
 }
 // LOD, once per frame from the view camera (not a probe's 90-degree cube faces): a cell within LOD_R draws its near
 // models, else its far ones. A material key a cell has only in its near model draws EMPTY when far, a geometry whose

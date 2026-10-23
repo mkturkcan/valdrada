@@ -22,6 +22,9 @@ import { SPECS } from '../city/trains/cars.js';
 import { MV, P as mvP } from '../city/vk/mvv.js';
 import { TRACKS } from '../city/w125eData.js';
 import { COLLIDERS } from '../city/colliders.js';
+import { HA_ON, haAnchors, haDeckShift } from '../world/haAnchor.js';   // P1 TERRAIN (`?terrain=p1`): the trains on the decks' LiDAR heights
+import { haInit } from '../world/heightAuthority.js';
+if (HA_ON) await Promise.all([haInit(), haAnchors()]);
 
 const Q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams('');
 const MPH = 0.44704;
@@ -89,7 +92,12 @@ function mvvLines() {
   const mk = (l, dir) => {
     const ua = dir > 0 ? MV.u0 - 12 - 400 : MV.u1 + 12 + 400, ub = dir > 0 ? MV.u1 + 12 + 400 : MV.u0 - 12 - 400;
     const a = mvP(ua, l, MV.RAIL), b = mvP(ub, l, MV.RAIL);
-    const path = new Path([a, b]);
+    // (P1 TERRAIN: the rail on the viaduct's LiDAR deck, every 10 m)
+    const path = new Path(HA_ON ? Array.from({ length: Math.round(Math.abs(ub - ua) / 10) + 1 }, (_, k) => {
+      const u = ua + ((ub - ua) * k) / Math.round(Math.abs(ub - ua) / 10), p = mvP(u, l, MV.RAIL);
+      p[1] += haDeckShift('irt_mvv', u, p[0], p[2]);
+      return p;
+    }) : [a, b]);
     const sOfU = (u) => (u - ua) * dir;
     return {
       path, dir,
@@ -114,7 +122,7 @@ function parkLines() {
   const VN = Math.min(...uv.map((t) => t[t.length - 1][1])) - 1;
   const lines = uv.map((t, i) => {
     const pts = [[t[0][0], PARK_VS - 300], [t[0][0], PARK_VS], ...t.filter((p) => p[1] > PARK_VS + 1 && p[1] < VN + 200)];
-    const sm = smooth2(pts, 2).map(([u, v]) => { const [x, z] = toXZ(u, v); return [x, PARK_RAIL, z]; });
+    const sm = smooth2(pts, 2).map(([u, v]) => { const [x, z] = toXZ(u, v); return [x, PARK_RAIL + (HA_ON ? haDeckShift('park', v, x, z) : 0), z]; });
     return { i, pts: sm, VN };
   });
   const mk = (i, dir) => {
@@ -200,6 +208,13 @@ function timeAtDs(R, ds) {
   return R.dwell + R.vmax / R.a + (ds - da) / R.vmax;
 }
 
+// the lines' rails as point lists (tools/terrain/anchor_gate.mjs holds them over the ground)
+export function trainLines() {
+  const out = [];
+  try { const { NB, SB } = mvvLines(); for (const L of [NB, SB]) out.push({ id: L.id, pts: (L.path.p || []).filter((_, i) => L.path.s[i] >= L.sVis[0] && L.path.s[i] <= L.sVis[1]) }); } catch { /* none */ }
+  try { const PL = parkLines(); for (const i of [0, 1, 2, 3]) { const L = PL.mk(i, 1); out.push({ id: L.id, pts: (L.path.p || []).filter((_, k) => L.path.s[k] >= L.sVis[0] && L.path.s[k] <= L.sVis[1]) }); } } catch { /* none */ }
+  return out;
+}
 // ---------------------------------------------------------------------------------------------- services
 function buildServices() {
   const out = [];

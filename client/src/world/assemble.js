@@ -14,10 +14,64 @@ import { buildShopSigns } from '../city/shopSigns.js';
 import { namedShopZone } from '../city/namedShops.js';
 import { buildBillboards, buildTsqScreens } from '../city/billboards.js';
 import { BP28, bpDropTree, bpTrees, bpOwns, bpBuild, bpWorld, bpApply, bpSkipBuilding } from '../city/bryantPark.js';
-import { cpTileHit, cpApply, cpSkipBuilding, cpDropFurniture, cpFurniture, cpBuild, cpLift } from '../city/centralPark.js';
+import { cpTileHit, cpApply, cpApplyP1, cpSkipBuilding, cpDropFurniture, cpFurniture, cpBuild, cpLift } from '../city/centralPark.js';
 import { st38ClipTri, st38GapFill } from '../city/stations/subEnt38.js';   // ST38 (STATIONS2): the stair openings cut out of the drawn grid
 import { gf38Load, gf38Apply, gf38Index } from '../city/groundFix38.js';   // GF38 (GROUNDFIX): the bare ground paved from the planimetric data
 import { tileContentKey } from '../shared/overlay.js';   // OV39: the overlays' content key
+import { gradeBaseClasses } from './terrainGrade.js';   // TERRAIN GRADE: the base's urban pieces as one surface
+import { HA_P1, HA_GROUND, haInCentralPark, haTileReady, haApplyTile, haGridDraw, haBuildingGround, haBuildingFloor, haClampGround, haTerrainAt, HA_PAVED } from './heightAuthority.js';   // P1 TERRAIN (`?terrain=p1`)
+import { haLift, haPreload, haHoldDecks, haRestoreDecks, haWarpDeep, haAnchors, haBpWarp } from './haAnchor.js';   // P1 TERRAIN: the re-anchored furniture, Central Park's chunks
+import { HHP, hhpReady, hhpPre, hhpPost, hhpSkipBuilding, hhpAfterClamp } from '../city/hhp.js';   // HIGHWAYS P2 (`?hhp=1`): the Henry Hudson Parkway as designed alignments
+import { wshGroundFix } from '../city/wshGround.js';
+import { wshCoastReady } from '../city/wshCoast.js';   // (the West Side Highway's and the northern parkway's shore ground)
+import { pbrMaterial } from '../city/mat/pbrLib.js';   // P2C: the built walls' stone
+const SMOOTH_P2C = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('terrainSmooth') === '0');   // TERRAIN INT2: on by default (`?terrainSmooth=0` off)
+const SMOOTH_IDS = new Set([5, 6, 7, 15, 17]);
+function smoothNatural(pos, mat, nrm, ox, oz) {
+  // (TERRAIN INT2: gathered in 1.5 m cells by position, not by shared vertices: the compiled lawn's needles meet the
+  // base and each other at T-junctions, so a vertex rarely has the faces round it as its own; a cell's faces within the
+  // crease of a vertex's own face, in that cell and the eight round it and within 1.2 m of height, give its normal)
+  const nV = mat.length, CS = 1.5, H = new Map(), key = (i, j, k) => (i * 65536 + j) * 512 + k;
+  const cell = (x, y, z) => [Math.floor((x - ox + 64) / CS), Math.floor((z - oz + 64) / CS), Math.floor((y + 300) / 1.2)];
+  const ok = new Uint8Array(nV);
+  for (let t = 0; t + 2 < nV; t += 3) {
+    if (!SMOOTH_IDS.has(mat[t]) || mat[t + 1] !== mat[t] || mat[t + 2] !== mat[t]) continue;
+    const o = t * 3;
+    const ux = pos[o + 3] - pos[o], uy = pos[o + 4] - pos[o + 1], uz = pos[o + 5] - pos[o + 2], vx = pos[o + 6] - pos[o], vy = pos[o + 7] - pos[o + 1], vz = pos[o + 8] - pos[o + 2];
+    let fx = uy * vz - uz * vy, fy = uz * vx - ux * vz, fz = ux * vy - uy * vx;   // area-weighted face normal
+    if (fx * fx + fy * fy + fz * fz < 1e-12) continue;
+    if (fy < 0) { fx = -fx; fy = -fy; fz = -fz; }
+    ok[t] = ok[t + 1] = ok[t + 2] = 1;
+    for (let k = 0; k < 3; k++) {
+      const v = t + k, [ci, cj, ck] = cell(pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]), q = key(ci, cj, ck);
+      let l = H.get(q); if (!l) H.set(q, (l = [])); l.push(fx, fy, fz);
+    }
+  }
+  const C = Math.cos((78 * Math.PI) / 180);
+  const out = new Float32Array(nV * 3);
+  for (let v = 0; v < nV; v++) {
+    if (!ok[v]) continue;
+    let ax = nrm[v * 3], ay = nrm[v * 3 + 1], az = nrm[v * 3 + 2];
+    if (ay < 0) { ax = -ax; ay = -ay; az = -az; }
+    const [ci, cj, ck] = cell(pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]);
+    let sx = 0, sy = 0, sz = 0;
+    for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) for (let dk = -1; dk <= 1; dk++) {
+      const l = H.get(key(ci + di, cj + dj, ck + dk));
+      if (!l) continue;
+      for (let i = 0; i < l.length; i += 3) {
+        const L = Math.hypot(l[i], l[i + 1], l[i + 2]);
+        if ((l[i] * ax + l[i + 1] * ay + l[i + 2] * az) / L < C) continue;
+        sx += l[i]; sy += l[i + 1]; sz += l[i + 2];
+      }
+    }
+    const L = Math.hypot(sx, sy, sz);
+    if (L > 0) { const sg = nrm[v * 3 + 1] < 0 ? -1 : 1; out[v * 3] = (sg * sx) / L; out[v * 3 + 1] = (sg * sy) / L; out[v * 3 + 2] = (sg * sz) / L; }
+    else { out[v * 3] = nrm[v * 3]; out[v * 3 + 1] = nrm[v * 3 + 1]; out[v * 3 + 2] = nrm[v * 3 + 2]; }
+  }
+  for (let v = 0; v < nV; v++) if (ok[v]) { nrm[v * 3] = out[v * 3]; nrm[v * 3 + 1] = out[v * 3 + 1]; nrm[v * 3 + 2] = out[v * 3 + 2]; }
+}
+import { vegTile, vegDropTree, vegBuild } from './vegP1.js';
+import { placeGuard, PG_ON } from './placeGuard.js';   // TERRAIN INT2: one placement rule for every standing instance   // VEG P1 (terrain art, lane 1): the parks' woodland from the LiDAR canopy (`?vegp1=0` off)
 import { lf39Load, lf39Apply } from './lotfix39.js';   // LF39 (LOTFIX): missing buildings, lot cars, NYCHA lawns and trees
 import { areaTileHit, areaApply, areaSkipBuilding, areaDropFurniture, areaFurniture, areaBuild } from '../city/areas.js';
 import { tpTileHit, tpApply, tpStepsOwner, tpBuildSteps, tpSkipBuilding, tpBuildFurniture, tpDropFrontage } from '../city/tsqPlaza.js';
@@ -1743,6 +1797,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
   try { bpApply(tile, ox, oz); } catch (e) { console.warn('bp28 walks', e); }
   // CP32: Central Park's water, ground cover, terrace and landmarks re-kind the tile's ground, likewise (city/centralPark.js)
   const CPT = cpTileHit(ox, oz);
+  if (CPT && HA_P1) await haPreload(ox - 512, oz - 512, ox + 1023, oz + 1023);   // P1: cpApply leaves a region tile to cpApplyP1, whose parts read round the tile
   if (CPT) cpApply(tile, ox, oz);
   // AR32: the detailed areas (125th Street, Hunters Point: city/areas.js), likewise
   const ART = areaTileHit(ox, oz);
@@ -1752,10 +1807,27 @@ export async function assembleTile(key, arrayBuf, ctx) {
   // GF38 (GROUNDFIX, city/groundFix38.js; `?gf38=0` none): what is still bare where the city's planimetric data has a walk,
   // a roadway, a median, a lot or a plaza is paved as that, with kerb faces where a walk meets the roadway
   try { gf38Apply(tile, await gf38P); } catch (e) { console.warn('[gf38] fill', e); }
+  // P1 TERRAIN (world/heightAuthority.js; `?terrain=p1`, off by default): the proving region's real ground, after every
+  // re-kinding pass and before anything samples or draws the sections: each ground section cut along the region's TIN and
+  // lifted by its relief (0 on the region's boundary), the road lines and the grid lifted, the region's base laid
+  // HIGHWAYS P2 (city/hhp.js, `?hhp=1`): the compiled parkway out before the cut, its own ground laid after it
+  const HHPT = HHP && await hhpReady();
+  const P1T = HA_P1 && await haTileReady(Math.floor(ox / 512), Math.floor(oz / 512));
+  if (HHPT) { try { hhpPre(tile, ox, oz, P1T); } catch (e) { console.warn('[hhp] pre', e); } }
+  // (P1 anchors: the elevated decks and the FDR under the park decks are Phase 2's structures: held out of the cut)
+  if (P1T) await haAnchors();   // (the cuts' profiles: haHoldDecks holds the cut roads and the street bridges too)
+  if (P1T) { const held = haHoldDecks(tile, ox, oz); try { haApplyTile(tile, ox, oz); } catch (e) { console.warn('[terrain p1] apply', e); } haRestoreDecks(tile, held); }
+  if (P1T && CPT) cpApplyP1(tile, ox, oz);   // P1: Central Park's parts on the authority's ground (city/centralPark.js)
+  if (HHPT) { try { hhpPost(tile, ox, oz, P1T); } catch (e) { console.warn('[hhp] post', e); } }
+  if (HHPT && P1T) { try { await wshCoastReady(); wshGroundFix(tile, ox, oz); } catch (e) { console.warn('[wsh] ground', e); } }
+  if (P1T) haClampGround(tile);   // TERRAIN FIX: the natural ground never over the paving (heightAuthority.js)
+  if (HHPT) hhpAfterClamp(tile);   // (the FDR structures' deck tops: over the drives by design)
+  const VGT = P1T && await vegTile(ox, oz);   // VEG P1: this tile's trees, understorey and cover mask (world/vegP1.js)
 
   // tile terrain sampler (carved grid) for foundation depths
   const terrRes = tile.header.res, terrN = terrRes + 1, terrG = tile.S.terrain;
   const sampleT = (x, z) => {
+    if (P1T) { const a = haTerrainAt(x, z); if (a !== null) return a; }   // P1: the region's base, exact (the grid is 16 m)
     const fx = Math.min(terrRes - 0.001, Math.max(0, ((x - ox) / 512) * terrRes));
     const fz = Math.min(terrRes - 0.001, Math.max(0, ((z - oz) / 512) * terrRes));
     const i = Math.floor(fx), j = Math.floor(fz), u = fx - i, v = fz - j;
@@ -1780,7 +1852,11 @@ export async function assembleTile(key, arrayBuf, ctx) {
   // section (4 m cells) so a tile whose furniture never leaves the sidewalk
   // pays for the sidewalk section only.
   const SURF = new Map();        // section name -> {a, H} spatial hash
-  const surfCell = 4;
+  // P2C (terrain): the cut leaves a section 5-12 times the triangles, and the sims ask this hash every frame (cars,
+  // walkers): 1 m cells, each triangle in the cells its box reaches 0.6 m out (every metric tolerance asked: the answer
+  // within it no longer depends on where the 4 m cell's edge fell). Flat tiles keep the 4 m cells. Numeric keys.
+  const P2CS = !!(P1T && tile.p1);
+  const surfCell = P2CS ? 1 : 4, surfPad = P2CS ? 0.6 : 0, SK = (i, j) => (i + 40000) * 80000 + (j + 40000);
   const surfHash = (name) => {
     if (SURF.has(name)) return SURF.get(name);
     const a = tile.S[name];
@@ -1791,11 +1867,11 @@ export async function assembleTile(key, arrayBuf, ctx) {
       for (let t = 0; t < nTri; t++) {
         const o = t * 9;
         const x0 = a[o] + ox, z0 = a[o + 2] + oz, x1 = a[o + 3] + ox, z1 = a[o + 5] + oz, x2 = a[o + 6] + ox, z2 = a[o + 8] + oz;
-        const i0 = Math.floor(Math.min(x0, x1, x2) / surfCell), i1 = Math.floor(Math.max(x0, x1, x2) / surfCell);
-        const j0 = Math.floor(Math.min(z0, z1, z2) / surfCell), j1 = Math.floor(Math.max(z0, z1, z2) / surfCell);
-        if ((i1 - i0) > 64 || (j1 - j0) > 64) continue;     // river-straddling overlay slivers
+        const i0 = Math.floor((Math.min(x0, x1, x2) - surfPad) / surfCell), i1 = Math.floor((Math.max(x0, x1, x2) + surfPad) / surfCell);
+        const j0 = Math.floor((Math.min(z0, z1, z2) - surfPad) / surfCell), j1 = Math.floor((Math.max(z0, z1, z2) + surfPad) / surfCell);
+        if ((i1 - i0) * surfCell > 256 || (j1 - j0) * surfCell > 256) continue;     // river-straddling overlay slivers
         for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-          const k = i + '_' + j;
+          const k = SK(i, j);
           let arr = H.get(k); if (!arr) H.set(k, (arr = []));
           arr.push(t);
         }
@@ -1820,7 +1896,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
     const rec = surfHash(name);
     if (!rec) return null;
     const { a, H } = rec;
-    const list = H.get(Math.floor(x / surfCell) + '_' + Math.floor(z / surfCell));
+    const list = H.get(SK(Math.floor(x / surfCell), Math.floor(z / surfCell)));
     if (!list) return null;
     let bestY = null, bestD = 1e9;
     for (const t of list) {
@@ -1880,6 +1956,31 @@ export async function assembleTile(key, arrayBuf, ctx) {
   };
   // median of the pavement height around a footprint's edge midpoints — the
   // datum a building's ground floor must start at.
+  // TERRAIN FIX: the drawn ground's top at (x, z) (every ground section within 2 cm, the region's base), or null
+  // (at grade only: a section more than 1 m over the region's base there is a deck, a viaduct or a ramp beside the
+  // facade, not the ground the building stands in)
+  const p1GroundTop = (x, z) => {
+    const g = p1BaseAt(x, z);   // (the drawn base: haClampGround may have lowered it)
+    if (g === null) return null;
+    let m = g;
+    for (const k of HA_GROUND) { const y = sectionY0(k, x, z, 0.02); if (y !== null && y > m && y <= g + 1.0) m = y; }
+    return m;
+  };
+  // (the drawn base there; where none is drawn, the highest ground section, which hides it; else the authority's)
+  const p1BaseAt = (x, z) => {
+    const b = sectionY0('terrP1', x, z, 0.02);
+    if (b !== null) return b;
+    let m = null;
+    for (const k of HA_GROUND) { const y = sectionY0(k, x, z, 0.02); if (y !== null && (m === null || y > m)) m = y; }
+    return m !== null ? m : haTerrainAt(x, z);
+  };
+  const p1PavedTop = (x, z) => {
+    const g = p1BaseAt(x, z);
+    if (g === null) return null;
+    let m = null;
+    for (const k of HA_GROUND) { if (k === 'grass' || k === 'grassU') continue; const y = sectionY0(k, x, z, 0.02); if (y !== null && y <= g + 1.0 && (m === null || y > m)) m = y; }   // (built frontage: every ground section but the lawns)
+    return m;
+  };
   const padUnderRing = (ring) => {
     const hits = [];
     const n = ring.length;
@@ -2097,6 +2198,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
   const cyMap = CY12 ? holesOf(tile) : new Map();
   let cyCourts = 0, cyDropped = 0;            // realised / dropped by a massing branch, reported on the tile record
   let fpPents = 0;                            // FP18: penthouse storeys drawn (towers and the mid-rise), on the tile record
+  const p1Bl = [];   // P1 TERRAIN: each building's footprint and lift (its roof and wall furniture moves with it)
   for (const b of buildingsOf(tile)) {
     buf.curBid = b.i;
     b.greenRoof = !!(b.roofKind & 128);
@@ -2131,7 +2233,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
     cx /= ring.length; cz /= ring.length;
     // a footprint that lies entirely in the traffic lanes is not a building
     if (!NO_DATUM && !b.landmarkId && b.area <= 200 && onCarriageway(ring, cx, cz)) { culledOnRoad++; cyDrop(); continue; }   // CY12: a footprint that is not a building has no courts
-    if (tpSkipBuilding(cx, cz, b.height, b.area) || bpSkipBuilding(cx, cz, b.height, b.area) || (CPT && cpSkipBuilding(cx, cz, b.height, b.area)) || (ART && areaSkipBuilding(cx, cz, b.height, b.area))) { cyDrop(); continue; }   // TP28: the TKTS booth (the red steps stand there) and the kiosk box on the Duffy Square plaza
+    if (tpSkipBuilding(cx, cz, b.height, b.area) || bpSkipBuilding(cx, cz, b.height, b.area) || (CPT && cpSkipBuilding(cx, cz, b.height, b.area)) || (ART && areaSkipBuilding(cx, cz, b.height, b.area)) || (HHPT && hhpSkipBuilding(cx, cz))) { cyDrop(); continue; }   // TP28: the TKTS booth (the red steps stand there) and the kiosk box on the Duffy Square plaza
     // foundation: walls extend down to below the lowest terrain under the footprint,
     // shader renders the below-grade band (v<0) as a stone/brick foundation course
     let minT = 1e9;
@@ -2147,15 +2249,28 @@ export async function assembleTile(key, arrayBuf, ctx) {
     // median pavement height around the footprint, clamped so a bad sample can
     // never move a building (and never a landmark, which carries its own pads).
     if (CPT) { const dy = cpLift(cx, cz); if (dy) b.baseY += dy; }   // CP32: the park's relief under its compiled buildings
+    // P1: the region's relief round the footprint (less the campus pad it was compiled on); the ground floor then settles
+    // on the lifted pavement (padUnderRing) and the foundation reaches the lowest ground round it (the plinth: minT)
+    if (P1T) {
+      const q = haBuildingGround(ring, tile, ox, oz);
+      if (q) {
+        b.baseY += q.lift; b.haLift = q.lift; minT = Math.min(minT, q.low);
+        let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+        for (const [x, z] of ring) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+        p1Bl.push({ ring, lift: q.lift, bb: [x0, z0, x1, z1] });
+      }
+    }
     let y0 = b.baseY;
     if (!b.landmarkId && !NO_DATUM) {
       const padY = padUnderRing(ring);
       const want = padY !== null ? padY : sampleT(cx, cz) + 0.28;   // 0.28 = the compiler's lot lift
       if (want > b.baseY && want - b.baseY < 1.2) y0 = want;
     }
+    // TERRAIN FIX: on a slope the ground floor never lies under the drawn ground along its facades (heightAuthority)
+    if (P1T && b.haLift !== undefined && !b.landmarkId) y0 = haBuildingFloor(ring, y0, p1GroundTop, p1PavedTop);
     b.baseY = y0;                                          // decals / hero recs / roof all read this
     const topY = y0 + b.height;
-    const fndY = Math.min(y0, Math.max(minT - 1.0, y0 - 6));
+    const fndY = Math.min(y0, Math.max(minT - 1.0, y0 - (P1T ? 25 : 6)));   // P1: an exposed base on a slope can be 10 m
 
     // collider prism (full height)
     let minX = 1e9, minZ = 1e9, maxX = -1e9, maxZ = -1e9;
@@ -2591,7 +2706,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
       const obb = ringOBB(local);
       const g = ctx.landmarks(L.spec.key, {
         footprint: local, height: L.b.height, floors: L.b.floors, floorH: L.b.floorH, groundY: L.groundY,
-        obb, THREE, cx: L.cx, cz: L.cz,
+        obb, THREE, cx: L.cx, cz: L.cz, haLift: L.b.haLift || 0,   // P1 TERRAIN: the lift under the flag (landmarks.js cuYP)
         padY: padUnderRing(L.ring), // paved/pad top under the footprint (replaces the campus kit's CU_PADS table)
       });
       if (g) {
@@ -2651,6 +2766,9 @@ export async function assembleTile(key, arrayBuf, ctx) {
     // touching its four cells, at most 1.5 m below its sample; the samples themselves (terrainAt) are untouched.
     const terrDraw = new Float32Array(n * n);
     for (let k = 0; k < n * n; k++) terrDraw[k] = terr[k] - 0.12;
+    if (P1T && tile.S.terrP1 && tile.S.terrP1.length) { sections.push(['terrP1', 7]); total += tile.S.terrP1.length / 3; }   // P1: the region's base
+    // P2A: the slits' faces (masonry as the board-formed concrete of matId 21, rock as terrain, schist on a vertical face)
+    if (P1T) for (const [nm, id] of [['terrWall', 21], ['terrRock', 7]]) if (tile.S[nm] && tile.S[nm].length && !(nm === 'terrWall' && tile.S.terrWallUV)) { sections.push([nm, id]); total += tile.S[nm].length / 3; }
     if (!NO_TL26) {
       const cw = TILE_OF(tile) / res;
       for (const [name] of sections) {
@@ -2669,6 +2787,8 @@ export async function assembleTile(key, arrayBuf, ctx) {
         }
       }
     }
+    // P1: a grid cell wholly inside the region is not drawn (the region's base is), a boundary cell's points sink under it
+    const p1Skip = P1T ? haGridDraw(tile, ox, oz, terrDraw) : null;
     const terrVerts = res * res * 6;
     const pos = new Float32Array((total + terrVerts) * 3);
     const mat = new Float32Array(total + terrVerts);
@@ -2677,9 +2797,15 @@ export async function assembleTile(key, arrayBuf, ctx) {
       const src = tile.S[name];
       if (!src) continue;
       const perV = name === 'rtop' && tile.S.rtopA && tile.S.rtopA.length * 3 === src.length ? tile.S.rtopA : null;
+      // (TERRAIN INT2: the region's base where it shows in Central Park is the park's lawn: one surface, one shading)
+      const cpB = name === 'terrP1' && CPT ? (i) => haInCentralPark((src[i] + src[i + 3] + src[i + 6]) / 3 + ox, (src[i + 2] + src[i + 5] + src[i + 8]) / 3 + oz) : null;
+      // (TERRAIN GRADE, world/terrainGrade.js: the base's urban pieces as one surface each, the lawn's or a plaza's)
+      const gbc = name === 'terrP1' && P1T ? gradeBaseClasses(tile) : null;
+      let tm = mid;
       for (let i = 0, v = 0; i < src.length; i += 3, v++) {
+        if ((cpB || gbc) && v % 3 === 0) tm = cpB && cpB(i) ? 5 : gbc && gbc[v / 3] ? gbc[v / 3] : mid;
         pos[o * 3] = src[i] + ox; pos[o * 3 + 1] = src[i + 1]; pos[o * 3 + 2] = src[i + 2] + oz;
-        mat[o] = perV ? perV[v] : mid; o++;
+        mat[o] = perV ? perV[v] : cpB || gbc ? tm : mid; o++;
       }
     }
     const T = TILE_OF(tile);
@@ -2696,6 +2822,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
     for (let j = 0; j < res; j++) for (let i = 0; i < res; i++) {
       const x0 = ox + (i / res) * T, x1 = ox + ((i + 1) / res) * T;
       const z0 = oz + (j / res) * T, z1 = oz + ((j + 1) / res) * T;
+      if (p1Skip && p1Skip[j * res + i]) continue;
       const y00 = terrDraw[j * n + i], y10 = terrDraw[j * n + i + 1], y01 = terrDraw[(j + 1) * n + i], y11 = terrDraw[(j + 1) * n + i + 1];
       const quad = [[x0, y00, z0], [x1, y11, z1], [x1, y10, z0], [x0, y00, z0], [x0, y01, z1], [x1, y11, z1]];
       if (holes38) {
@@ -2704,7 +2831,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
       }
       for (const [x, y, z] of quad) { pos[o * 3] = x; pos[o * 3 + 1] = y; pos[o * 3 + 2] = z; mat[o] = 7; o++; }
     }
-    let posF = pos, matF = mat;
+    let posF = p1Skip ? pos.subarray(0, o * 3) : pos, matF = p1Skip ? mat.subarray(0, o) : mat;
     if (holes38) {
       const ne = extra38 ? extra38.length * 3 : 0;
       posF = new Float32Array((o + ne) * 3); matF = new Float32Array(o + ne);
@@ -2715,10 +2842,46 @@ export async function assembleTile(key, arrayBuf, ctx) {
     g.setAttribute('position', new THREE.BufferAttribute(posF, 3));
     g.setAttribute('matId', new THREE.BufferAttribute(matF, 1));
     g.computeVertexNormals();
+    // P2C: natural ground (lawns, the base, park paths, gravel) shaded smooth: each vertex takes the area-weighted normal of
+    // the faces of those kinds that meet at it within 78 deg of its own (walls, kerbs and slits keep their creases); the
+    // TIN's facets read as relief, not as cut planes. Paved kinds keep their face normals. On by default (`?terrainSmooth=0` off).
+    if (P1T && SMOOTH_P2C) smoothNatural(posF, matF, g.attributes.normal.array, ox, oz);
     g.computeBoundingSphere();
     const m = new THREE.Mesh(g, ctx.groundMat);
     m.receiveShadow = true;
     group.add(m);
+    // P2C: the built walls (heightAuthority.js wallFaces): their stone from the material library at true size, UVs in
+    // metres along each run, the library's weathering by toe and top; one mesh per stone and one for the copings
+    if (P1T && tile.S.terrWallUV && tile.S.terrWall.length) {
+      const W = tile.S.terrWall, UV = tile.S.terrWallUV, WE = tile.S.terrWallWe, MK = tile.S.terrWallMat;
+      const mats = [pbrMaterial('stone_lime_rusticated', { tint: '#6f6a62', weatherAttr: true, dirt: 0.45, seed: 3 }),   // Manhattan schist rubble
+        pbrMaterial('stone_lime_ashlar', { tint: '#a39e95', weatherAttr: true, dirt: 0.35, seed: 5 }),                  // granite ashlar
+        pbrMaterial('concrete_board', { weatherAttr: true, dirt: 0.4, seed: 7 })];                                      // board-formed concrete
+      const mkMesh = (pos, uv, we, mat) => {
+        const gg = new THREE.BufferGeometry();
+        gg.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+        gg.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+        gg.setAttribute('aWeather', new THREE.BufferAttribute(we, 3));
+        gg.computeVertexNormals();
+        gg.computeBoundingSphere();
+        const mm = new THREE.Mesh(gg, mat);
+        mm.castShadow = true; mm.receiveShadow = true; mm.position.set(ox, 0, oz); mm.name = 'terrWall';
+        group.add(mm);
+      };
+      for (let k = 0; k < 3; k++) {
+        let nT = 0;
+        for (let t = 0; t < MK.length; t++) if (MK[t] === k) nT++;
+        if (!nT) continue;
+        const pos = new Float32Array(nT * 9), uv = new Float32Array(nT * 6), we = new Float32Array(nT * 9);
+        let o2 = 0;
+        for (let t = 0; t < MK.length; t++) {
+          if (MK[t] !== k) continue;
+          pos.set(W.subarray(t * 9, t * 9 + 9), o2 * 9); uv.set(UV.subarray(t * 6, t * 6 + 6), o2 * 6); we.set(WE.subarray(t * 9, t * 9 + 9), o2 * 9); o2++;
+        }
+        mkMesh(pos, uv, we, mats[k]);
+      }
+      if (tile.S.terrCap && tile.S.terrCap.length) mkMesh(tile.S.terrCap, tile.S.terrCapUV, tile.S.terrCapWe, pbrMaterial('granite_grey_flamed', { weatherAttr: true, dirt: 0.3, seed: 11 }));
+    }
   }
 
   // ---- furniture instances
@@ -2787,11 +2950,30 @@ export async function assembleTile(key, arrayBuf, ctx) {
     ? treeFixes(furn0, ox, oz, tfo?.t?.[`${Math.round(ox / 512)}_${Math.round(oz / 512)}`] || null, tovRows, (tfo && tfo.boxes) || [], (x, z) => sectionY('sidewalk', x, z, 1.5) !== null)
     : null;
   const bpExtra = [];
+  // P1 TERRAIN: the lift of a compiled furniture record at (x, z): inside a footprint (a roof piece) or, for a wall-hung
+  // kind, within 3 m of one, its building's lift; else the ground's under it (world/haAnchor.js haLift)
+  const p1In = (P, x, z) => { let ins = false; for (let i = 0, j = P.length - 1; i < P.length; j = i++) { const [xi, zi] = P[i], [xj, zj] = P[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) ins = !ins; } return ins; };
+  const p1FurnLift = (x, z, k) => {
+    const hung = !GROUND_KIND.has(k);
+    let best = null, bd = 3;
+    for (const B of p1Bl) {
+      if (x < B.bb[0] - 3 || x > B.bb[2] + 3 || z < B.bb[1] - 3 || z > B.bb[3] + 3) continue;
+      if (p1In(B.ring, x, z)) return B.lift;
+      if (!hung) continue;
+      for (let i = 0; i < B.ring.length; i++) {
+        const [ax, az] = B.ring[i], [bx, bz] = B.ring[(i + 1) % B.ring.length], dx = bx - ax, dz = bz - az, L2 = dx * dx + dz * dz || 1e-9;
+        const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L2)), d = Math.hypot(ax + dx * t - x, az + dz * t - z);
+        if (d < bd) { bd = d; best = B.lift; }
+      }
+    }
+    return best !== null ? best : haLift(x, z, ox, oz);
+  };
   if (TF) for (const a of TF.add) { a.y = padYNear(a.x + ox, a.z + oz); bpExtra.push(a); }
   if (BP28) for (const t of bpTrees(ox, oz, 0)) { t.bp = true; t.y = padYNear(t.x + ox, t.z + oz); bpExtra.push(t); }
   // CP32: Central Park's trees, lamps and benches likewise (a record without a height stands on the ground under it)
   if (CPT) for (const t of cpFurniture(ox, oz)) { if (t.y === null) t.y = padYNear(t.x + ox, t.z + oz); bpExtra.push(t); }
   if (ART) for (const t of areaFurniture(ox, oz)) { if (t.y === null) t.y = padYNear(t.x + ox, t.z + oz); bpExtra.push(t); }
+  const PGD = PG_ON ? placeGuard(tile, ox, oz) : null, PGS = {};
   for (const f of (bpExtra.length ? [...furn0, ...bpExtra] : furn0)) {
     let wx = f.x + ox, wz = f.z + oz;
     if (TF && f.k === FURN.TREE && f.ix !== undefined) {
@@ -2801,11 +2983,17 @@ export async function assembleTile(key, arrayBuf, ctx) {
         if (e.p0 !== undefined) f.p0 = e.p0;
         if (e.p1 !== undefined) f.p1 = e.p1;
         if (e.pit !== undefined) f.pit = e.pit;
-        if (e.x !== undefined) { wx = e.x; wz = e.z; f.x = wx - ox; f.z = wz - oz; f.y = padYNear(wx, wz); }
+        if (e.x !== undefined) { wx = e.x; wz = e.z; f.x = wx - ox; f.z = wz - oz; f.y = padYNear(wx, wz); f.p1Done = true; }
       }
     }
+    // P1 TERRAIN: a compiled record stood at the flat heights: it moves with the ground under it (a roof or wall piece with
+    // its building's lift); the snap below then settles a ground piece on the lifted pavement. (f.y0 keeps the compiled
+    // height for the ground-floor test.)
+    // (kind 33, the piers under the elevated decks, stay with the decks the cut holds: Phase 2)
+    if (P1T && f.ix !== undefined && !f.p1Done && f.k !== 33) { f.y0 = f.y; f.y += p1FurnLift(wx, wz, f.k); f.p1Done = true; }
     if (BP28 && f.k === FURN.TREE && !f.bp && bpDropTree(wx, wz, f)) continue;
     if (CPT && !f.cp && cpDropFurniture(wx, wz, f)) continue;
+    if (VGT && f.k === FURN.TREE && f.ix !== undefined && vegDropTree(wx, wz, f)) continue;   // VEG P1: the compiled park scatter where the LiDAR's trees stand
     if (ART && !f.ar && areaDropFurniture(wx, wz, f)) continue;
     // GROUND SNAP. Three compiler datums reach us for things that stand on the
     // pavement: `terrain + 0.28` (correct on the flags), the bare `terrain`
@@ -2816,7 +3004,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
     // 2 cm — the 2 cm one is the worst, because it is exactly the gap SSAO
     // paints black). Ask the ground. 0.5 m of authority so a bad sample can
     // never launch a bus shelter, and never touch anything above ground floor.
-    if (f.y < 12 && !NO_DATUM) {
+    if ((f.y0 !== undefined ? f.y0 : f.y) < 12 && !NO_DATUM) {
       if (GROUND_KIND.has(f.k) || f.k === FURN.FIRE_ESCAPE) {
         let gy = padYNear(wx, wz);
         // standing in the roadway? walk it back to the kerb if it is that kind
@@ -2841,11 +3029,18 @@ export async function assembleTile(key, arrayBuf, ctx) {
           else if (KERB_ONLY.has(f.k) && surfY(wx, wz, ROAD_KINDS, 0.2) !== null) { strandedInRoad++; continue; }
         }
         if (Math.abs(gy - f.y) < 0.5) f.y = gy;
+        // P1 TERRAIN: a lifted record the ring missed (beside a wall or a steep bank the lift at its point and the ring's
+        // highest pavement part) stands on the surface at its own point
+        else if (f.y0 !== undefined) { const at = padYAt(wx, wz); if (at !== null && Math.abs(at - f.y) < 3) f.y = at; }
       } else if (frontageOnTerrain && FRONTAGE_HUNG.has(f.k)) {
         const lift = padYNear(wx, wz) - sampleT(wx, wz);
         if (lift > 0 && lift < 0.6) f.y += lift;
       }
     }
+    // TERRAIN INT2: the placement rule (world/placeGuard.js) at the record's final place (after the kerb nudge): no tree
+    // within 2 m of a facade, nothing standing in a building, a carriageway or a park drive
+    if (PGD && (f.ix === undefined || (f.y0 !== undefined ? f.y0 : f.y) < 12)) { const r = PGD.why(wx, wz, f.k);   // (a park's or an area's own record stands at its world height)
+      if (r) { PGS[r] = (PGS[r] || 0) + 1; continue; } }
     if (f.k === FURN.TREE) {
       if (tsxT && f.p0 === 0 && (f.p2 & 1)) { const c9 = tsxAt(tsxT, f.x, f.z); if (c9) f.p0 = c9; }
       const sp = inst.treeSpecies(f.p0);
@@ -3125,17 +3320,31 @@ export async function assembleTile(key, arrayBuf, ctx) {
   }
   // BP28: the park's gravel, hedges, chairs and fountain, built by the tile that holds the lawn's centre
   // TP28: the TKTS red steps in Duffy Square, standing on the plaza
-  if (tpStepsOwner(ox, oz)) { try { tpBuildSteps(group, padYNear(-1157.65, 2661.15)); } catch (e) { console.warn('tp28 steps', e); } }
+  // (P1 TERRAIN: the red steps are one rigid block: on the lowest paving under their footprint, set into the high side)
+  const tpY = () => {
+    let y = padYNear(-1157.65, 2661.15);
+    // (their footprint: 17.4 m up the steps (0.374, -0.927) by 11.5 across, round the booth's centre)
+    if (P1T) for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) { const s = i * 4.2, t = j * 2.8, v = padYAt(-1157.65 + 0.374 * s + 0.927 * t, 2661.15 - 0.927 * s + 0.374 * t); if (v !== null && v < y) y = v; }
+    return y;
+  };
+  if (tpStepsOwner(ox, oz)) { try { tpBuildSteps(group, tpY()); } catch (e) { console.warn('tp28 steps', e); } }
   // TF31: the plaza's benches, bollards, cafe tables and planters, for the pieces of plaza in this tile
   if (tpRoadsW) { try { tpBuildFurniture(group, tpRoadsW, (x, z) => sectionY('plaza', x, z, 0.6) ?? padYNear(x, z), ox, oz, key); } catch (e) { console.warn('tf31', e); } }
   // CP32: Central Park's meshes for this tile (each part builds what lies in it)
   if (CPT) cpBuild(group, { ox, oz, key, tile, sampleT, sectionY, surfY, padYNear });
+  if (VGT) { try { vegBuild(group, { ox, oz, key, tile, sampleT, sectionY, surfY, padYNear }); } catch (e) { console.warn('[vegp1] build', e); } }
   if (ART) await areaBuild(group, { ox, oz, key, tile, sampleT, sectionY, surfY, padYNear });   // AR34 KIT: the facade kit builds in slices (city/areas.js)
+  if (HHPT && !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('hhpkit') === '0')) { try { await (await import('../city/hhpKit.js')).build(group, { ox, oz, key, tile, sampleT }); } catch (e) { console.warn('[hhp] kit', e); } }   // HIGHWAYS P2: the parkway's structures
   if (BP28 && bpOwns(ox, oz)) {
     try {
       const [lx, lz] = bpWorld(77, 69);
       const ly = sectionY('grass', lx, lz, 0.5) ?? padYNear(lx, lz);
+      const bp0 = group.children.length;
+      if (P1T) await haPreload(-1180, 3200, -900, 3320);   // (the park's chunks past this tile's margin)
       bpBuild(group, ly);
+      // P1 TERRAIN: the park was built on one lawn sample; on the park's own level model (world/haAnchor.js haBpWarp: the
+      // base its ground rides on, the walls' street faces down to the sidewalks), else by the relief under each vertex
+      if (P1T) { const r0 = haLift(lx, lz, ox, oz); haWarpDeep(group, bp0, haBpWarp(ly) || ((x, y, z) => y + haLift(x, z, ox, oz) - r0)); }
     } catch (e) { console.warn('bryant park', e); }
   }
   // per-tile sign text / decal / billboard / shop-sign meshes share one static

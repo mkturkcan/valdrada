@@ -65,7 +65,7 @@ python PythonAPI/examples/intersection_120_amsterdam.py
 ```
 npm install && (cd client && npm install)
 # binary banks (tiles, models, textures): download, or compile the tiles (BUILDING.md)
-hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.5.1 \
+hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.5.2 \
     --include "Content/tiles/*" --include "Content/models/*" --include "Content/textures/*" --local-dir .cache/hf
 mv .cache/hf/Content/tiles .cache/hf/Content/models .cache/hf/Content/textures client/public/
 cd client && npm run dev        # http://127.0.0.1:5219
@@ -117,17 +117,18 @@ launcher starts the headless core (the simulation and the Python API on port 200
 the Python code above runs against it unchanged.
 
 ```bash
-curl -LO https://github.com/mkturkcan/valdrada/releases/latest/download/fetch_valdrada_ue.py
-python3 fetch_valdrada_ue.py          # downloads, checks and assembles the release for this system
-./ValdradaUE.sh                       # Windows: ValdradaUE.bat
+curl -LO https://github.com/mkturkcan/valdrada/releases/download/v0.5.1/fetch_valdrada_ue.py
+python3 fetch_valdrada_ue.py --version 0.5.1   # downloads, checks and assembles the release for this system
+./ValdradaUE.sh                                # Windows: ValdradaUE.bat
 ```
 
 The [guide](https://mkturkcan.github.io/valdrada/ue-client/) gives the requirements, the options and what the
 renderer serves so far; [building it from source](https://mkturkcan.github.io/valdrada/ue-client-build/) covers the
 engine, the city's content, cooking, chunking and publishing on Linux and Windows. The renderer is distributed under
 the Unreal Engine End User License Agreement; the repository's code stays MIT.
-Release 0.5.1 provides the Linux x86-64 build (32 files, 35.4 GB to download, 52.3 GB installed); the Windows x64
-build is made from source as the build guide describes.
+Release 0.5.1 provides the Linux x86-64 build (32 files, 35.4 GB to download, 52.3 GB installed) and remains the
+current Unreal client: release 0.5.2 did not rebuild it. The Windows x64 build is made from source as the build guide
+describes.
 
 ## Coverage
 
@@ -196,7 +197,7 @@ rendered with it, please cite Valdrada itself:
   author  = {Turkcan, Mehmet Kerem},
   title   = {{Valdrada}: a real-data, real-time digital twin of New York City},
   year    = {2026},
-  version = {0.5.1},
+  version = {0.5.2},
   url     = {https://github.com/mkturkcan/valdrada}
 }
 ```

@@ -1330,8 +1330,15 @@ export function makeFacadeMaterial({ hideTex = null } = {}) {
           // below-grade foundation course: rusticated stone/brick, darker and coarser
           float course = step(0.5, fract(v / 0.42));
           float blocks = hash12(vec2(floor(u / 1.1), floor(v / 0.42) + cvar * 41.0));
-          albedo = mix(vec3(0.32, 0.28, 0.24), vec3(0.42, 0.38, 0.33), blocks) * (0.85 + 0.1 * course);
-          FAC_rough = 0.96;
+          vec3 fndStone = mix(vec3(0.32, 0.28, 0.24), vec3(0.42, 0.38, 0.33), blocks) * (0.85 + 0.1 * course);
+          // TERRAIN FIX: on a slope the raised floor can leave metres of base exposed downhill: below a 0.6 m stone water
+          // table the building's own wall material carries on to the ground (its colour in courses, no windows), never a
+          // plain beige box
+          float wc = step(0.5, fract(v / 0.075 + step(0.5, fract(u / 0.21)) * 0.5)), wb = hash12(vec2(floor(u / 0.21), floor(v / 0.075) + cvar * 17.0));
+          float wfade = smoothstep(0.06, 0.02, fwidth(v));   // (the courses fade to their mean before they alias)
+          vec3 fndWall = albedo * (0.90 + wfade * (0.10 * wc + 0.10 * wb - 0.10));
+          albedo = v > -0.6 ? fndStone : fndWall;
+          FAC_rough = v > -0.6 ? 0.96 : 0.92;
         } else if (isRoof) {
           // NYC roof membranes — DATA-DRIVEN from the compiler's packed roof
           // byte via aux.z (1 silver coat, 2 dark EPDM/tar, 3 gravel ballast,
@@ -4945,6 +4952,9 @@ const GP31_SURF_GLSL = /* glsl */ `
 // over the park's box: R the woodland floor (OSM natural=wood), G the ballfields' clay infields, B the tennis centre's
 // green clay, A the wet bank along every shore (1 at the water, 0 by 4 m); rect = x0, z0, 1/w, 1/h in world metres.
 export const CP32L_GROUND = { mask: { value: null }, rect: { value: new THREE.Vector4(0, 0, 0, 0) }, on: { value: 0 } };
+// TERRAIN FIX: the region's ground-cover mask round the lens (world/vegP1.js fills it: R class 1 lawn, 2 meadow, 3 woodland
+// floor, 4 soil and trails, 5 rock, 6 paved, 7 water, 8 building): the drawn base (matId 7) takes litter, soil or schist from it
+export const VEG_GROUND_U = { mask: { value: null }, rect: { value: new THREE.Vector4(0, 0, 0, 0) }, on: { value: 0 } };
 export function makeGroundMaterial() {
   const mat = new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0.0 });
   if (GP31) {
@@ -4967,6 +4977,7 @@ export function makeGroundMaterial() {
     sh.uniforms.gs35 = ENV.gs35;   // GS35
     for (const k of ['asC', 'asN', 'asR', 'asD', 'coC', 'coN', 'grC', 'grN', 'pvC', 'pvN']) sh.uniforms['t_' + k] = { value: GTEX[k] };
     sh.uniforms.cp32lMask = CP32L_GROUND.mask; sh.uniforms.cp32lRect = CP32L_GROUND.rect; sh.uniforms.cp32lOn = CP32L_GROUND.on;   // CP32L
+    sh.uniforms.vgMask = VEG_GROUND_U.mask; sh.uniforms.vgRect = VEG_GROUND_U.rect; sh.uniforms.vgOn = VEG_GROUND_U.on;   // TERRAIN FIX
     if (CP32R_MASK) sh.uniforms.cpFarPhoto = { value: cpFarPhoto() };   // CP32R: the far park's ground (matId 8) from the aerial
     gtexRefPush(sh.uniforms); // async KTX2 arrivals refresh these (MEM41: weakly held)
     if (GP32) sh.uniforms.gpVN = { value: 1 };
@@ -5022,6 +5033,7 @@ export function makeGroundMaterial() {
         uniform sampler2D t_grC; uniform sampler2D t_grN;
         uniform sampler2D t_pvC; uniform sampler2D t_pvN;
         uniform sampler2D cp32lMask; uniform vec4 cp32lRect; uniform float cp32lOn;   // CP32L: Central Park's ground cover
+        uniform sampler2D vgMask; uniform vec4 vgRect; uniform float vgOn;   // TERRAIN FIX: the region's ground cover (world/vegP1.js)
         ${CP32R_MASK ? 'uniform sampler2D cpFarPhoto;   // CP32R: the far park' : ''}
         uniform vec3 lb14StCal; uniform vec3 lb14Walk; uniform vec3 lb14Paint; uniform float lb14Road;   // LB14 (docs/notes/lb14.md)
         varying float vMat; varying vec3 vWPos;
@@ -5033,6 +5045,7 @@ export function makeGroundMaterial() {
         float GND_paint;  // 1 = intact thermoplastic film (fills the aggregate)
         float GND_wall;   // 1 = near-vertical face (curb face, park rock cut)
         float GND_rock;   // 1 = schist outcrop (steep terrain/grass)
+        int GND_vgC;      // TERRAIN FIX: the cover class under the base fragment (-1 none)
         float GND_spec;   // dielectric F0 scale (see the specular trim below)
         // three values the asphalt branch computes anyway, published so the
         // gutter (11) and the red bus lane (12) can key off them instead of
@@ -5048,9 +5061,12 @@ export function makeGroundMaterial() {
         if (m == 11 || m == 12) m = 0;
         if (m == 15) m = 5;                 // TL26: the campus lawn underlay is lawn (its own id only for the depth order)
         GND_patch = 0.0; GND_manhole = 0.0; GND_oil = 0.0; GND_tn = vec3(0.0, 0.0, 1.0); GND_tnW = 0.0;
-        GND_paint = 0.0; GND_rock = 0.0; GND_spec = 1.0;
+        GND_paint = 0.0; GND_rock = 0.0; GND_spec = 1.0; GND_vgC = -1;
         GND_age = 0.5; GND_wheel = 0.0; GND_cast = 0.0;
         if (m == 8 && farHidden(vWPos.xz)) discard;   // NM24: far terrain only where no ready near tile is
+        // TERRAIN FIX: the far skirt's coarse cells span the shore, so their slope crosses the water plane a few metres off
+        // the near tiles' bulkheads and stood in the river as pale specks: the skirt is never drawn within 1.2 m of the water
+        if (m == 8 && vWPos.y < 1.2) discard;
         GND_rough = 0.95;
         vec3 albedo;
         float n1 = vnoise(vWPos.xz * 0.35); // macro variation (~9m) only
@@ -5061,6 +5077,9 @@ export function makeGroundMaterial() {
         // rock cuts and river banks are all vertical strips of the same merged
         // ground mesh, and everything below keys off this instead of guessing.
         GND_wn = normalize(cross(dFdx(vWPos), dFdy(vWPos)));
+        // (TERRAIN INT2: natural ground (the lawns, the region's base) takes its smoothed vertex normal (world/assemble.js
+        // smoothNatural): the slope-keyed layers (litter, schist, bank) no longer change facet by facet)
+        if (m == 5 || m == 7 || m == 6) { vec3 sn = normalize((vec4(normalize(vNormal), 0.0) * viewMatrix).xyz); if (dot(sn, GND_wn) < 0.0) sn = -sn; if (abs(dot(sn, GND_wn)) > 0.2) GND_wn = sn; }
         GND_wall = smoothstep(0.62, 0.30, abs(GND_wn.y));   // 52deg -> 73deg
         // world-XZ pixel footprint: the one AA/LOD gate the whole shader shares
         float gFw = max(fwidth(vWPos.x), fwidth(vWPos.z));
@@ -6095,6 +6114,58 @@ vec3 worn = mix(asph, paintC * 0.80, 0.62);
             vec2 c1 = smoothstep(vec2(995.0, -2502.0), vec2(979.0, -2518.0), vWPos.xz);
             GND_rock *= 1.0 - c0.x * c0.y * c1.x * c1.y;
           }
+          // TERRAIN FIX: on the region's base the cover mask's rock (class 5) is schist whatever the slope; its woodland
+          // floor, soil, lawn and meadow (3, 4, 1, 2) are never rock below 60 deg
+          GND_vgC = -1;
+          if (vgOn > 0.5 && m == 7) {
+            // (TERRAIN GRADE: the mask's 1 m cells never show as steps: the lookup is warped by a smooth world noise, 1.1 m
+            // either way, and the class voted below, so a class edge is a smooth, irregular line)
+            vec2 vgW = (vec2(vnoise(vWPos.xz * 0.35), vnoise(vWPos.xz * 0.35 + 17.3)) - 0.5) * 2.2;
+            vec2 vgUV = (vWPos.xz + vgW - vgRect.xy) * vgRect.zw;
+            if (vgUV.x > 0.0 && vgUV.y > 0.0 && vgUV.x < 1.0 && vgUV.y < 1.0) {
+              vec4 vgT = texture2D(vgMask, vgUV);
+              // (TERRAIN GRADE: the class is never one texel's: a tent-weighted vote of the 4x4 texels round the point,
+              // bilinear in the point's place among them, so a class edge is the vote's smooth iso-line, rounded over
+              // ~2 m, single-texel islands voted away; never a cell's square edge)
+              {
+                vec2 vgTx = vgUV / vgRect.zw;   // (texel units: one texel per metre)
+                vec2 vgB = floor(vgTx - 0.5), vgF = vgTx - 0.5 - vgB;
+                vec4 vgA4 = vec4(0.0); vec3 vgA3 = vec3(0.0);   // (sward 1-2, wood 3, soil 4, rock 5 | paved 6, water/bldg 7-8, none 0)
+                for (int jy = -1; jy <= 2; jy++) for (int jx = -1; jx <= 2; jx++) {
+                  vec2 d = vec2(float(jx), float(jy)) - vgF;
+                  float w = max(0.0, 1.0 - abs(d.x) * 0.5) * max(0.0, 1.0 - abs(d.y) * 0.5);
+                  float c = floor(texture2D(vgMask, (vgB + vec2(float(jx), float(jy)) + 0.5) * vgRect.zw).r * 255.0 + 0.5);
+                  if (c > 0.5 && c < 2.5) vgA4.x += w; else if (c < 3.5 && c > 2.5) vgA4.y += w; else if (c < 4.5 && c > 3.5) vgA4.z += w;
+                  else if (c < 5.5 && c > 4.5) vgA4.w += w; else if (c < 6.5 && c > 5.5) vgA3.x += w; else if (c > 6.5) vgA3.y += w; else vgA3.z += w;
+                }
+                float vgM = max(max(max(vgA4.x, vgA4.y), max(vgA4.z, vgA4.w)), max(max(vgA3.x, vgA3.y), vgA3.z));
+                int vgV = vgM == vgA4.x ? 1 : vgM == vgA4.y ? 3 : vgM == vgA4.z ? 4 : vgM == vgA4.w ? 5 : vgM == vgA3.x ? 6 : vgM == vgA3.y ? 7 : 0;
+                vgT.r = float(vgV == 1 && floor(vgT.r * 255.0 + 0.5) == 2.0 ? 2 : vgV) / 255.0;
+              }
+              GND_vgC = int(floor(vgT.r * 255.0 + 0.5));
+              // (the 2017 land cover calls many steep wooded banks 'other impervious' (6); where the base is drawn no paving
+              // lies there, so a bank with understorey or canopy over it is woodland floor)
+              bool vgBank = GND_vgC == 6 && (vgT.b > 0.25 || vgT.g > 0.12);
+              if (vgBank) GND_vgC = vgT.b > 0.25 ? 2 : 3;   // (understorey over it: the shrubs and vines read as the sward's green; canopy alone: litter)
+              // (a managed park or plaza (flag 1): its mown lawn and 'paved' pixels shaded as one surface, the majority of the
+              // cover within 10 m round the fragment: a lawn or a paved plaza, not a pixel mix of the two)
+              if (!vgBank && (GND_vgC == 1 || GND_vgC == 6) && mod(floor(vgT.a * 255.0 + 0.5), 2.0) > 0.5) {
+                float vgL = 0.0, vgN = 0.0;
+                for (int q = 0; q < 12; q++) {
+                  float an = float(q) * 2.3998, rr = 3.0 + 7.0 * fract(float(q) * 0.618);
+                  vec4 vq = texture2D(vgMask, vgUV + vec2(cos(an), sin(an)) * rr * vgRect.zw);
+                  int cq = int(floor(vq.r * 255.0 + 0.5));
+                  if (cq == 1 || cq == 2) { vgL += 1.0; vgN += 1.0; } else if (cq == 6) vgN += 1.0;
+                }
+                if (vgN > 3.5) GND_vgC = vgL > 0.5 * vgN ? 1 : 6;
+              }
+              if (GND_vgC == 5) GND_rock = max(GND_rock, 0.92);
+              else if (vgBank) GND_rock *= smoothstep(0.09, 0.04, abs(GND_wn.y));   // (a wooded bank under understorey, 77-82 deg at the GWB: schist only on a sheer face)
+              else if (GND_vgC >= 1 && GND_vgC <= 4) GND_rock *= smoothstep(0.50, 0.38, abs(GND_wn.y));   // (wooded and grassy banks stay ground to 60-68 deg)
+              // (TERRAIN INT2: a steep natural bank, past ~55 deg, shows its schist in patches through the litter)
+              if (GND_vgC != 6) GND_rock = max(GND_rock, smoothstep(0.60, 0.45, abs(GND_wn.y)) * smoothstep(0.48, 0.72, fbm(vWPos.xz * 0.08 + 19.0)) * 0.85);
+            }
+          }
           if (GND_rock > 0.004) {
             float ha = dot(vWPos.xz, normalize(vec2(GND_wn.z, -GND_wn.x) + 1e-5));
             vec2 rf = vec2(ha, vWPos.y);
@@ -6111,6 +6182,7 @@ vec3 worn = mix(asph, paintC * 0.80, 0.62);
             rock = mix(rock, rock * vec3(0.42, 0.40, 0.38), smoothstep(0.55, 0.20, band) * 0.55);   // biotite / shadowed cleavage
             rock = mix(rock, rock * vec3(1.24, 1.02, 0.78), smoothstep(0.72, 0.97, fbm(rf * vec2(0.55, 1.7) + 61.0)) * 0.55);
             rock *= 0.86 + 0.28 * vnoise(rf * 6.0) * gNear + 0.14 * (1.0 - gNear);
+            rock *= 1.35;   // TERRAIN FIX: the cliffs read as near-black slabs from the air; mid-grey schist as photographed
             // quartz / pegmatite dikes: the NYC Parks outcrops are cut by pale
             // veins running ACROSS the foliation, which is what stops a banded
             // wall from reading as corduroy. Rotated frame, wider AA than the
@@ -6140,6 +6212,19 @@ vec3 worn = mix(asph, paintC * 0.80, 0.62);
             GND_spec = 0.80;   // wet-looking schist is real, but not a mirror
             albedo = mix(albedo, rock, GND_rock);
             GND_rough = mix(GND_rough, 0.82, GND_rock);
+          }
+        }
+        // TERRAIN FIX: paving the ground's steps tilt (a walk laid across a bank the wall data lacks) reads as a crumpled
+        // pale sheet; past ~37 deg it takes a weathered concrete retaining face (world-aligned streaks, darker, rough)
+        if (m <= 4 || m == 6) {
+          float stp = smoothstep(0.80, 0.55, abs(GND_wn.y));
+          if (stp > 0.004) {
+            float ha2 = dot(vWPos.xz, normalize(vec2(GND_wn.z, -GND_wn.x) + 1e-5));
+            float strk = fbm(vec2(ha2 * 0.9, vWPos.y * 0.12) + 17.0), mot = fbm(vec2(ha2, vWPos.y) * 0.25 + 3.0);
+            vec3 cw = mix(vec3(0.17, 0.165, 0.155), vec3(0.27, 0.26, 0.24), mot) * (0.8 + 0.3 * strk);
+            albedo = mix(albedo, cw, stp);
+            GND_rough = mix(GND_rough, 0.92, stp);
+            GND_tnW *= 1.0 - 0.8 * stp;
           }
         }
         ${GP31 && typeof location !== 'undefined' && new URLSearchParams(location.search).get('gpdbg') === '1' ? `albedo = kOk ? vec3(0.05, fract(kQ / 3.2) * 0.4, kOk2 ? fract(kqx / 9.0) * 0.4 : 0.0) : vec3(0.4, 0.0, 0.0);` : ''}
@@ -6325,6 +6410,34 @@ ${GP31_SURF_GLSL}
         // CP32L_GROUND): the woodland floor (browned oak and maple litter, moss and ivy in the damp, trodden soil), the
         // ballfields' clay infields, the tennis centre's green clay, the wet bank at every shore, the silt of the beds.
         // Here, after the grass detail, so it is the lawn's last word (the revetment below skips the park).
+        // TERRAIN FIX: the base's natural ground by the cover mask (not the backlot concrete): woodland floor (3) and soil (4)
+        // as leaf litter and trodden soil, lawn and meadow (1, 2) as a dry sward; world-aligned noise, no new textures
+        // (TERRAIN INT2: steep natural ground, 24-39 deg and over, is woodland floor whatever the mask says (lawn, meadow, or
+        // no cover at all): a pale sward on a wooded bank read as the TIN's facets)
+        float vgSt = ((m == 7 && GND_vgC != 5 && GND_vgC != 6) || (m == 5 && vgOn > 0.5)) ? smoothstep(0.91, 0.78, abs(GND_wn.y)) : 0.0;   // (the compiled lawn on a steep bank too)
+        if ((m == 7 && ((GND_vgC >= 1 && GND_vgC <= 4) || vgSt > 0.004)) || (m == 5 && vgSt > 0.004)) {
+          float vn1 = fbm(vWPos.xz * 0.7 + 13.0), vn2 = vnoise(vWPos.xz * 4.1 + 7.0);
+          vec3 vgLit = mix(mix(vec3(0.090, 0.072, 0.052), vec3(0.140, 0.108, 0.076), vn1), mix(vec3(0.060, 0.088, 0.036), vec3(0.096, 0.124, 0.050), vn2), GND_vgC == 4 ? 0.1 : 0.35 * smoothstep(0.4, 0.7, vn1));
+          vec3 vgA = (m == 7 && GND_vgC >= 3) ? vgLit : mix(vec3(0.070, 0.098, 0.040), vec3(0.118, 0.130, 0.060), vn1);
+          vgA = mix(vgA, vgLit, vgSt);
+          vgA *= 0.9 + 0.2 * vn2 * gNear;
+          float vgW = (1.0 - GND_rock) * (m == 7 && GND_vgC >= 1 && GND_vgC <= 4 ? 1.0 : vgSt);
+          albedo = mix(albedo, vgA, vgW);
+          GND_tnW *= 1.0 - 0.7 * vgW;
+          GND_rough = mix(GND_rough, 0.97, vgW);
+          GND_spec = mix(GND_spec, 0.3, vgW);
+        }
+        // (a paved plaza on the base (cover 6): concrete pavers, 1.5 m slabs with dark joints, world-aligned)
+        if (m == 7 && GND_vgC == 6) {
+          vec2 pg = abs(fract(vWPos.xz / 1.5) - 0.5);
+          float joint = smoothstep(0.47, 0.49, max(pg.x, pg.y));
+          float pn = vnoise(floor(vWPos.xz / 1.5) * 1.7 + 3.0);
+          vec3 pav = vec3(0.30, 0.295, 0.28) * (0.93 + 0.1 * pn);
+          float pw = (1.0 - GND_rock);
+          albedo = mix(albedo, mix(pav, pav * 0.62, joint * gNear), pw);
+          GND_tnW *= 1.0 - 0.6 * pw;
+          GND_rough = mix(GND_rough, 0.86, pw);
+        }
         if (cp32lOn > 0.5 && (m == 5 || m == 7) && GND_rock < 0.6) {
           vec2 cpJ = (vec2(vnoise(vWPos.xz * 0.19 + 3.1), vnoise(vWPos.xz * 0.19 + 8.7)) - 0.5) * 3.0;   // ragged edges, +-1.5 m
           vec2 cpUV = (vWPos.xz + cpJ - cp32lRect.xy) * cp32lRect.zw;

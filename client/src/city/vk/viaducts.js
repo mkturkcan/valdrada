@@ -9,6 +9,8 @@
 // out) with skipBent(x, z) / skipTrack(x, z) for city/elevatedKit.js (the generic IRT deck and bents on the viaduct).
 
 import { COLLIDERS } from '../colliders.js';
+import { HA_ON, haAnchors, haStructWarp, haWarpKids, haFoot } from '../../world/haAnchor.js';   // P1 TERRAIN (`?terrain=p1`)
+import { haInit } from '../../world/heightAuthority.js';
 import { Geo, UP } from './vkKit.js';
 import { vkMatsReady, setRivBand, spikeMat } from './vkMats.js';
 import { MV, P, toUL, archGeom, archBuild, mvvBents, bentBuild, spanBuild, deckBuild, mvvMats, COLL } from './mvv.js';
@@ -18,7 +20,8 @@ import { PK, PP, tU, parkUV, parkMats, parkInterval, parkSpan125, parkBent, park
 
 const Q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
 export const VK = !(Q && (Q.get('vk') === '0' || Q.get('ar33') === '0' || Q.get('ar32') === '0'));
-export const ready = vkMatsReady;
+// (P1 TERRAIN, `?terrain=p1`: the structures stand on the authority's ground and carry their LiDAR decks, world/haAnchor.js)
+export const ready = HA_ON ? Promise.all([vkMatsReady, haInit(), haAnchors()]) : vkMatsReady;
 
 const owns = (ox, oz, x, z) => x >= ox && x < ox + 512 && z >= oz && z < oz + 512;
 // the Manhattan Valley corridor: the whole viaduct, 122nd to 135th St
@@ -48,7 +51,8 @@ function mvvPlan() {
 }
 const _coll = new Set();
 const once = (k, f) => { if (_coll.has(k)) return; _coll.add(k); try { f(); } catch (e) { console.warn('[vk] colliders', e); } };
-function addBox(x, y, z, hw, hh, hd, rotY) { try { COLLIDERS.addBox('kit31', { x, y, z, hw, hh, hd, rotY }); } catch { /* colliders not loaded */ } }
+let WARP = null;   // P1 TERRAIN: the structure being built's warp (its colliders move with it)
+function addBox(x, y, z, hw, hh, hd, rotY) { if (WARP) y = WARP(x, y, z); try { COLLIDERS.addBox('kit31', { x, y, z, hw, hh, hd, rotY }); } catch { /* colliders not loaded */ } }
 const ROT = Math.atan2(MV.A[1], MV.A[0]);   // local +x along the line
 
 // instanced rivet heads where the street lenses come close: the lower 3.6 m of each structure round 125th St
@@ -218,11 +222,38 @@ export function apply(tile, ox, oz) {
   }
   if (nr || nt) console.log(`[vk] tile ${ox / 512}_${oz / 512}: the compiled Riverside Drive bridge ribbon: ${nt} triangles out, ${nr} roads without traffic`);
 }
+// P1 TERRAIN: each structure's warp (world/haAnchor.js haStructWarp): its flat ground datum, the underside of its deck
+// (under it the bents and arches stretch to the authority's ground), its LiDAR deck profile by its own frame's parameter
+const GKINDS = ['sidewalk', 'curb', 'brick', 'plaza', 'path', 'grass', 'grassU', 'gravel', 'asphalt', 'gutter', 'busred'];
+const vkWarp = (k, ctx) => {
+  if (!HA_ON) return null;
+  const gr = (x, z) => { try { return ctx.surfY ? ctx.surfY(x, z, GKINDS, 0.05) : null; } catch { return null; } };   // the foot on the lifted section under it
+  if (k === 'mvv') return haStructWarp('irt_mvv', (x, z) => toUL(x, z)[0], GY, MV.RAIL - 3.0, ctx.ox, ctx.oz, gr);
+  if (k === 'rsd') return haStructWarp('rsd', (x, z) => rsUL(x, z)[0], RS.gy, RS.gy + RS.crown - 1.0, ctx.ox, ctx.oz, gr);
+  return haStructWarp('park', (x, z) => parkUV(x, z)[1], 3.38, PK.XG_B, ctx.ox, ctx.oz, gr);
+};
+const VK_G0 = { mvv: GY, rsd: RS.gy, park: 3.38 };
+const warped = (k, group, ctx, f) => {
+  const i0 = group.children.length;
+  WARP = vkWarp(k, ctx);
+  try { f(); } finally {
+    const W = WARP; WARP = null;
+    // (the anchor gate, tools/terrain/anchor_gate.mjs: the vertices the flat build stood on its ground datum, one a metre,
+    // are footings after the warp)
+    const probe = globalThis.__HA_FEET ? new Map() : null;
+    if (probe) for (let i = i0; i < group.children.length; i++) {
+      const o = group.children[i], pa = o.isMesh && !o.isInstancedMesh && o.geometry.attributes.position;
+      if (pa) for (let q = 0; q < pa.count; q++) { const y = pa.array[3 * q + 1]; if (Math.abs(y - VK_G0[k]) < 0.02) { const key = `${i}:${Math.round(pa.array[3 * q])}:${Math.round(pa.array[3 * q + 2])}`; if (!probe.has(key)) probe.set(key, q); } }
+    }
+    if (W) haWarpKids(group, i0, W);
+    if (probe) for (const [key, q] of probe) { const o = group.children[+key.split(':')[0]], a = o.geometry.attributes.position.array; haFoot('viaducts', `${k}:${key}`, 'col', a[3 * q], a[3 * q + 2], a[3 * q + 1], { r: 0 }); }
+  }
+};
 export function build(group, ctx) {
   if (!VK) return;
-  if (inMVV(ctx.ox + 256, ctx.oz + 256, 400)) { try { mvvBuildTile(group, ctx); } catch (e) { console.warn('[vk] mvv', e); } }
-  if (inPARK(ctx.ox + 256, ctx.oz + 256, 400)) { try { parkBuildTile(group, ctx); } catch (e) { console.warn('[vk] park', e); } }
-  if (inRSD(ctx.ox + 256, ctx.oz + 256, 400)) { try { rsdBuildTile(group, ctx); } catch (e) { console.warn('[vk] rsd', e); } }
+  if (inMVV(ctx.ox + 256, ctx.oz + 256, 400)) { try { warped('mvv', group, ctx, () => mvvBuildTile(group, ctx)); } catch (e) { console.warn('[vk] mvv', e); } }
+  if (inPARK(ctx.ox + 256, ctx.oz + 256, 400)) { try { warped('park', group, ctx, () => parkBuildTile(group, ctx)); } catch (e) { console.warn('[vk] park', e); } }
+  if (inRSD(ctx.ox + 256, ctx.oz + 256, 400)) { try { warped('rsd', group, ctx, () => rsdBuildTile(group, ctx)); } catch (e) { console.warn('[vk] rsd', e); } }
 }
 // compiled furniture standing on a pier, a pedestal or a column line of the Manhattan Valley viaduct
 export function dropFurniture(wx, wz) {

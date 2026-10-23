@@ -867,8 +867,11 @@ export const TW_SPECS = {
     P: { arch: 'cwSuper', famObj: CLEARG, floorH: 3.9, winW: 1.52, bayFit: true, finish: 'alu_clear', mullW: 0.07, mullD: 0.22, spandrelH: 0.6, spandrelHex: '#9aa6ad' },
     masses: (L) => [
       { tiers: [{ ring: L.ring, y1: 46 }], P: { arch: 'cwGrid', spandrelH: 1.4, floorH: 5.6 } },
-      { y0: 46, tiers: [{ ring: L.poly([[-44, 49], [6, 49], [16, 79], [-44, 79]]), y1: 229 }], roof: { parapet: 3.5, set: 'alu_clear' } },
-      { y0: 46, tiers: [{ ring: L.poly([[-44, -41], [26, -41], [16, -11], [-44, -11]]), y1: 229 }], roof: { parapet: 3.5, set: 'alu_clear' } },
+      // the towers on the lot (owner 2026-10-22: the north one stood 30 m out over Broadway): parallelograms whose
+      // circle faces run with Broadway's cut of the lot's north-east corner, set 3 m inside the podium's front
+      // (tools/qa/tw_lot_audit.mjs checks every tier ring against its lot)
+      { y0: 46, tiers: [{ ring: L.poly([[-62, 49], [-3, 49], [-20, 79], [-62, 79]]), y1: 229 }], roof: { parapet: 3.5, set: 'alu_clear' } },
+      { y0: 46, tiers: [{ ring: L.poly([[-50, -41], [20, -41], [2.5, -11], [-50, -11]]), y1: 229 }], roof: { parapet: 3.5, set: 'alu_clear' } },
     ],
   },
 

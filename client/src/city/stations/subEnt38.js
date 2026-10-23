@@ -17,6 +17,7 @@
 // sign on the closed end ("125 Street Station" and the direction), "Subway" plates on the sides, the stair itself down
 // through a hole cut in the walk: risers 178 mm, treads 279 mm with yellow nosings, glazed tile walls, handrails, the
 // stair running on under the walk to a lit landing.
+import { haLiftSoon } from '../../world/haAnchor.js';   // P1 TERRAIN (`?terrain=p1`): the stair heads' colliders on the lifted walk
 import * as THREE from 'three';
 import { Model, cyl, rbox, plane, lathe, rod } from '../pk/pkGeo.js';
 import { COLLIDERS } from '../colliders.js';
@@ -170,7 +171,9 @@ export function st38Apply(tile, ox, oz) {
     if (!_coll.has(e.id)) {
       _coll.add(e.id);
       const el = e.kind === 'elev';
-      try { COLLIDERS.addBox('kit31', { x: e.x, y: SIDEWALK_Y + 0.7, z: e.z, hw: (el ? 2.3 : e.W) / 2 + 0.05, hh: 0.7, hd: (el ? 2.6 : e.L) / 2 + 0.05, rotY: -e.yaw }); } catch { /* colliders not loaded */ }
+      // (P1 TERRAIN: on the lifted walk; flag off, at once)
+      // (under the flag the box reaches 0.2 m under the lifted walk: the walk's own lift round the head varies by a few cm)
+      haLiftSoon(e.x, e.z, (dy) => { const lo = dy ? 0.2 : 0; try { COLLIDERS.addBox('kit31', { x: e.x, y: SIDEWALK_Y + dy + 0.7 - lo / 2, z: e.z, hw: (el ? 2.3 : e.W) / 2 + 0.05, hh: 0.7 + lo / 2, hd: (el ? 2.6 : e.L) / 2 + 0.05, rotY: -e.yaw }); } catch { /* colliders not loaded */ } });
     }
     if (e.kind === 'elev') continue;
     const H = holeOf(e);

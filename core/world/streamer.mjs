@@ -13,6 +13,7 @@ import { parseTile, buildingsOf } from '../../client/src/world/tiledata.js';
 import { COLLIDERS } from '../../client/src/city/colliders.js';
 import { simTile } from './simTile.mjs';
 import { PUBLIC } from '../env/shim.mjs';
+import { HA_P1, haTerrainAt } from '../../client/src/world/heightAuthority.js';
 
 export const NEAR_R = 1000, UNLOAD_R = NEAR_R + 320;
 
@@ -52,6 +53,20 @@ export class HeadlessStreamer {
     this.hold = null;
     this.stats = { near: 0, loaded: 0, unloaded: 0, loadMs: 0, bytes: 0, ...(this.obstaclesDir ? { obstacles: 0 } : {}) };
   }
+  // P1 TERRAIN (TERRAIN_P1=1): the bridges' Manhattan ends on the authority's ground and their LiDAR decks
+  // (client/src/world/haAnchor.js haAnchorBridges), and the decks the cars drive with them; core/sim/world.mjs calls it
+  async anchorBridges() {
+    if (!HA_P1) return 0;
+    const { haAnchorBridges } = await import('../../client/src/world/haAnchor.js');
+    const n = await haAnchorBridges(this.bridges);
+    this.bridgeRoads = [];
+    for (const br of this.bridges) {
+      if (!br.deck || br.deck.length < 2 || br.foot) continue;
+      const W = Math.min(38, br.width);
+      this.bridgeRoads.push({ pts: br.deck.map((p) => [...p]), width: W, lanes: Math.max(2, Math.round(W / 3.6)), speed: 40, oneway: 0, rclass: 3, name: br.name, level: 1 });
+    }
+    return n;
+  }
   onTile(add, remove) {
     this.listeners.add.push(add); this.listeners.remove.push(remove);
     for (const [key, t] of this.tiles) if (t.state === 'ready' && t.data) add(key, t.data);
@@ -61,6 +76,7 @@ export class HeadlessStreamer {
   surfaceInfoAt(x, z, tol) { const fn = this.surfInfos.get(this._key(x, z)); return fn ? fn(x, z, tol) : null; }
   roadAt(x, z, tol) { const fn = this.roadAts.get(this._key(x, z)); return fn ? fn(x, z, tol) : null; }
   terrainAt(x, z) {
+    if (HA_P1) { const a = haTerrainAt(x, z); if (a !== null) return a; }   // P1 TERRAIN: the region's base (client/src/world/heightAuthority.js)
     const t = this.terrains.get(this._key(x, z));
     if (!t) return null;
     const { grid, res, ox, oz } = t;

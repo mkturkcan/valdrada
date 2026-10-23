@@ -265,7 +265,7 @@ function rampsBuild(B, ctx) {
       const sideIn = [-1, 1].map((sg) => { const q = pt(fa, sg * hw), r = pt(fb, sg * hw); return insideOther(ci, (q[0] + r[0]) / 2, (q[2] + r[2]) / 2, (q[1] + r[1]) / 2, 0.05); });
       // asphalt between the parapets' toes, with its edge lines and lane lines
       if (!merged) {
-      band(B, M.matte, fa, fb, -hw + 0.6, 0, hw - 0.6, 0, C.asph, up);
+      if (!RFK_TILE_ASPHALT) band(B, M.matte, fa, fb, -hw + 0.6, 0, hw - 0.6, 0, C.asph, up);   // (else the tile's asphalt: rfkDeckAsphalt)
       band(B, M.matte, fa, fb, -hw + 0.85, 0.008, -hw + 1.0, 0.008, C.yellow, up);
       band(B, M.matte, fa, fb, hw - 1.0, 0.008, hw - 0.85, 0.008, C.white, up);
       if (lanes > 1) {
@@ -593,6 +593,37 @@ function bridgeBuild(B, ctx) {
   // the deck's collider over the river (cars and the camera ride the traffic decks; this stops a walker or the fly camera)
   COLLIDERS.addBox('kit31', { x: mx, y: ROAD - 0.6, z: mz, hw: SPAN / 2 + SIDE, hh: 0.6, hd: SW1, rotY: Math.atan2(U[1], U[0]) });
   return 1;
+}
+
+// ---- the ramps' road surface in the tile's asphalt (HIGHWAYS P2, city/wshEnds.js): the parkway's own material on the
+// kit's decks, one surface across the hand-overs; the kit then draws only its markings, slabs, girders and parapets
+let RFK_TILE_ASPHALT = false;
+export function rfkDeckAsphalt(tile, ox, oz, groundAt, skip = null) {
+  if (!RFK34) return 0;
+  if (ox > 3900 || ox + TILE < 3100 || oz > -1500 || oz + TILE < -2800) return 0;
+  RFK_TILE_ASPHALT = true;
+  const out = [];
+  CH.forEach((c, ci) => {
+    const F = frames(c), hw = c.w / 2;
+    for (let i = 0; i + 1 < F.length; i++) {
+      const fa = F[i], fb = F[i + 1];
+      const mx = (fa.x + fb.x) / 2, mz = (fa.z + fb.z) / 2;
+      if (!owns(ox, oz, mx, mz)) continue;
+      const g = groundAt(mx, mz), hy = (fa.y + fb.y) / 2;
+      if (g !== null && hy - g < 0.3) continue;
+      if (onBridge(mx, mz) && sOf(mx, mz) > S_GORE + 1) continue;
+      if (insideOther(ci, mx, mz, hy)) continue;
+      if (skip && [pt(fa, -hw + 0.6), pt(fa, hw - 0.6), pt(fb, -hw + 0.6), pt(fb, hw - 0.6), [mx, hy, mz]].some((p) => skip(p[0], p[2], p[1]))) continue;   // (another builder's paving there)
+      const q = [pt(fa, -hw + 0.6), pt(fb, -hw + 0.6), pt(fb, hw - 0.6), pt(fa, hw - 0.6)];
+      // (wound up, as the tile's ground)
+      for (const T of [[q[0], q[1], q[2]], [q[0], q[2], q[3]]]) {
+        const upw = ((T[1][2] - T[0][2]) * (T[2][0] - T[0][0]) - (T[1][0] - T[0][0]) * (T[2][2] - T[0][2])) > 0;
+        for (const v of upw ? T : [T[0], T[2], T[1]]) out.push(v[0] - ox, v[1], v[2] - oz);
+      }
+    }
+  });
+  if (out.length) { const a = tile.S.asphalt || new Float32Array(0), m = new Float32Array(a.length + out.length); m.set(a); m.set(out, a.length); tile.S.asphalt = m; }
+  return out.length / 9;
 }
 
 // ---- hooks ---------------------------------------------------------------------------------------------------------------

@@ -14,11 +14,16 @@ import { parseTile, roadsOf } from '../../client/src/world/tiledata.js';
 import { lf39Load, lf39Apply } from '../../client/src/world/lotfix39.js';
 import { tpTileHit, tpApply } from '../../client/src/city/tsqPlaza.js';
 import { bpApply } from '../../client/src/city/bryantPark.js';
-import { cpTileHit, cpApply } from '../../client/src/city/centralPark.js';
+import { cpTileHit, cpApply, cpApplyP1 } from '../../client/src/city/centralPark.js';
+import { haPreload, haHoldDecks, haRestoreDecks, haAnchors } from '../../client/src/world/haAnchor.js';   // P1 TERRAIN: Central Park's chunks round the tile
 import { areaTileHit, areaApply } from '../../client/src/city/areas.js';
 import { st38GapFill } from '../../client/src/city/stations/subEnt38.js';
 import { gf38Load, gf38Apply, gf38Index } from '../../client/src/city/groundFix38.js';
 import { tileContentKey } from '../../client/src/shared/overlay.js';
+import { HA_P1, haTileReady, haApplyTile, haClampGround } from '../../client/src/world/heightAuthority.js';
+import { HHP, hhpReady, hhpPre, hhpPost, hhpAfterClamp } from '../../client/src/city/hhp.js';   // HIGHWAYS P2 (HHP_P2=1): the Henry Hudson Parkway
+import { wshGroundFix } from '../../client/src/city/wshGround.js';
+import { wshCoastReady } from '../../client/src/city/wshCoast.js';   // (the West Side Highway's and the northern parkway's shore ground)
 
 const warnOnce = new Set();
 const warn = (k, e) => { if (!warnOnce.has(k)) { warnOnce.add(k); console.warn(`[core] ${k}`, e?.message || e); } };
@@ -39,10 +44,23 @@ export async function simTile(key, arrayBuf) {
   // the ground re-kinding passes, in assembleTile's order
   if (tpTileHit(ox, oz)) { try { tpApply(tile, ox, oz, roadsW()); } catch (e) { warn('tp28', e); } }
   try { bpApply(tile, ox, oz); } catch (e) { warn('bp28', e); }
+  if (cpTileHit(ox, oz) && HA_P1) await haPreload(ox - 512, oz - 512, ox + 1023, oz + 1023);   // P1: cpApply leaves a region tile to cpApplyP1, whose parts read round the tile
   if (cpTileHit(ox, oz)) { try { cpApply(tile, ox, oz); } catch (e) { warn('cp32', e); } }
   if (areaTileHit(ox, oz)) { try { areaApply(tile, ox, oz); } catch (e) { warn('ar32', e); } }
   try { st38GapFill(tile); } catch (e) { warn('st38', e); }
   try { gf38Apply(tile, await gf38P); } catch (e) { warn('gf38', e); }
+  // P1 TERRAIN (client/src/world/heightAuthority.js; TERRAIN_P1=1): the region's relief, as assembleTile lays it
+  const HHPT = HHP && await hhpReady();
+  const P1T = HA_P1 && await haTileReady(Math.floor(ox / 512), Math.floor(oz / 512));
+  if (HHPT) { try { hhpPre(tile, ox, oz, P1T); } catch (e) { warn('hhp pre', e); } }
+  if (P1T) await haAnchors();   // (the cuts' profiles: haHoldDecks holds the cut roads and the street bridges too)
+  if (P1T) { const held = haHoldDecks(tile, ox, oz); try { haApplyTile(tile, ox, oz); } catch (e) { warn('terrain p1', e); } haRestoreDecks(tile, held); }   // (P1 anchors: elevated decks held)
+  if (P1T && cpTileHit(ox, oz)) { try { cpApplyP1(tile, ox, oz); } catch (e) { warn('cp32 p1', e); } }   // P1: the park's parts on the authority's ground
+  if (HHPT) { try { hhpPost(tile, ox, oz, P1T); } catch (e) { warn('hhp post', e); } }
+  if (globalThis.__SIMTILE_KEEP) globalThis.__SIMTILE_KEEP.set(key, tile);   // (probes and gates: the tile's sections as laid)
+  if (HHPT && P1T) { try { await wshCoastReady(); wshGroundFix(tile, ox, oz); } catch (e) { warn('wsh ground', e); } }
+  if (P1T) haClampGround(tile);   // TERRAIN FIX: the natural ground never over the paving
+  if (HHPT) hhpAfterClamp(tile);   // (the FDR structures' deck tops: over the drives by design)
 
   // ---- the section sampler (mirror of assembleTile's SURFACE SAMPLER block)
   const SURF = new Map();

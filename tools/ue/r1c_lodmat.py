@@ -37,7 +37,7 @@ return VC * t;
 
 
 # ==== BD40: the private masters' code (Unreal world space: Z up, centimetres)
-BDV = 8   # (8, GB43: Night from MPC_r1c) #   # (7: the vertex's open-sky share, UV1.y from the packages' _ao, into the AO input: indirect light only)
+BDV = 9   # (9, FARFACE: the glass no glossier than the presets' Lumen trace cut) # (8, GB43: Night from MPC_r1c) #   # (7: the vertex's open-sky share, UV1.y from the packages' _ao, into the AO input: indirect light only)
 BDSHELL = r'''
 float2 b = UV0 * 4.0;
 float2 w = max(abs(ddx(b)) + abs(ddy(b)), 1e-4);
@@ -59,7 +59,11 @@ float3 glass = lerp(float3(0.018, 0.022, 0.027), wall * 0.5, 0.2);
 float3 col = lerp(wall, glass, cov * 0.95);
 col *= lerp(1.0, WallAO, vert);
 // (v6: no distance darkening or desaturation: the haze is the atmosphere's, matched to the page's in the preset)
-Rough = lerp(0.85, 0.10, saturate(cov + glassy * 0.6 * vert));
+// (v9, FARFACE 2026-10-22: at 0.10 the far glass traced Lumen mirror reflections, and a tower 5 km off mirrored its
+// neighbours' shaded backs as sharp dark shapes that moved with the lens and read as walls gone (trBdHarbour, ue11);
+// a far facade's glass is a box-filtered average of panes and mullions: rough enough (0.62) to stay under the presets'
+// r.Lumen.Reflections.MaxRoughnessToTrace 0.6, its sheen from the radiance cache; tools/qa/far_faces_audit.py checks it)
+Rough = lerp(0.85, 0.62, saturate(cov + glassy * 0.6 * vert));
 // (v7: the chunk's per-vertex open-sky share on the indirect light; packages without one carry 0 there: open sky)
 AOo = UV1.y > 0.001 ? UV1.y : 1.0;
 // night: three.js's stipple (hash12 on the window cells, octaves where a bay is under 2 px)

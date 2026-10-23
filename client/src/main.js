@@ -28,6 +28,9 @@ if (typeof window !== 'undefined') window.__LAMPS = cityLamps;
 
 const Q = new URLSearchParams(location.search);
 const engine = new Engine(document.getElementById('app'));
+// SHIP-MN (bakes): `?bakenap=<ms>` draws a frame every <ms> while the page has tiles to assemble, so the main thread goes to
+// the new Manhattan's tile assembly rather than to frames nobody sees (the bake's export and its settle draw as before)
+{ const nap = Number(new URLSearchParams(location.search).get('bakenap')) || 0; if (nap > 0) engine.idleNap = () => (window.__BAKE_DRAW ? 0 : nap); }
 initGTEX(engine.renderer); // async KTX2 texture bank (needs renderer for detectSupport)
 initCityAO(); // baked city-scale sky occlusion field
 const sky = new Sky(engine);
@@ -1630,11 +1633,12 @@ window.__SHIMMER = (dyaw = 0.0005) => {
   for (let i = 0; i < a.length; i += 4) sum += Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]);
   return sum / (a.length / 4) / 3;
 };
-window.__PICK = async (nx, ny) => {
+window.__PICK = async (nx, ny, skip = null, nHits = 3) => {   // (skip: object names or 'water' left out of the hits)
   const { Raycaster, Vector2 } = await import('three');
   const rc = new Raycaster();
   rc.setFromCamera(new Vector2(nx * 2 - 1, -(ny * 2 - 1)), engine.camera);
-  const hits = rc.intersectObjects(engine.scene.children, true).slice(0, 3);
+  const isSkip = (o) => skip && (skip.includes(o.name) || (skip.includes('water') && o.geometry?.attributes?.position?.count === 4 && o.material?.type === 'ShaderMaterial') || (skip.includes('hidden') && !o.visible));
+  const hits = rc.intersectObjects(engine.scene.children, true).filter((h) => !isSkip(h.object)).slice(0, nHits);
   return hits.map((h) => ({
     d: +h.distance.toFixed(1),
     name: h.object.name || h.object.parent?.name || h.object.type,
@@ -1645,6 +1649,7 @@ window.__PICK = async (nx, ny) => {
     // facade vertex attributes at the hit (materials.js facade shader: aux = floorH, winW, storeH, style; aux2 = bldgH,
     // litAmt, cvar, flags; aux3 = wallLen, wallSeed, faceH/door pack)
     fac: h.face && h.object.geometry?.attributes?.aux ? ['aux', 'aux2', 'aux3'].map((k) => { const at = h.object.geometry.attributes[k]; return at ? Array.from({ length: at.itemSize }, (_, c) => +at.getComponent(h.face.a, c).toFixed(3)) : null; }) : null,
+    ny: h.face ? +h.face.normal.y.toFixed(3) : null,   // (the face normal's y, object space)
     x: +h.point.x.toFixed(1),
     y: +h.point.y.toFixed(2),
     z: +h.point.z.toFixed(1),

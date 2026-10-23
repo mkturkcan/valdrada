@@ -315,8 +315,9 @@ export function setCampusPads(p) {
   if (p && p.top > 0 && p.walk > 0) { CU_PADS.walk = p.walk; CU_PADS.apron = p.apron; CU_PADS.top = p.top; }
 }
 // paving level of a campus landmark expressed above its own group origin
+// (P1 TERRAIN, `?terrain=p1`: the building and the paving it stands on were lifted together, by ctx.haLift)
 const cuYP = (ctx, pad, lo, hi) =>
-  Math.max(lo, Math.min(hi, pad - (Number.isFinite(ctx.groundY) ? ctx.groundY : pad)));
+  Math.max(lo, Math.min(hi, pad + (ctx.haLift || 0) - (Number.isFinite(ctx.groundY) ? ctx.groundY : pad)));
 
 // orient() plus the two things a ring-driven builder also needs: the local
 // extents FOR THE ROTATION IT PICKED (dims() is wrong after a quarter turn —
@@ -2488,7 +2489,8 @@ export const BUILDERS = {
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     const TR = 0xe6e0d2, fw = D * 0.85;
     const warm = { emissive: 0x2f2415, emissiveIntensity: 0.5 };
-    r.add(box(W * 0.95, H * 0.92, D * 0.9, TR));
+    // banded travertine (bays and floor lines), not a flat-colour box: the flat block drew as a white slab in Unreal
+    r.add(bandBox(W * 0.95, H * 0.92, D * 0.9, TR, { band: { glass: 0x3e3830, sill: 0xd8d0bf, bay: 5.5, floor: 5.2 } }));
     r.add(box(W * 0.98, H * 0.06, D * 0.92, TR, { y: H * 0.92 }));
     for (let i = -2; i <= 2; i++) {
       const z = i * fw / 5.4;

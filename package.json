@@ -1,6 +1,6 @@
 {
   "name": "valdrada",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "description": "Valdrada: shared dependencies of the client (client/), the building generator (src/) and the render tools (tools/)",
   "license": "MIT",

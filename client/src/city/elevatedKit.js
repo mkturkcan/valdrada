@@ -12,6 +12,7 @@ import { mvvArchSkip } from './w125wData.js';   // AR32W
 // AR33: the viaduct part (vk/viaducts.js) may take over a stretch of an elevated line: globalThis.__AR33VK.skipBent(x, z)
 // and .skipTrack(x, z) (world metres) leave those bents and track segments to it; the parts load before this builds
 import { areasReady } from './areas.js';
+import { HA_ON, haAnchorBridges, haAnchorTracks } from '../world/haAnchor.js';   // P1 TERRAIN: the J/M/Z on the Williamsburg Bridge
 
 const EL14 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('el14') === '0');
 const STEEL = 0x34383b;    // the els are painted a near-black green that weathers to rust-brown streaks
@@ -31,6 +32,17 @@ export async function buildElevated(scene) {
   let D;
   try { D = await (await fetch('data/elevated.json')).json(); } catch { return null; }
   if (!D || !D.tracks || !D.tracks.length) return null;
+  // P1 TERRAIN (`?terrain=p1`): the J/M/Z over the Williamsburg Bridge on its LiDAR deck and the re-seated bridge
+  // (world/haAnchor.js haAnchorTracks; the bridges re-seated here as the streamer re-seats them)
+  if (HA_ON) {
+    try {
+      const tb = (typeof location !== 'undefined' && new URLSearchParams(location.search).get('tiles')) || 'tiles';
+      const B = await (await fetch(`${tb}/bridges.json`)).json();
+      await haAnchorBridges(B);
+      const n = await haAnchorTracks(D, B);
+      if (n) console.log(`[elevated] ${n} tracks on the re-seated bridges' decks`);
+    } catch (e) { console.warn('[terrain p1] elevated tracks', e); }
+  }
   const steel = [], bed = [], rail = [];
   const U = D.deckUnder ?? 1.35;
   let segs = 0;

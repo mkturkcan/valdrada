@@ -34,6 +34,7 @@ export async function createWorld({ seed = 1, peds: withPeds = true, trains: wit
   await PK34_TABLES.ready();
   const scene = new THREE.Scene();
   const streamer = new HeadlessStreamer({ ...(nearR ? { nearR, unloadR: nearR + 320 } : {}), ...(tilesDir ? { tilesDir } : {}), obstaclesDir });
+  await streamer.anchorBridges();   // P1 TERRAIN (TERRAIN_P1=1 only): the bridges' Manhattan ends
   const { kinds, trafficFleet, names } = loadFleetMeta();
   const traffic = new Traffic(scene, streamer, trafficFleet);
   installFleetMeta(traffic, kinds);

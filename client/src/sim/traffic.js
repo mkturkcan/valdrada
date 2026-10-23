@@ -7,6 +7,7 @@ import { signalState } from './signals.js';
 import { CarLights } from './carlights.js';
 import { applySnowCap, ENV } from '../world/materials.js';
 import { lf39Stalls } from '../world/lotfix39.js';   // LF39 (LOTFIX): the cars in the city's parking lots
+import { HA_ON, haSettle } from '../world/haAnchor.js';   // P1 TERRAIN (`?terrain=p1`)
 // see world/assemble.js: `?nodatum=1` restores the pre-seam-pass datums for A/B plates
 const NO_DATUM = typeof location !== 'undefined' && new URLSearchParams(location.search).get('nodatum') === '1';
 
@@ -791,7 +792,7 @@ export class Traffic {
       for (const [x, y, z, yaw, h] of st39) {
         if (!fit.length) break;
         const kind = fit[((h * 917.3) | 0) % fit.length];
-        this._v.set(x, y, z);
+        this._v.set(x, HA_ON ? haSettle(y, x, z, 0.75) : y, z);   // P1 TERRAIN: the lot's car on the lifted lot
         this._e.set(0, yaw + (h - 0.35) * 0.06, 0);
         this._q.setFromEuler(this._e);
         this._m.compose(this._v, this._q, this._s);
@@ -3259,6 +3260,9 @@ export class Traffic {
     return off;
   }
   _placeCar(car, x, y, z, yaw, dt) {
+    // HIGHWAYS P2 (city/hhp.js, `?hhp=1`): on the parkway a car stands on its paving (the road line is the carriageway's
+    // centre line; the lanes lie off it across the cross slope)
+    if (globalThis.__hhpSurf) { const ys = globalThis.__hhpSurf(x, z, y); if (ys !== null) y = ys + 0.002; }
     // VT27: the heading from the dragged rear point (see VT27); a jump of more than three drag lengths (a spawn, a
     // recycled car) starts it again behind the car along the path heading
     if (VT29 && !car.api) {

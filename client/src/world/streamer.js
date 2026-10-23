@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { StaticPool } from './staticPool.js';
 import { assembleTile } from './assemble.js';
+import { HA_P1, haTerrainAt } from './heightAuthority.js';
+import { haSetSurface, haAnchorBridges } from './haAnchor.js';   // P1 TERRAIN: the re-anchored builders stand on this streamer's surfaces
 import { FAR_UNIFORMS, NEAR_MASK_N } from './materials.js';
 import { TILE, MACRO } from '../shared/geo.js';
 import { buildMacroCrowns } from './towers.js';
@@ -22,6 +24,7 @@ export class Streamer {
   constructor(scene, ctx) {
     this.scene = scene;
     this.ctx = ctx;
+    if (HA_P1) haSetSurface((x, z) => this.surfaceAt(x, z), (x, z) => this.surfaces.has(`${Math.floor(x / TILE)}_${Math.floor(z / TILE)}`));
     if (!ctx.scene) ctx.scene = scene; // shared pools (signs) need the scene
     this.manifest = null;
     this.tiles = new Map();   // key -> {state: 'loading'|'ready', data}
@@ -46,6 +49,7 @@ export class Streamer {
     this.base = base;
     this.manifest = await (await fetch(`${base}/manifest.json`)).json();
     this.bridges = await (await fetch(`${base}/bridges.json`)).json();
+    if (HA_P1) { try { await haAnchorBridges(this.bridges); } catch (e) { console.warn('[terrain p1] bridges', e); } }   // P1 TERRAIN: the Manhattan ends
     // ==== R1A cells (client/src/cells/, docs/specs/cell-package.md): ?cells=1 draws the baked cells from their packages
     if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('cells') === '1') {
       try { const { CellLoader } = await import('../cells/cellLoader.js'); this.cells = await new CellLoader(this).init(); }
@@ -90,6 +94,7 @@ export class Streamer {
     return fn ? fn(x, z, tol) : null;
   }
   terrainAt(x, z) {
+    if (HA_P1) { const a = haTerrainAt(x, z); if (a !== null) return a; }   // P1 TERRAIN: the region's base (world/heightAuthority.js)
     const key = `${Math.floor(x / TILE)}_${Math.floor(z / TILE)}`;
     const t = this.terrains.get(key);
     if (!t) return null;

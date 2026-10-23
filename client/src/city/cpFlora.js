@@ -36,6 +36,9 @@ import { cpbInside } from './cpBethesda.js';
 import { cpLmKeepOut } from './cpLandmarks.js';
 import { bridgeShrubSpots } from './cpBridges.js';   // CP34: the thickets at Gapstow's and Bow Bridge's ends
 import { lampKit, benchKit, basketKit, fenceKit } from './cpFurnKit.js';
+import { pgDriveHit } from '../world/placeGuard.js';   // TERRAIN INT2
+import { cpDriveFurniture } from './cpDrives.js';
+import { HA_P1 } from '../world/heightAuthority.js';
 import { COLLIDERS } from './colliders.js';   // SPACE r2: the hoop fence as a walker's barrier
 import { cpBarkMat, elmForms, willowForms, shrubForms, fernForms, groundForms, lodSet, grassField, filmPath, ELM_H, ELM_W, WILLOW_H, WILLOW_W, SHRUB_H, SHRUB_W } from './cpFloraKit.js';
 import { mallSurface } from './cpMall.js';   // CP33: the Mall's promenade surface (cpMall.js)
@@ -254,6 +257,8 @@ function canopyHex(F, x, z, con, trim) {
   const c = tone(trim ? [Math.min(1, b0[0] * trim[0]), Math.min(1, b0[1] * trim[1]), Math.min(1, b0[2] * trim[2])] : b0, x, z);
   return _cc.setRGB(c[0], c[1], c[2]).getHex();
 }
+// (terrain veg lane, world/vegP1.js: the same crown tone for a species index)
+export const cpCanopyHex = (F, x, z, con, sp) => canopyHex(F, x, z, con, spTrim(sp));
 // CP33 (review: "from 260 m the south end reads as savanna ... the real south end is closed canopy"): inside OSM's woods
 // the crowns are drawn wider (x 1.55 of the measured width, against 1.3 elsewhere) and the gaps are filled: a tree of the
 // woodland mix on a jittered 8 m lattice wherever no measured crown stands within 8 m (not on water, rock or a path)
@@ -644,9 +649,12 @@ function bins() {
   if (_bins) return _bins;
   const B = new Map();
   const bin = (x, z) => { const k = `${Math.floor(x / 512)}_${Math.floor(z / 512)}`; let b = B.get(k); if (!b) B.set(k, (b = { lamps: [], benches: [], baskets: [] })); return b; };
-  for (let i = 0; i < CP_LAMPS.length; i += 3) { const x = CP_LAMPS[i] / 10, z = CP_LAMPS[i + 1] / 10; bin(x, z).lamps.push([x, z, CP_LAMPS[i + 2]]); }
-  for (let i = 0; i < CP_BENCHES.length; i += 4) { const x = CP_BENCHES[i] / 10, z = CP_BENCHES[i + 1] / 10; bin(x, z).benches.push([x, z, CP_BENCHES[i + 2] / 1000, CP_BENCHES[i + 3]]); }
-  for (let i = 0; i < CP_BASKETS.length; i += 2) { const x = CP_BASKETS[i] / 10, z = CP_BASKETS[i + 1] / 10; bin(x, z).baskets.push([x, z]); }
+  // (TERRAIN INT2: none in a drive's carriageway, world/placeGuard.js)
+  for (let i = 0; i < CP_LAMPS.length; i += 3) { const x = CP_LAMPS[i] / 10, z = CP_LAMPS[i + 1] / 10; if (!pgDriveHit(x, z, FURN.LAMP_CROOK)) bin(x, z).lamps.push([x, z, CP_LAMPS[i + 2]]); }
+  for (let i = 0; i < CP_BENCHES.length; i += 4) { const x = CP_BENCHES[i] / 10, z = CP_BENCHES[i + 1] / 10; if (!pgDriveHit(x, z, FURN.BENCH)) bin(x, z).benches.push([x, z, CP_BENCHES[i + 2] / 1000, CP_BENCHES[i + 3]]); }
+  for (let i = 0; i < CP_BASKETS.length; i += 2) { const x = CP_BASKETS[i] / 10, z = CP_BASKETS[i + 1] / 10; if (!pgDriveHit(x, z, FURN.LITTER)) bin(x, z).baskets.push([x, z]); }
+  // (TERRAIN INT2: the rebuilt drives' own lamps and settees, city/cpDrives.js)
+  if (HA_P1) { const D = cpDriveFurniture(); for (const l of D.lamps) bin(l[0], l[1]).lamps.push(l); for (const b2 of D.benches) bin(b2[0], b2[1]).benches.push(b2); }
   return (_bins = B);
 }
 const _seatByTile = new Map();

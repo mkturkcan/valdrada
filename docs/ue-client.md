@@ -28,25 +28,27 @@ requests with the error `needs_renderer` until a renderer is attached.
 
 ## Download and verify
 
-A release consists of a manifest, `ValdradaUE-<version>-<platform>.json`, and the files it lists, published as assets
-of the [GitHub release](https://github.com/mkturkcan/valdrada/releases) and mirrored in the Hugging Face dataset
+The current Unreal client is release 0.5.1: release 0.5.2 changed the browser client and its data and did not rebuild
+the Unreal client, so its files stay on the 0.5.1 release and the commands below name that version. A release consists
+of a manifest, `ValdradaUE-<version>-<platform>.json`, and the files it lists, published as assets of the [GitHub
+release](https://github.com/mkturkcan/valdrada/releases) and mirrored in the Hugging Face dataset
 `mehmetkeremturkcan/valdrada-ue`. `fetch_valdrada_ue.py`, published with them, downloads every file, resumes
 interrupted downloads, checks each file against the SHA256 of the manifest, joins files that were published in parts
 and unpacks the archives. It needs Python 3.8 or later and nothing else.
 
 ```bash
-curl -LO https://github.com/mkturkcan/valdrada/releases/latest/download/fetch_valdrada_ue.py
-python3 fetch_valdrada_ue.py                       # the latest release for this system, into ./ValdradaUE-<version>-<platform>
+curl -LO https://github.com/mkturkcan/valdrada/releases/download/v0.5.1/fetch_valdrada_ue.py
+python3 fetch_valdrada_ue.py --version 0.5.1       # for this system, into ./ValdradaUE-0.5.1-<platform>
 python3 fetch_valdrada_ue.py --version 0.5.1 --dest ~/ValdradaUE
-python3 fetch_valdrada_ue.py --mirror huggingface  # from the Hugging Face copy
+python3 fetch_valdrada_ue.py --version 0.5.1 --mirror huggingface  # from the Hugging Face copy
 ```
 
 On Windows, once a Windows build is published (release 0.5.1 has none; build it as the [build guide](ue-client-build.md#windows)
 describes), in PowerShell:
 
 ```powershell
-Invoke-WebRequest https://github.com/mkturkcan/valdrada/releases/latest/download/fetch_valdrada_ue.py -OutFile fetch_valdrada_ue.py
-python fetch_valdrada_ue.py
+Invoke-WebRequest https://github.com/mkturkcan/valdrada/releases/download/v0.5.1/fetch_valdrada_ue.py -OutFile fetch_valdrada_ue.py
+python fetch_valdrada_ue.py --version <version>
 ```
 
 The script checks the free disk space first. Files that fail their check are downloaded again on the next run; nothing

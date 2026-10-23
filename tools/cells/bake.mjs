@@ -14,6 +14,9 @@
 //                                   distance to the shot's camera path (tools/ad/shots.json) and --near <m> keeps those within
 //   --batch <n>                     cells dressed and exported together (one page boot for all batches; default 16)
 //   --kitrec                        the dresser's parts and boxes as kit instances (Unreal's data path), not merged
+//   --terrain p1                    the proving region's ground (P1 TERRAIN, client/src/world/heightAuthority.js), the grading,
+//                                   woodland and park drives; its data dirs hashed by content
+//   --hhp                           with --terrain p1: the highways (?hhp=1, client/src/city/hhp.js; data/hhp_p2 hashed)
 //   --pages <n>                     pages (each its own browser) taking batches from one queue (default 4, BAKE_PAGES); a
 //                                   cell another bake has claimed (cellcache/claims/<hash>) is waited for, not baked again
 //   --all                           with --loadset: every cell of the set (union.cells too), not only the missing ones
@@ -63,6 +66,26 @@ if (TILES_DIR !== 'tiles') {
 // GB43 KIT (docs/notes/ue-city-architecture.md): --kitrec bakes the dresser's parts and boxes as kit instances (the
 // page's ?kitrec=1), part of OPTS so its cells hash apart from the merged bake's
 if (has('kitrec') || process.env.BAKE_KITREC === '1') OPTS.flags += '&kitrec=1';   // (BAKE_KITREC=1 through valdrada's cells step)
+// P1 TERRAIN (client/src/world/heightAuthority.js): --terrain p1 bakes with the proving
+// region's ground (the page's ?terrain=p1); the region's data (client/public/data/terrain_p1: manifest and chunks) is hashed
+// into OPTS, so these cells hash apart from the flat city's and again whenever the ground product changes
+if (opt('terrain') === 'p1') {
+  const td = path.join(CLIENT, 'public', 'data', 'terrain_p1'), h = crypto.createHash('sha256');
+  if (!fs.existsSync(path.join(td, 'manifest.json'))) { console.error('--terrain p1: no client/public/data/terrain_p1/manifest.json'); process.exit(2); }
+  for (const f of fs.readdirSync(td).sort()) h.update(f).update(fs.readFileSync(path.join(td, f)));
+  OPTS.flags += '&terrain=p1';
+  OPTS.terrainP1 = h.digest('hex').slice(0, 16);
+  // SHIP-MN: the rest of the new Manhattan under the same flag (the edge cut, terrainGrade.js; the woodland, vegP1.js; the
+  // park drives, cpDrives.js) and, with --hhp, the parkway/FDR/HRD/WSH highways (?hhp=1: hhp.js, hhpKit.js, fdrBox.js,
+  // wshCoast.js, wshGround.js); every data dir they read is hashed by content into OPTS, so a new product rebakes
+  const dirHash = (d) => { const x = crypto.createHash('sha256'), walk = (q) => { for (const f of fs.readdirSync(q).sort()) { const p = path.join(q, f); if (fs.statSync(p).isDirectory()) walk(p); else x.update(path.relative(d, p)).update(fs.readFileSync(p)); } }; walk(d); return x.digest('hex').slice(0, 16); };
+  OPTS.terrainData = {};
+  for (const d of ['terrain_p1a', 'terrain_grade', 'veg_p1', 'hhp_p2']) { const dd = path.join(CLIENT, 'public', 'data', d); OPTS.terrainData[d] = fs.existsSync(dd) ? dirHash(dd) : 'none'; }
+  if (has('hhp')) OPTS.flags += '&hhp=1';
+  // (the page assembles a new-Manhattan tile in ~60 s of main thread: the near radius from 1,000 m to 600 m, so a page
+  // boots on the 3 x 3 tiles round its batch, not 15; a batch reads its own tile and the neighbours within 64 m)
+  OPTS.flags += `&near=${opt('near-r', '600')}`;
+}
 
 let name = opt('name'), cells = [];
 if (opt('loadset')) {
@@ -264,7 +287,7 @@ if (has('sidecars')) {
     const xs = cells.map((c) => (c[0] + 0.5) * CELL), zs = cells.map((c) => (c[1] + 0.5) * CELL);
     const x0 = Math.min(...xs), x1 = Math.max(...xs), z0 = Math.min(...zs), z1 = Math.max(...zs);
     await page.goto(`${url}/?shot=1&rel=1&x=${((x0 + x1) / 2).toFixed(1)}&y=60&z=${((z0 + z1) / 2).toFixed(1)}&yaw=0&pitch=-0.6&time=${OPTS.time}&${OPTS.flags}`, { waitUntil: 'domcontentloaded', timeout: 180000 });
-    await page.waitForFunction('window.__READY === true', undefined, { timeout: 300000 });
+    await page.waitForFunction('window.__READY === true', undefined, { timeout: 3600000 });   // (SHIP-MN: the new Manhattan's tiles assemble in ~60 s each)
     await page.evaluate(async () => { window.__BAKE = await import('/src/cells/bakeLib.js'); if (window.__DRESS_HOLD) window.__DRESS_HOLD('grow'); });
     // every tile under the cells assembled: the camera over each quarter of the set in turn (the streamer holds them all)
     for (const [fx, fz] of [[0.25, 0.25], [0.75, 0.25], [0.25, 0.75], [0.75, 0.75], [0.5, 0.5]]) {
@@ -365,7 +388,7 @@ async function bakePage(queue, total) {
     plog('boot', `${url}/?${q}`);
     const tBoot = Date.now();
     await page.goto(`${url}/?${q}`, { waitUntil: 'domcontentloaded', timeout: 180000 });
-    await page.waitForFunction('window.__READY === true', undefined, { timeout: 300000 });
+    await page.waitForFunction('window.__READY === true', undefined, { timeout: 3600000 });   // (SHIP-MN: the new Manhattan's tiles assemble in ~60 s each)
     plog(`READY after ${((Date.now() - tBoot) / 1000).toFixed(1)} s`, JSON.stringify(await page.evaluate(() => window.__BOOT)));
     await page.evaluate(async () => { window.__BAKE = await import('/src/cells/bakeLib.js'); });
     const teleport = (x, z, h, pitch) => page.evaluate(([x, z, h, pitch]) => { const S = window.__STREAMER, g = S.terrainAt(x, z); window.__TELEPORT(x, (Number.isFinite(g) ? g : 3) + h, z, 0, pitch); }, [x, z, h, pitch]);
@@ -393,7 +416,7 @@ async function bakePage(queue, total) {
       await teleport(bx, bz, 60, -0.6);
       plog('dress', JSON.stringify(await page.evaluate(() => window.__BAKE.dressRegion())));
       let st = null;
-      for (let i = 0; i < 1200; i++) {
+      for (let i = 0; i < 7200; i++) {   // (SHIP-MN: up to an hour, the new Manhattan's tiles)
         st = await page.evaluate(() => window.__BAKE.status());
         if (st.queue === 0 && st.idle) break;
         if (i % 20 === 0) plog('settle', JSON.stringify(st));
@@ -472,7 +495,11 @@ const bakeAll = async (cellsToBake) => {   // the batches in order, PAGES pages 
   log(`${cellsToBake.length} cells in ${total} batches over ${n} pages`);
   // (each page's browser started afresh every RECYCLE batches, GB43 2026-10-14: a page that had baked for two hours held
   // 747 tiles and 10,441 buildings and stopped answering for ten minutes, and the guard ended the run)
-  const r = await Promise.allSettled(Array.from({ length: n }, (_, i) => sleep(i * 4000).then(async () => { while (queue.length) await bakePage(queue, total); })));
+  // (SHIP-MN --chunked: each page its own contiguous run of the batches, so a page walks on to the next tile with most of
+  // its neighbours assembled)
+  const own = has('chunked') ? Array.from({ length: n }, (_, i) => queue.slice(Math.floor((i * total) / n), Math.floor(((i + 1) * total) / n))) : null;
+  if (own) queue.length = 0;
+  const r = await Promise.allSettled(Array.from({ length: n }, (_, i) => sleep(i * 4000).then(async () => { if (own) while (own[i].length) await bakePage(own[i], total); while (queue.length) await bakePage(queue, total); })));
   for (const x of r) if (x.status === 'rejected') { code = 1; console.error('[bake] a page failed:', x.reason?.stack || x.reason); }
 };
 try {

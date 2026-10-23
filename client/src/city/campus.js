@@ -10,6 +10,8 @@ import { applySnowCap, applyLightTrim, applyStoneDetail, ENV } from '../world/ma
 import { COLLIDERS } from './colliders.js';
 import { setCampusPads } from './landmarks.js';
 import { FW25, FW26, FW27, fountainProbe, fountainSpray, poolRings, veilMat } from './fountainFX.js';   // FW25: spray, ring waves; FW26: water veils, foam; FW27: probe-lit clear pools
+import { HA_ON, haPreload, haGround, haGroundMin, haGroundReady, haFoot } from '../world/haAnchor.js';
+import { haRegistry } from '../world/heightAuthority.js';   // P1 TERRAIN (`?terrain=p1`): the kit on the real ground
 
 // every campus material takes the scene light trim (see applyLightTrim): the
 // untrimmed granite and limestone clipped to pure white at noon
@@ -327,9 +329,25 @@ const tmpM = new THREE.Matrix4(), tmpQ = new THREE.Quaternion(), tmpP = new THRE
 const AXIS_Y = new THREE.Vector3(0, 1, 0);
 
 // batched unit-box instancing per material — one draw call per bucket
+// P1 TERRAIN: while BOX_LIFT is set (the kit's flat-authored pieces), a box is lifted by the authority's lift at its centre;
+// a long thin box (a kerb, a rail, a wall course) is cut into pieces of at most 4 m, each lifted at its own centre
+let BOX_LIFT = null;
 class BoxBatch {
   constructor(mat) { this.mat = mat; this.items = []; }
-  add(cx, cy, cz, sx, sy, sz, yaw = 0) { this.items.push([cx, cy, cz, sx, sy, sz, yaw]); }
+  add(cx, cy, cz, sx, sy, sz, yaw = 0) {
+    if (BOX_LIFT) {
+      if (sz > 4.5 && sx < 1.5) {
+        const n = Math.ceil(sz / 4), dx = Math.sin(yaw), dz = Math.cos(yaw);
+        for (let k = 0; k < n; k++) {
+          const o = (k + 0.5) * sz / n - sz / 2, px = cx + dx * o, pz = cz + dz * o;
+          this.items.push([px, cy + BOX_LIFT(px, pz), pz, sx, sy, sz / n + 0.02, yaw]);
+        }
+        return;
+      }
+      cy += BOX_LIFT(cx, cz);
+    }
+    this.items.push([cx, cy, cz, sx, sy, sz, yaw]);
+  }
   build(group, shadows) {
     if (!this.items.length) return;
     const m = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), this.mat, this.items.length);
@@ -384,11 +402,38 @@ export async function buildCampus(scene) {
     return d > 0 && d < 0.6 ? d : 0;
   })();
   const distAlma = (x, z) => Math.hypot(x - alma[0], z - alma[1]);
+  // ==== P1 TERRAIN (`?terrain=p1`, world/haAnchor.js): the kit on the authority's ground. The flat kit stands on the
+  // compile's McKim pads (two planes 6.7 m apart, seams under authored walls); the real campus (the 2017 bare earth, its
+  // walls as slits) has its terrace walls, flights and landings elsewhere (the plaza's flanks at |across| ~42 not 54.6,
+  // the parterre wall at along +1.5 not -8.4, the grand flights at along -10..-7 and -3..+0.5). Under the flag:
+  //   - every flat-authored piece is lifted at its footing by the relief less the pad (haLift), a point object stands on
+  //     the paved ground under it (gS)
+  //   - the McKim axis (the plaza's south steps, the grand staircase, Alma Mater's landing) is laid again where the real
+  //     ground rises (fitted from the authority below), the landings are the ground itself
+  //   - the pad-seam masses (flank walls, parterre-north wall, cascade terraces, their decks, the Kent/Dodge flights) are
+  //     not built: the real walls are slits the ground's builder faces, the side flights are OSM steps like the others
+  // The kit waits for the campus's tiles (the drawn ground it stands on is their lifted sections: world/haAnchor.js
+  // haGround); main.js does not await buildCampus, so the boot does not wait with it
+  const HA = HA_ON && await haPreload(alma[0] - 460, alma[1] - 460, alma[0] + 460, alma[1] + 460)
+    && await haGroundReady([[alma[0], alma[1]], [alma[0] - 150, alma[1] + 150], [alma[0] + 150, alma[1] - 150], [alma[0] + 200, alma[1] + 200], [alma[0] - 200, alma[1] - 200]]);
+  const gS = (x, z) => haGround(x, z);
+  // a rigid piece of radius r: on the lowest ground under it, unless a wall runs through its footprint (over 0.4 m between
+  // its lowest and highest ground): then on the ground at its centre, its own level
+  const gMin = (x, z, r, yFlat) => {
+    const g = haGroundMin(x, z, r), c = haGround(x, z);
+    if (g === null || c === null) return yFlat;
+    let hi = c;
+    if (r > 0.05) for (let k = 0; k < 8; k++) { const a = (k * Math.PI) / 4, v = haGround(x + Math.cos(a) * r, z + Math.sin(a) * r); if (v !== null) hi = Math.max(hi, v); }
+    return hi - g > 0.4 ? c : g;
+  };
+  // a group's new children (from index i0), authored on the level `ref`, stood on the ground under each
+  const liftKids = (grp, i0, ref) => { if (HA) for (let i = i0; i < grp.children.length; i++) { const o = grp.children[i], g = gS(o.position.x, o.position.z); if (g !== null) o.position.y += g - ref; } };
   // deck = a walking surface (flight treads, granite decks): sim/peds.js stands campus walkers on these
   const addPrism = (pts, y0, y1, deck = false) => {
     let minX = 1e9, minZ = 1e9, maxX = -1e9, maxZ = -1e9;
     const flat = new Float32Array(pts.length * 2);
     pts.forEach(([x, z], i) => { flat[i * 2] = x; flat[i * 2 + 1] = z; minX = Math.min(minX, x); maxX = Math.max(maxX, x); minZ = Math.min(minZ, z); maxZ = Math.max(maxZ, z); });
+    if (BOX_LIFT) { const d = BOX_LIFT((minX + maxX) / 2, (minZ + maxZ) / 2); y0 += d; y1 += d; }
     COLLIDERS.addPrism('campus', { pts: flat, minX, minZ, maxX, maxZ, y0, y1, deck });
   };
   const rectPts = (cx, cz, hw, hd, yaw) => {
@@ -406,10 +451,24 @@ export async function buildCampus(scene) {
     const yaw = Math.atan2(dirx, dirz);
     const n = Math.max(2, Math.round(Math.abs(rise) / 0.155));
     const tread = len / n, rh = Math.abs(rise) / n;
+    let prevTop = -Infinity;
     for (let i = 0; i < n; i++) {
       const t0 = (i + 0.5) * tread;
       // deep skirt + ride 9cm proud of the terrain ramp so its coarse triangle
       // cells can never interleave with the treads
+      if (HA) {
+        // (TERRAIN INT2: on the real ground a straight flight between its two ends rode up to 1.2 m over a dip in the
+        // slope (a grey slab on Morningside's bank) or sank under a hump: each tread's top is the line's or 2 cm over the
+        // ground under its front, never below the tread before, and its block reaches 0.3 m into the ground under it)
+        const cx = lo[0] + dirx * t0, cz = lo[1] + dirz * t0, g0 = gS(cx, cz);
+        let top = loY + rh * (i + 1);
+        if (g0 !== null && g0 + 0.02 > top) top = g0 + 0.02;
+        if (top < prevTop) top = prevTop;
+        prevTop = top;
+        const foot = Math.min(top - rh - 0.34, g0 !== null ? g0 - 0.3 : top - rh - 0.34);
+        granite.add(cx, (top - 0.04 + foot) / 2, cz, w, top - 0.04 - foot, tread + 0.06, yaw);
+        continue;
+      }
       granite.add(lo[0] + dirx * t0, loY + rh * (i + 1) - rh / 2 - 0.04, lo[1] + dirz * t0, w, rh + 0.34, tread + 0.06, yaw);
     }
     if (cheeks) {
@@ -430,16 +489,33 @@ export async function buildCampus(scene) {
     return (along > -17 && along < 19 && Math.abs(across) < 62) ||
            (along > -47 && along < -34 && Math.abs(across) < 60);
   };
+  // P1: the zone the axis fit lays (the plaza's south steps; the grand staircase up to Low's own stair, which Low builds)
+  const haZone = (x, z) => {
+    const dx = x - alma[0], dz = z - alma[1];
+    const along = dx * AX + dz * AZ, across = dx * -AZ + dz * AX;
+    return (along > -45 && along < -27 && Math.abs(across) < 50) || (along > -13 && along < 24 && Math.abs(across) < 30);
+  };
   for (const st of C.steps || []) {
-    const p = st.pts3;
+    let p = st.pts3;
     if (!p || p.length < 2) continue;
+    if (HA) {
+      // P1: an OSM flight from the real ground at its two ends (0.3 m past each end: the foot and the head)
+      const a0 = p[0], b0 = p[p.length - 1], L0 = Math.hypot(b0[0] - a0[0], b0[1] - a0[1]);
+      if (haZone((a0[0] + b0[0]) / 2, (a0[1] + b0[1]) / 2) || L0 < 0.8) continue;
+      const ux = (b0[0] - a0[0]) / L0, uz = (b0[1] - a0[1]) / L0;
+      const ga = gS(a0[0] - ux * 0.3, a0[1] - uz * 0.3), gb = gS(b0[0] + ux * 0.3, b0[1] + uz * 0.3);
+      if (ga === null || gb === null) continue;
+      p = [[a0[0], a0[1], ga - LIFT], [b0[0], b0[1], gb - LIFT]];
+      const ea = [a0[0] - ux * 0.3, a0[1] - uz * 0.3, ga], eb = [b0[0] + ux * 0.3, b0[1] + uz * 0.3, gb], lo = ga < gb ? ea : eb, hi = ga < gb ? eb : ea;
+      if (Math.abs(gb - ga) >= 0.22) haFoot('campus', `step:${a0[0].toFixed(1)},${a0[1].toFixed(1)}`, 'flight', lo[0], lo[1], lo[2], { x1: hi[0], z1: hi[1], y1: hi[2] });
+    }
     const a = p[0], b = p[p.length - 1];
     const mx = (a[0] + b[0]) / 2, mz = (a[1] + b[1]) / 2;
-    if (inZone(mx, mz)) continue;
+    if (!HA && inZone(mx, mz)) continue;
     const rise = b[2] - a[2];
     // near the terrace pads the flattening leaves residual sub-0.6m "rises"
     // pointing arbitrary directions — a wrong-facing stair is worse than none
-    if (Math.abs(rise) < 0.6 && distAlma(mx, mz) < 120) continue;
+    if (!HA && Math.abs(rise) < 0.6 && distAlma(mx, mz) < 120) continue;
     stairRun(rise > 0 ? a : b, rise > 0 ? b : a, Math.min(14, st.width || 3.2), false);
   }
   /* ===================== THE McKIM AXIS =====================================
@@ -518,6 +594,194 @@ export async function buildCampus(scene) {
 
   const yL1 = yApron + (yTop - yApron) / 3, yL2 = yApron + 2 * (yTop - yApron) / 3;
   const yDeck = yTop + 0.05;      // granite walking level on the terrace masses
+  // ---- P1 TERRAIN: the McKim axis on the real ground (see the note at the top of buildCampus)
+  const gAC = (a, c) => { const q = relPt(a, c); return gS(q[0], q[1]); };
+  let haAlma = null;   // Alma Mater's landing: [along, y]
+  const haAxis = () => {
+    // the flights on the line of constant across c within [a0, a1]: runs steeper than 1 in 6 over a metre (the plaza and
+    // the landings are under 3 %), refined to where the ground leaves the foot and reaches the head
+    const runsOn = (c, a0, a1) => {
+      const P = [];
+      for (let a = a0; a <= a1 + 1e-6; a += 0.25) P.push([a, gAC(a, c)]);
+      const R = [];
+      let st = -1;
+      for (let i = 2; i < P.length - 2; i++) {
+        const g0 = P[i - 2][1], g1 = P[i + 2][1];
+        const steep = g0 !== null && g1 !== null && g1 - g0 > 0.16;
+        if (steep && st < 0) st = i;
+        if ((!steep || i === P.length - 3) && st >= 0) {
+          const u = P[st][0], w = P[i][0];
+          if (w - u >= 1.0) {
+            const foot = gAC(u - 1.0, c), head = gAC(w + 1.0, c);
+            if (foot !== null && head !== null && head - foot > 0.3) {
+              let us = u, ws = w;
+              for (let a = u - 1.0; a <= w; a += 0.05) { const g = gAC(a, c); if (g !== null && g > foot + 0.04) { us = a - 0.05; break; } }
+              for (let a = w + 1.0; a >= u; a -= 0.05) { const g = gAC(a, c); if (g !== null && g < head - 0.04) { ws = a + 0.05; break; } }
+              R.push({ u: us, w: ws, foot: gAC(us - 0.3, c), head: gAC(ws + 0.3, c) });
+            }
+          }
+          st = -1;
+        }
+      }
+      return R;
+    };
+    // one flight over the across strips that carry it, outward from the axis while the strip's rise is the axis's
+    const flight = (A0, A1, tag) => {
+      const ax = runsOn(0, A0, A1);
+      if (!ax.length) return null;
+      const F = ax.reduce((m, r) => (r.head - r.foot > m.head - m.foot ? r : m));
+      const strips = [];
+      for (const dir of [1, -1]) {
+        for (let k = dir > 0 ? 0 : 1; k < 16; k++) {
+          const c = dir * (k * 4);
+          const r = runsOn(c, F.u - 2.5, F.w + 2.5).find((q) => q.w > F.u - 1 && q.u < F.w + 1);
+          if (!r || Math.abs((r.head - r.foot) - (F.head - F.foot)) > 0.6 * (F.head - F.foot)) break;
+          strips.push({ c0: c - 2, c1: c + 2, ...r });
+        }
+      }
+      // a strip whose foot or head varies more than 5 cm across it is halved (down to 1 m)
+      const lay = (S0, depth) => {
+        const cm = (S0.c0 + S0.c1) / 2, wdt = S0.c1 - S0.c0, cs = [S0.c0 + 0.15, S0.c0 + wdt * 0.25, cm, S0.c0 + wdt * 0.75, S0.c1 - 0.15];
+        const gm = (a) => { let m = -Infinity; for (const c of cs) { const g = gAC(a, c); if (g !== null) m = Math.max(m, g); } return Number.isFinite(m) ? m : null; };
+        const spread = (a) => { let lo = Infinity, hi = -Infinity; for (const c of cs) { const g = gAC(a, c); if (g !== null) { lo = Math.min(lo, g); hi = Math.max(hi, g); } } return hi - lo; };
+        if (wdt > 1.1 && depth < 3 && (spread(S0.u - 0.6) > 0.05 || spread(S0.w + 0.6) > 0.05)) {
+          lay({ ...S0, c1: cm }, depth + 1); lay({ ...S0, c0: cm }, depth + 1);
+          return;
+        }
+        // the strip's flight: uniform risers of about 0.155 m from the landing at its foot to the one at its head, laid so
+        // the line through the inner corners (where each riser meets the tread below it) never dips under the ground: the
+        // flight starts at r0, the latest start that keeps that line over the strip's highest ground at every station
+        // (the foot on the lowest ground across the strip, the riser's base set into the higher side; the head on the highest)
+        const gl = (a) => { let m = Infinity; for (const c of cs) { const g = gAC(a, c); if (g !== null) m = Math.min(m, g); } return Number.isFinite(m) ? m : null; };
+        let foot = Infinity, head = -Infinity;
+        for (let a = S0.u - 1.5; a <= S0.u - 0.3; a += 0.1) { const g = gl(a); if (g !== null) foot = Math.min(foot, g); }
+        for (let a = S0.w + 0.3; a <= S0.w + 1.2; a += 0.1) { const g = gm(a); if (g !== null) head = Math.max(head, g); }
+        if (!Number.isFinite(foot) || !Number.isFinite(head) || head - foot < 0.25) return;
+        // an edge strip that rises otherwise than the flight is the side terrain, not the flight
+        if (Math.abs((head - foot) - (F.head - F.foot)) > 0.3 * (F.head - F.foot)) return;
+        const rise = head - foot, n = Math.max(1, Math.round(rise / 0.155)), rh = rise / n;
+        const tr = Math.min(0.6, Math.max(0.28, (S0.w - S0.u) / n)), slope = rh / tr;
+        let r0 = S0.u;
+        for (let a = S0.u - 1.5; a <= S0.w + 1.5; a += 0.1) { const g = gm(a); if (g !== null && g > foot + 0.005 && g < head) r0 = Math.min(r0, a - (g - foot) / slope); }
+        // the top tread runs on to where the ground reaches the head (the ramp's rounded top under it)
+        let E = r0 + n * tr;
+        for (let a = r0 + n * tr; a <= S0.w + 1.5; a += 0.05) { const g = gm(a); if (g !== null && g >= head - 0.03) { E = a; break; } E = a; }
+        const S = { ...S0, u: r0, w: r0 + n * tr, foot, head };
+        // its foot and head must meet the ground on the strip's centre line: halve it, or (at 1 m) leave it to the terrain
+        const gf = gAC(S.u - 0.3, cm), gh = gAC(Math.max(E, S.w) + 0.3, cm);
+        if (gf === null || gh === null || Math.abs(gf - foot) > 0.05 || Math.abs(gh - head) > 0.05) {
+          if (wdt > 1.1 && depth < 3) { lay({ ...S0, c1: cm }, depth + 1); lay({ ...S0, c0: cm }, depth + 1); }
+          return;
+        }
+        let lo = Math.min(S.foot, S.head);
+        for (let t = 0; t <= 1.0001; t += 0.125) for (const cc of [S.c0 - 0.4, cm, S.c1 + 0.4]) { const g = gAC(S.u + (S.w - S.u) * t, cc); if (g !== null) lo = Math.min(lo, g); }
+        for (let i = 0; i < n; i++) {
+          const a0 = S.u + i * tr, a1 = i === n - 1 ? Math.max(E, S.u + n * tr) : S.u + (i + 1) * tr, d = a1 - a0, am = (a0 + a1) / 2;
+          const top = S.foot + rh * (i + 1) + 0.01, q = relPt(am, cm), h = top - (lo - 0.3);
+          granite.add(q[0], top - h / 2, q[1], wdt + 0.01, h, d + 0.03, yawAxis);
+          addPrism(rectPts(q[0], q[1], wdt / 2, d / 2 + 0.01, yawAxis), top - 0.45, top, true);
+          const pts = [];
+          for (const da of [-0.45, 0, 0.45]) for (const dc of [-0.45, 0, 0.45]) pts.push(relPt(am + da * d, cm + dc * wdt));
+          haFoot('campus', `${tag}:${cm}:${i}`, 'deck', q[0], q[1], top, { pts, skirt: h });
+        }
+        const qf = relPt(S.u - 0.3, cm), qh = relPt(Math.max(E, S.w) + 0.3, cm);
+        haFoot('campus', `${tag}:${cm}`, 'flight', qf[0], qf[1], S.foot, { x1: qh[0], z1: qh[1], y1: S.head });
+      };
+      for (const S0 of strips) lay(S0, 0);
+      return { ...F, strips: strips.length };
+    };
+    const south = flight(-45, -27, 'southSteps');
+    const g1 = flight(-13, -5, 'grandA');
+    const g2 = flight(-5.5, 3, 'grandB');
+    // Alma Mater on the landing at the head of the grand flights, clear of the last tread
+    const aA = Math.max(0.35, (g2 ? g2.w : 0) + 1.6);
+    let ay = -Infinity;
+    for (let da = -1.2; da <= 1.2; da += 0.4) for (let dc = -1.2; dc <= 1.2; dc += 0.4) { const g = gAC(aA + da, dc); if (g !== null) ay = Math.max(ay, g); }
+    haAlma = Number.isFinite(ay) ? [aA, ay] : null;
+    console.log('[terrain p1] campus axis:', JSON.stringify({ south, g1, g2, alma: haAlma }));
+  };
+  if (HA) haAxis();
+  // P1 (second pass): Low's terrace between the head of the steps and Low's own stair is brick with pale granite joint
+  // bands (the flat kit's field over its slab, (3) below, which the flag leaves out with the flat axis); on the real ground
+  // the terrace rises 0.5 m toward Low, so the field is draped on the drawn ground (a 0.5 m grid, 4 cm over it, its edges
+  // turned down 8 cm) and the joints over it as draped ribbons 1.5 cm higher, as the flat field lays them
+  if (HA) {
+    const drape = (mat, a0, a1, c0, c1, dy, tag) => {
+      const na = Math.max(1, Math.ceil((a1 - a0) / 0.5)), nc = Math.max(1, Math.ceil((c1 - c0) / 0.5)), P = [], I = [];
+      const at = (a, c) => { const q = relPt(a, c), y = gS(q[0], q[1]); return [q[0], (y === null ? 0 : y) + dy, q[1]]; };
+      for (let i = 0; i <= na; i++) for (let j = 0; j <= nc; j++) P.push(...at(a0 + ((a1 - a0) * i) / na, c0 + ((c1 - c0) * j) / nc));
+      const id = (i, j) => i * (nc + 1) + j;
+      for (let i = 0; i < na; i++) for (let j = 0; j < nc; j++) I.push(id(i, j), id(i, j + 1), id(i + 1, j), id(i + 1, j), id(i, j + 1), id(i + 1, j + 1));
+      // the edges turned down: a skirt under each border line
+      const base = P.length / 3, edge = [];
+      for (let i = 0; i <= na; i++) edge.push(id(i, 0));
+      for (let j = 1; j <= nc; j++) edge.push(id(na, j));
+      for (let i = na - 1; i >= 0; i--) edge.push(id(i, nc));
+      for (let j = nc - 1; j >= 1; j--) edge.push(id(0, j));
+      for (const k of edge) P.push(P[3 * k], P[3 * k + 1] - 0.08, P[3 * k + 2]);
+      for (let e = 0; e < edge.length; e++) { const k0 = edge[e], k1 = edge[(e + 1) % edge.length], b0 = base + e, b1 = base + ((e + 1) % edge.length); I.push(k0, b0, k1, k1, b0, b1); }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+      geo.setIndex(I);
+      geo.computeVertexNormals();
+      // (the winding: up-facing when the frame's mirror flips it)
+      const nrm = geo.attributes.normal.array;
+      if (nrm[1] < 0) { const ix = geo.index.array; for (let q = 0; q < ix.length; q += 3) { const t = ix[q + 1]; ix[q + 1] = ix[q + 2]; ix[q + 2] = t; } geo.computeVertexNormals(); }
+      const m = new THREE.Mesh(geo, mat);
+      m.receiveShadow = true;
+      g.add(m);
+      // (the gate: the field's corners and middle at their own ground + dy)
+      for (const [a, c] of [[a0, c0], [a0, c1], [a1, c0], [a1, c1], [(a0 + a1) / 2, (c0 + c1) / 2]]) { const v = at(a, c); haFoot('campus', `drape:${tag}:${a.toFixed(1)},${c.toFixed(1)}`, 'top', v[0], v[2], v[1], { ref: (gS(v[0], v[2]) ?? v[1] - dy) + dy, tol: 0.02, why: 'drape off the ground' }); }
+    };
+    drape(PAVBRICK, 7.4, 16.4, -29, 29, 0.04, 'lowBrick');
+    for (let k = -7; k <= 7; k++) drape(GRANITE, 7.4, 16.4, k * 4.05 - 0.26, k * 4.05 + 0.26, 0.055, `lowJointC${k}`);
+    for (const a of [8.0, 11.9, 15.8]) drape(GRANITE, a - 0.26, a + 0.26, -29, 29, 0.055, `lowJointA${a}`);
+    if (TB32) drape(GRANITE, 7.36, 7.74, -29.2, 29.2, 0.055, 'lowBorder');
+  }
+  // P1: McKim's balustrades on the real terrace walls (the authority's wall registry: slits the ground's builder faces in
+  // masonry): along every run of the McKim core (along -48..+26, across +-75) that drops 1 m or more, a granite plinth,
+  // balusters and a rail 0.45 m in from the edge on its upper side, piece by piece on the drawn ground there
+  if (HA) {
+    try {
+      const WR = await haRegistry('walls');
+      const bal = (x0, z0, x1, z1, y) => {
+        const L = Math.hypot(x1 - x0, z1 - z0);
+        if (L < 0.6) return;
+        const yaw = Math.atan2(x1 - x0, z1 - z0), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, dx = (x1 - x0) / L, dz = (z1 - z0) / L;
+        granite.add(cx, y + 0.09, cz, 0.62, 0.18, L + 0.04, yaw);
+        const nB = Math.max(1, Math.floor(L / 0.46));
+        for (let k = 0; k < nB; k++) { const t = (k + 0.5) / nB; balB.add(x0 + dx * L * t, y + 0.52, z0 + dz * L * t, 0.13, 0.68, 0.13, yaw); }
+        granite.add(cx, y + 0.94, cz, 0.5, 0.16, L + 0.04, yaw);
+        addPrism(rectPts(cx, cz, 0.3, L / 2, yaw), y, y + 1.05);
+        haFoot('campus', `balustrade:${cx.toFixed(1)},${cz.toFixed(1)}`, 'foot', cx, cz, y, { pts: [[x0, z0], [cx, cz], [x1, z1]] });
+      };
+      let nRun = 0;
+      for (const w of (WR && WR.walls) || []) {
+        const P = w.xz;
+        if (!P || P.length < 3) continue;
+        const ac = P.map(([x, z]) => [(x - alma[0]) * AX + (z - alma[1]) * AZ, (x - alma[0]) * -AZ + (z - alma[1]) * AX]);
+        if (!ac.some(([a, c]) => a > -48 && a < 26 && Math.abs(c) < 75)) continue;
+        let used = false;
+        for (let i = 0; i + 1 < P.length; i++) {
+          const [a, c] = ac[i];
+          if (!(a > -48 && a < 26 && Math.abs(c) < 75)) continue;
+          const rl = w.reliefLeft[i], rr = w.reliefRight[i];
+          if (rl === null || rr === null || Math.abs(rl - rr) < 1.0) continue;
+          // the upper side: left = +normal of the run (-tz, tx)
+          const tx = P[i + 1][0] - P[i][0], tz = P[i + 1][1] - P[i][1], tl = Math.hypot(tx, tz) || 1, nx = -tz / tl, nz = tx / tl, sg = rl > rr ? 1 : -1;
+          const o = 0.45 * sg, x0 = P[i][0] + nx * o, z0 = P[i][1] + nz * o, x1 = P[i + 1][0] + nx * o, z1 = P[i + 1][1] + nz * o;
+          const ys = [gS(x0, z0), gS(x1, z1), gS((x0 + x1) / 2, (z0 + z1) / 2)];
+          if (ys.some((v) => v === null) || Math.max(...ys) - Math.min(...ys) > 0.3) continue;   // (not where the wall's top falls away: its ends)
+          const y = Math.min(...ys);   // (on the lowest of its ends and middle)
+          bal(x0, z0, x1, z1, y);
+          used = true;
+        }
+        if (used) nRun++;
+      }
+      console.log(`[terrain p1] campus balustrades on ${nRun} wall runs`);
+    } catch (e) { console.warn('[terrain p1] campus balustrades', e); }
+  }
+  if (!HA) {
   // (1) College Walk band -> the plaza apron: the plaza's south steps.
   // The COMPILED brick ramp under this runs along -45 .. -37 at ~0.14 m/m
   // (probed on tiles_flat4 at across 0, +-30, +-50). Round 1 fitted the flight
@@ -664,12 +928,16 @@ export async function buildCampus(scene) {
       }
     }
   }
+  }
   /* (4) the College Walk gates at Broadway and Amsterdam. Reference:
   `Columbia University Entrance (Oct. 2024).jpg` (Commons) -- RUSTICATED granite
   piers in five deep banded courses, a moulded cap carrying a classical stone
   URN, a low balustraded dwarf wall returning from each pier, and tall black
   wrought-iron leaves with spear finials and a scrolled frieze band. The walk
   skews ~1.3 deg to the axis, so track it off walkLine. */
+  // (P1: the gates, the kerbs and the medallions are flat-authored: lifted at each piece's footing)
+  const uniq0 = uniq.children.length;
+  BOX_LIFT = HA ? (x, z) => { const g = gS(x, z); return g === null ? 0 : g - yWalk; } : null;
   for (const s of [-1, 1]) {
     const cG = 129 * s, aG = -52.5 - 0.0231 * cG;
     for (const e of [-1, 1]) {
@@ -713,6 +981,8 @@ export async function buildCampus(scene) {
       fenceB.add(gr[0], yWalk + 0.35, gr[1], 3.5, 0.12, 0.14, yawAxis + Math.PI / 2);
     }
   }
+  liftKids(uniq, uniq0, yWalk);
+  const uniqM = uniq.children.length;
   // (5) granite kerbs around the plaza parterres and the upper-campus lawns:
   // every lawn edge is a raised granite kerb, never grass running into paving
   for (const gp of C.grass || []) {
@@ -734,6 +1004,8 @@ export async function buildCampus(scene) {
     // TL26: kerb tops 0.12 over the pad (was 0.09): the compiled beds now sit 4 cm higher (0.20 over terrain, 4 cm
     // over the brick ribbons that run across them), and the granite must stay proud of the grass it edges
     const kTop = LP26 ? 0.12 : 0.09;
+    // P1: the kerb's zone level is the kit's, not the real ground's: each piece stands on the paving under it
+    if (HA) BOX_LIFT = (x, z) => { const g = gS(x, z); return g === null ? 0 : g - kerbY; };
     for (let i = 0; i < pts.length; i++) {
       const [ax2, az2] = pts[i], [bx2, bz2] = pts[(i + 1) % pts.length];
       const L = Math.hypot(bx2 - ax2, bz2 - az2);
@@ -804,6 +1076,9 @@ export async function buildCampus(scene) {
     }
   }
 
+  BOX_LIFT = null;
+  liftKids(uniq, uniqM, yApron);
+  if (HA) for (const s of [-1, 1]) for (const e of [-1, 1]) { const cG = 129 * s, p = relPt(-52.5 - 0.0231 * cG + e * 9.2, cG); haFoot('campus', `gate:${s}:${e}`, 'foot', p[0], p[1], gS(p[0], p[1]), { r: 0 }); }
   // ---------- retaining walls + terrace balustrades
   for (const wl of C.walls || []) {
     const p = wl.pts3;
@@ -815,8 +1090,20 @@ export async function buildCampus(scene) {
       const L = Math.hypot(bx - ax, bz - az);
       if (L < 0.4) continue;
       const yaw = Math.atan2(bx - ax, bz - az);
-      const cx = (ax + bx) / 2, cz = (az + bz) / 2, top = Math.max(ay, by) + LIFT + 0.72;
-      const base = Math.min(ay, by) + LIFT - 1.2;
+      const cx = (ax + bx) / 2, cz = (az + bz) / 2;
+      let top = Math.max(ay, by) + LIFT + 0.72, base = Math.min(ay, by) + LIFT - 1.2;
+      if (HA) {
+        // P1: a retaining wall's line is a slit in the real ground: its cap 0.72 m over the higher side, its foot under
+        // the lower, sampled 0.6 m either side of each end
+        const nx = (bz - az) / L, nz = -(bx - ax) / L;
+        let hi = -Infinity, lo = Infinity;
+        for (const [px, pz, py] of [[ax, az, ay], [(ax + bx) / 2, (az + bz) / 2, (ay + by) / 2], [bx, bz, by]]) for (const o of [-1.2, -0.6, 0.6, 1.2]) {
+          const g = gS(px + nx * o, pz + nz * o), v = g === null ? py + LIFT : g;
+          hi = Math.max(hi, v); lo = Math.min(lo, v);
+        }
+        top = hi + 0.72; base = lo - 1.2;
+        haFoot('campus', `wall:${cx.toFixed(1)},${cz.toFixed(1)}`, 'wall', cx, cz, base + 1.2, { top: top - 0.72, nx, nz });
+      }
       stone.add(cx, (top + base) / 2, cz, 0.42, top - base, L + 0.1, yaw);
       granite.add(cx, top + 0.06, cz, 0.56, 0.13, L + 0.24, yaw); // cap
       addPrism(rectPts(cx, cz, 0.3, L / 2 + 0.05, yaw), base, top + 0.15);
@@ -844,8 +1131,9 @@ export async function buildCampus(scene) {
       const segs = Math.max(1, Math.round(L / 2.4));
       for (let k = 0; k < segs; k++) {
         const t0 = (k + 0.5) / segs;
-        const cx = ax + (bx - ax) * t0, cz = az + (bz - az) * t0, cy = ay + (by - ay) * t0 + LIFT;
+        const cx = ax + (bx - ax) * t0, cz = az + (bz - az) * t0, cy = HA ? gMin(ax + (bx - ax) * t0, az + (bz - az) * t0, 0, ay + (by - ay) * t0 + LIFT) : ay + (by - ay) * t0 + LIFT;
         const sl = L / segs;
+        if (HA) haFoot('campus', `fence:${cx.toFixed(1)},${cz.toFixed(1)}`, 'foot', cx, cz, cy, { r: 0.05 });
         fenceB.add(cx, cy + 0.52, cz, 0.05, 0.05, sl, yaw);      // top rail
         fenceB.add(cx, cy + 0.18, cz, 0.04, 0.04, sl, yaw);      // low rail
         fenceB.add(cx, cy + 0.3, cz, 0.05, 0.62, 0.05, yaw);     // post
@@ -859,7 +1147,9 @@ export async function buildCampus(scene) {
       const [ax, az, ay] = p[i], [bx, bz, by] = p[i + 1];
       const L = Math.hypot(bx - ax, bz - az);
       if (L < 0.5) continue;
-      hedgeB.add((ax + bx) / 2, (ay + by) / 2 + LIFT + 0.48, (az + bz) / 2, 0.85, 0.95, L + 0.15, Math.atan2(bx - ax, bz - az));
+      const hy = HA ? gMin((ax + bx) / 2, (az + bz) / 2, 0.4, (ay + by) / 2 + LIFT) : (ay + by) / 2 + LIFT;
+      hedgeB.add((ax + bx) / 2, hy + 0.48, (az + bz) / 2, 0.85, 0.95, L + 0.15, Math.atan2(bx - ax, bz - az));
+      if (HA) haFoot('campus', `hedge:${ax.toFixed(1)},${az.toFixed(1)}`, 'foot', (ax + bx) / 2, (az + bz) / 2, hy, { r: 0.4 });
     }
   }
 
@@ -1197,7 +1487,8 @@ export async function buildCampus(scene) {
   }
   for (const m of C.monuments || []) {
     if (!m.p || m.y === undefined) continue;
-    const [x, z] = m.p, y = m.y + LIFT;
+    const [x, z] = m.p, y = HA ? gMin(x, z, 1.0, m.y + LIFT) : m.y + LIFT;
+    if (HA && m.name !== 'Alma Mater') haFoot('campus', `monument:${m.name}`, 'foot', x, z, y, { r: 1.0 });
     if (m.name === 'Alma Mater') {
       // she sits on the plateau at the grand staircase head, centered before
       // Low — not at the OSM node's staircase-foot position
@@ -1206,8 +1497,8 @@ export async function buildCampus(scene) {
       // her granite platform + marble die are part of the model; the landing
       // only needs one low apron step round it (the old 6.6 m dais read as a
       // packing crate under her)
-      const p = relPt(0.35, 0);
-      const ly = yApron + 2 * (yTop - yApron) / 3;
+      let p = relPt(0.35, 0), ly = yApron + 2 * (yTop - yApron) / 3;
+      if (HA && haAlma) { p = relPt(haAlma[0], 0); ly = haAlma[1] - 0.16; haFoot('campus', 'monument:Alma Mater', 'foot', p[0], p[1], ly + 0.16, { r: 1.2 }); }
       // (AM30: the scan's own pedestal stands on the landing; the apron is the faceted model's alone)
       if (!AM30) granite.add(p[0], ly + 0.08, p[1], 4.7, 0.16, 4.1, yawAxis);
       uniq.add(almaMater(p[0], ly + 0.16, p[1]));
@@ -1229,6 +1520,7 @@ export async function buildCampus(scene) {
       const p = relPt(-21, 23 * side);
       x = p[0]; z = p[1]; y = yApron;
     }
+    if (HA) { y = gMin(x, z, small ? 1.5 : 4.0, y); haFoot('campus', `fountain:${x.toFixed(1)},${z.toFixed(1)}`, 'foot', x, z, y, { r: small ? 1.5 : 4.0 }); }
     // The Low Plaza pair: a big shallow granite pool with a broad moulded
     // coping you sit on, and at its centre a raised tazza BOWL on a baluster
     // pedestal whose water falls from the lip into the pool (Commons, `2014
@@ -1315,7 +1607,8 @@ export async function buildCampus(scene) {
 
   // ---------- flagpoles (Low Plaza pair)
   for (const fp of C.flagpoles || []) {
-    const [x, z] = fp.p, y = fp.y != null ? fp.y + LIFT : yTop;
+    const [x, z] = fp.p, y = HA ? gMin(x, z, 0.7, yTop) : (fp.y != null ? fp.y + LIFT : yTop);
+    if (HA) haFoot('campus', `flagpole:${x.toFixed(1)},${z.toFixed(1)}`, 'foot', x, z, y, { r: 0.7 });
     const G = new THREE.Group();
     G.add(cyl(GRANITE, 0.55, 0.7, 1.0, 0, 0.5, 0, 12));
     const pole = cyl(LT(new THREE.MeshStandardMaterial({ color: 0xe8e6e0, roughness: 0.35, metalness: 0.7 })), 0.05, 0.09, 14, 0, 7.5, 0, 10);
@@ -1360,7 +1653,8 @@ export async function buildCampus(scene) {
       for (let d = 15 - acc; d < L; d += 15) {
         const t = d / L;
         const side = lampPos.length % 2 ? 1 : -1;
-        lampPos.push([ax + dx * d - dz * side * 7.0, ay + (by - ay) * t + LIFT, az + dz * d + dx * side * 7.0, Math.atan2(dx, dz)]);
+        const lx = ax + dx * d - dz * side * 7.0, lz = az + dz * d + dx * side * 7.0;
+        lampPos.push([lx, HA ? gMin(lx, lz, 0.3, ay + (by - ay) * t + LIFT) : ay + (by - ay) * t + LIFT, lz, Math.atan2(dx, dz)]);
       }
       acc = (acc + L) % 15;
     }
@@ -1372,10 +1666,13 @@ export async function buildCampus(scene) {
     [-8.2, -40, 'L1'], [-8.2, 40, 'L1'], [0.2, -27.5, 'L2'], [0.2, 27.5, 'L2'],
     [3, -31, 'T'], [3, 31, 'T'], [16, -22, 'T'], [16, 22, 'T'], [26, -34, 'T'], [26, 34, 'T']]) {
     const p = rel(fwd, right, 0);
-    const y = lvl === 'T' ? yTop : lvl === 'L1' ? yApron + (yTop - yApron) / 3
+    let y = lvl === 'T' ? yTop : lvl === 'L1' ? yApron + (yTop - yApron) / 3
       : lvl === 'L2' ? yApron + 2 * (yTop - yApron) / 3 : yApron;
+    // P1: the kit's level tags are the pads'; a lamp stands on the paving under it
+    if (HA) y = gMin(p[0], p[2], 0.3, y);
     lampPos.push([p[0], y, p[2], Math.atan2(-AX, -AZ)]);
   }
+  if (HA) lampPos.forEach(([x, y, z], i) => haFoot('campus', `lamp:${i}`, 'foot', x, z, y, { r: 0.3 }));
   if (lampPos.length) {
     const lm = new THREE.InstancedMesh(lampProto, GREENPOST, lampPos.length);
     const gm = new THREE.InstancedMesh(new THREE.SphereGeometry(0.19, 12, 10), GLOBE, lampPos.length * 2);

@@ -16,7 +16,10 @@ import * as land from './cpLand.js';
 import * as flora from './cpFlora.js';
 import * as bethesda from './cpBethesda.js';
 import * as landmarks from './cpLandmarks.js';
-import { cpRelief, cpReliefReady, CP_RELIEF_BOX, cpBridgeRelief } from './cpRelief.js';
+import { cpRelief, cpReliefReady, CP_RELIEF_BOX, cpBridgeRelief, cpHaTile, CP_DATUM } from './cpRelief.js';
+import { haInCentralPark } from '../world/heightAuthority.js';
+import { cpDrivesApply, cpDriveDecks, cpDriveGroundDy } from './cpDrives.js';   // TERRAIN INT2: the drives on their own profiles
+import { HA_P1, haTileHit } from '../world/heightAuthority.js';   // P1 TERRAIN (`?terrain=p1`)
 
 export const CP32 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('cp32') === '0');
 // the order matters for apply(): the water is cut out of the lawn first, then the terrace and the landmarks re-kind what
@@ -35,9 +38,120 @@ const inBox = (x, z) => x > BOX.x0 && x < BOX.x1 && z > BOX.z0 && z < BOX.z1;
 // first (cpRelief.js), so every part's apply() sees the park's real ground.
 export function cpApply(tile, ox, oz) {
   if (!cpTileHit(ox, oz)) return;
+  // P1 TERRAIN: with the authority's region over the park, the park's parts apply after its cut (cpApplyP1)
+  if (HA_P1 && haTileHit(ox, oz)) return;
   try { reliefApply(tile, ox, oz); } catch (e) { warn('relief', 'apply', e); }
   try { mallApply(tile, ox, oz); } catch (e) { warn('mall', 'apply', e); }
   for (const [n, P] of PARTS) { if (P.apply) try { P.apply(tile, ox, oz); } catch (e) { warn(n, 'apply', e); } }
+}
+// P1 TERRAIN (`?terrain=p1`; world/assemble.js and core/world/simTile.mjs call it right after haApplyTile): the park on
+// the authority's ground. The cut has lifted the compiled sections onto the real ground (cpRelief.js answers from the
+// authority), so the relief is not laid again (no double rise); the hard sections on a bridge are raised from the ground
+// to the deck (cpBridgeRelief), then the Mall and every part apply as on the relief they were made for.
+export function cpApplyP1(tile, ox, oz) {
+  if (!cpTileHit(ox, oz)) return;
+  cpHaTile(Math.floor(ox / 512), Math.floor(oz / 512));
+  try {
+    try { decksP1(tile, ox, oz); } catch (e) { warn('relief', 'decks', e); }
+    try { mallApply(tile, ox, oz); } catch (e) { warn('mall', 'apply', e); }
+    for (const [n, P] of PARTS) { if (P.apply) try { P.apply(tile, ox, oz); } catch (e) { warn(n, 'apply', e); } }
+    try { sinkBaseP1(tile); } catch (e) { warn('relief', 'base', e); }
+  } finally { cpHaTile(null); }
+}
+// the authority's drawn base (tile.S.terrP1) sunk 0.12 m under any section a part carved below it within 2-4 m (Bethesda's
+// lower terrace, a bank shaped down to the water: the cut's own sinking, TL26, only saw the sections as compiled), 8 m at most
+function sinkBaseP1(tile) {
+  const B = tile.S.terrP1;
+  if (!B || !B.length) return;
+  const C = 2, H = new Map();
+  for (const name of GROUND) {
+    const a = tile.S[name];
+    if (!a || a.length < 9) continue;
+    for (let i = 0; i + 8 < a.length; i += 9) {
+      const y = Math.min(a[i + 1], a[i + 4], a[i + 7]);
+      const i0 = Math.floor(Math.min(a[i], a[i + 3], a[i + 6]) / C), i1 = Math.floor(Math.max(a[i], a[i + 3], a[i + 6]) / C);
+      const j0 = Math.floor(Math.min(a[i + 2], a[i + 5], a[i + 8]) / C), j1 = Math.floor(Math.max(a[i + 2], a[i + 5], a[i + 8]) / C);
+      if ((i1 - i0 + 1) * (j1 - j0 + 1) > 400) continue;   // (a long needle of lawn: the cells it spans are not under its lowest corner)
+      for (let j = j0; j <= j1; j++) for (let ii = i0; ii <= i1; ii++) { const k = ii * 100003 + j, v = H.get(k); if (v === undefined || y < v) H.set(k, y); }
+    }
+  }
+  let n = 0;
+  for (let i = 0; i + 2 < B.length; i += 3) {
+    const ci = Math.floor(B[i] / C), cj = Math.floor(B[i + 2] / C);
+    let v;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) { const w = H.get((ci + di) * 100003 + cj + dj); if (w !== undefined && (v === undefined || w < v)) v = w; }
+    if (v !== undefined && v - 0.12 < B[i + 1] && B[i + 1] - (v - 0.12) < 8) { B[i + 1] = v - 0.12; n++; }
+  }
+  if (n) tile.S.terrP1 = B;
+  // (TERRAIN INT2: the base left bare in the park, no section over it (a gap in the compiled lawn): up to the lawn's level,
+  // 4 cm under it, so the lawn and the bare base read as one surface, no step and no open edge at the lawn's rim; the
+  // drives' cut and fill bands are the drives')
+  const [ox, oz] = tile.header.origin, TI = new Map(), TL = [];
+  for (const name of GROUND) {
+    const a = tile.S[name];
+    if (!a || a.length < 9) continue;
+    for (let i = 0; i + 8 < a.length; i += 9) {
+      const i0 = Math.floor(Math.min(a[i], a[i + 3], a[i + 6]) / C), i1 = Math.floor(Math.max(a[i], a[i + 3], a[i + 6]) / C);
+      const j0 = Math.floor(Math.min(a[i + 2], a[i + 5], a[i + 8]) / C), j1 = Math.floor(Math.max(a[i + 2], a[i + 5], a[i + 8]) / C);
+      if ((i1 - i0 + 1) * (j1 - j0 + 1) > 2000) continue;
+      const k = TL.length; TL.push(a, i, name === 'grass' || name === 'grassU');
+      for (let j = j0; j <= j1; j++) for (let ii = i0; ii <= i1; ii++) { const q = ii * 100003 + j; let l = TI.get(q); if (!l) TI.set(q, (l = [])); l.push(k); }
+    }
+  }
+  const covered = (x, z) => {
+    const l = TI.get(Math.floor(x / C) * 100003 + Math.floor(z / C));
+    let lawn = false;
+    if (l) for (const k of l) {
+      const a = TL[k], i = TL[k + 1], ax = a[i], az = a[i + 2], bx = a[i + 3], bz = a[i + 5], cx = a[i + 6], cz = a[i + 8];
+      const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+      if (Math.abs(d) < 1e-9) continue;
+      const w0 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d, w1 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d;
+      if (w0 >= -0.02 && w1 >= -0.02 && w0 + w1 <= 1.02) { if (!TL[k + 2]) return 'paved'; lawn = true; }
+    }
+    return lawn ? 'lawn' : null;
+  };
+  let r = 0;
+  for (let i = 0; i + 2 < B.length; i += 3) {
+    const x = B[i] + ox, z = B[i + 2] + oz;
+    if (covered(B[i], B[i + 2]) === 'paved' || !haInCentralPark(x, z)) continue;   // (bare, or under the lawn only)
+    const t = CP_DATUM + cpRelief(x, z) + cpDriveGroundDy(x, z) - 0.04;
+    if (B[i + 1] < t && t - B[i + 1] < 1.0) { B[i + 1] = t; r++; }
+  }
+  if (r) tile.S.terrP1 = B;
+}
+// (TERRAIN FIX: the lift is per vertex and jumps at a deck line's edge, so a triangle with corners both on and off the deck
+// was a ramp across its own width, and the two tiles at a border, triangulated differently, ramped differently: West
+// Drive at 63rd stood 1.97 m apart across z 1536. Such a triangle is split in four, down to 0.12 m edges, before the lift:
+// the step lies within 0.12 m of the deck's edge in every tile)
+// (TERRAIN INT2: the drives first, each on its own continuous profile (cpDrives.js); a deck a drive runs along then lifts
+// nothing else, and the drives' own pieces are not lifted again)
+function decksP1(tile, ox, oz) {
+  const mine = cpDrivesApply(tile, ox, oz, ['terrP1', 'grass', 'grassU']), skip = mine ? cpDriveDecks() : null;
+  const dl = (x, z) => { const b = cpBridgeRelief(x + ox, z + oz, skip); if (b === null) return 0; const r = cpRelief(x + ox, z + oz); return b > r ? b - r : 0; };
+  for (const name of GROUND) {
+    if (name === 'grass' || name === 'grassU') continue;
+    const a = tile.S[name];
+    if (!a || a.length < 9) continue;
+    const own = mine && mine[name];
+    const out = [];
+    let split = 0;
+    const tri = (P, depth) => {
+      const L = P.map((p) => dl(p[0], p[2]));
+      const on = L.map((l) => l > 0);
+      const mixed = on[0] !== on[1] || on[1] !== on[2] || Math.max(...L) - Math.min(...L) > 0.25;
+      const e = Math.max(Math.hypot(P[0][0] - P[1][0], P[0][2] - P[1][2]), Math.hypot(P[1][0] - P[2][0], P[1][2] - P[2][2]), Math.hypot(P[2][0] - P[0][0], P[2][2] - P[0][2]));
+      if (mixed && e > 0.12 && depth < 12) {
+        split++;
+        const m = (u, w) => [(u[0] + w[0]) / 2, (u[1] + w[1]) / 2, (u[2] + w[2]) / 2];
+        const m01 = m(P[0], P[1]), m12 = m(P[1], P[2]), m20 = m(P[2], P[0]);
+        tri([P[0], m01, m20], depth + 1); tri([m01, P[1], m12], depth + 1); tri([m20, m12, P[2]], depth + 1); tri([m01, m12, m20], depth + 1);
+        return;
+      }
+      for (let k = 0; k < 3; k++) out.push(P[k][0], P[k][1] + L[k], P[k][2]);
+    };
+    for (let i = 0; i + 8 < a.length; i += 9) { if (own && own.has(i)) { for (let k = 0; k < 9; k++) out.push(a[i + k]); continue; } tri([[a[i], a[i + 1], a[i + 2]], [a[i + 3], a[i + 4], a[i + 5]], [a[i + 6], a[i + 7], a[i + 8]]], 0); }
+    tile.S[name] = Float32Array.from(out);
+  }
 }
 
 // The relief (cpRelief.js) laid onto the flat compile: every ground section's triangle that the park's relief reaches is
@@ -50,7 +164,7 @@ export function cpApply(tile, ox, oz) {
 // down to 7 m. A triangle the relief does not reach (the city round the park, the transverse roads, which stay on the
 // city's datum) is left as it is.
 const GROUND = ['asphalt', 'sidewalk', 'curb', 'paintW', 'paintY', 'grass', 'path', 'paintG', 'brick', 'gutter', 'busred', 'warn', 'warnIron', 'grassU', 'plaza', 'gravel'];
-export const cpLift = (x, z) => (CP32 ? cpRelief(x, z) : 0);   // world/assemble.js: a compiled building's base in the park
+export const cpLift = (x, z) => (CP32 && !HA_P1 ? cpRelief(x, z) : 0);   // (P1: the authority lifts the park's buildings)   // world/assemble.js: a compiled building's base in the park
 // a convex polygon [[x, y, z]...] cut by the plane (axis ax) = c into its low and high sides
 function cut(poly, ax, c) {
   const lo = [], hi = [];
@@ -246,7 +360,9 @@ export function cpFurniture(ox, oz) {
 // builds what lies in this tile, or a whole structure from the one tile that owns its anchor point (build it once).
 export function cpBuild(group, ctx) {
   if (!cpTileHit(ctx.ox, ctx.oz)) return;
-  for (const [n, P] of PARTS) { if (P.build) try { P.build(group, ctx); } catch (e) { warn(n, 'build', e); } }
+  if (HA_P1) cpHaTile(Math.floor(ctx.ox / 512), Math.floor(ctx.oz / 512));   // (P1: the tile's chunk answers past its edge)
+  try { for (const [n, P] of PARTS) { if (P.build) try { P.build(group, ctx); } catch (e) { warn(n, 'build', e); } } }
+  finally { if (HA_P1) cpHaTile(null); }
 }
 
 // The Mall: CSCL carries it as a roadway (THE MALL), so the compiled city laid it as a 20 m carriageway with a double

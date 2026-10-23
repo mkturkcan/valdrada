@@ -44,7 +44,7 @@ The smaller banks (`basis/`, `data/`, `fonts/`, `luts/`, `settings/`) are commit
 ### Download (recommended)
 
 ```
-hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.5.1 \
+hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.5.2 \
     --include "Content/tiles/*" --include "Content/models/*" --include "Content/textures/*" --local-dir .cache/hf
 mv .cache/hf/Content/tiles .cache/hf/Content/models .cache/hf/Content/textures client/public/
 ```
@@ -194,7 +194,7 @@ server headless at 1280 × 720 and stops it afterwards, and without it the scrip
 listening:
 
 ```
-bash tools/figures/tutorial_images.sh --server release/Valdrada_0.5.1_win64/Valdrada.exe [--python python]
+bash tools/figures/tutorial_images.sh --server release/Valdrada_0.5.2_win64/Valdrada.exe [--python python]
 ```
 
 ## Offline rendering in Blender
@@ -207,7 +207,7 @@ and the window interiors are in the dataset's `Blender/` folder; point `BXTREES_
 `docs/blender-cycles.md` and `docs/unreal.md` give the full steps for each renderer.
 
 ```
-hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.5.1 \
+hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.5.2 \
     --include "Blender/bxtrees2/*" --include "Blender/bxwin/*" --local-dir .cache/hf
 export BXTREES_ASSETS=$PWD/.cache/hf/Blender/bxtrees2 BXTREES2_TEX=$PWD/.cache/hf/Blender/bxtrees2/tex
 node client/tools/ar34/export/harvest.mjs --shots <shot> --frames 0,54,107 --out <harvest dir>   # 1. harvest

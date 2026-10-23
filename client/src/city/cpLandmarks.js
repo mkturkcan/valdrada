@@ -10,6 +10,9 @@ import * as land from './cpLand.js';
 import { CP_DATUM, cpDemToWorld, cpReliefReady } from './cpRelief.js';
 import { BOW, bowDeckY, buildBowBridge, bowColliders, bowPromenade, buildRowboats, BOATHOUSE, buildBoathouse, BELV, buildBelvedere, belvedereColliders, GAP, gapWalkY, buildGapstow, gapColliders, NEEDLE, buildNeedle, OAK, oakFrame, oakDeckY, buildOakBridge, oakColliders, STATUES, buildStatue, BANDSHELL, buildBandshell, LADIES, buildLadies, SGATE, buildGatehouse, LANDING, buildLanding, DELA, buildDelacorte, K as KC, buildOctagon, DAIRY, buildDairy, SWEDISH, buildSwedish, RINK, buildRinkBoards, mergeByMaterial, BALC, buildBalcony, buildArch, LBin, lmMats } from './cpLandmarksKit.js';
 import * as RELIEF from './cpRelief.js';
+import { cpDriveArch, cpDriveH, CPD_ON } from './cpDrives.js';   // TERRAIN INT2: arches under the drives
+import { HA_P1 } from '../world/heightAuthority.js';
+import { haBaseAt } from '../world/haAnchor.js';
 import { mkConvex, tpSplit } from './tsqPlaza.js';
 // CPB33: the bridges and arches modelled stone by stone (city/cpBridges.js); the CP32 builders stay as their far level
 import { CPB33, CPB34, buildBowBridgeB, buildGapstowB, buildOakBridgeB, buildBalconyB, buildArchB, gapGrade, bowBanks } from './cpBridges.js';
@@ -346,7 +349,8 @@ function balcLevels(sectY) {
   for (const sg of [-1, 1]) {
     const u = sg * BALC.HU, x = cx + ax * u, z = cz + az * u;
     let y = null;
-    try { const r = RELIEF.cpBridgeRelief?.(x, z); if (r != null && isFinite(r)) y = 3.38 + r; } catch { /* not in yet */ }
+    try { const r = HA_P1 && CPD_ON ? cpDriveH(x, z) : null; if (r != null && isFinite(r)) y = 3.38 + r; } catch { /* not in yet */ }   // (TERRAIN INT2: the drive's profile)
+    if (y === null) try { const r = RELIEF.cpBridgeRelief?.(x, z); if (r != null && isFinite(r)) y = 3.38 + r; } catch { /* not in yet */ }
     if (y === null) for (const d of [1.5, 3, 5]) { const uu = u + sg * d, yy = sectY(cx + ax * uu, cz + az * uu); if (yy !== null) { y = yy; break; } }
     if (y === null) return null;
     out.push(y);
@@ -414,18 +418,21 @@ const ARCHES = [[385446613, 'Greyshot Arch', '', -729.43, 1539.75, -0.33, 0.94, 
 function archesBuild(group, ctx) {
   const M = lmMats();
   const deckAt = (x, z) => { try { const r = RELIEF.cpBridgeRelief?.(x, z); return r != null && isFinite(r) ? 3.38 + r - 0.02 : null; } catch { return null; } };
-  const groundAt = (x, z) => ctx.sampleT(x, z) + 0.27;
+  // (TERRAIN INT2: on the region's ground the walls stand on the authority's bare earth, not the flat compile's grid)
+  const groundAt = (x, z) => { if (HA_P1) { const g = haBaseAt(x, z); if (g !== null) return g + 0.12; } return ctx.sampleT(x, z) + 0.27; };
   let n = 0, tris = 0;
   for (const A of ARCHES) {
     const [, name, , cx, cz, ax, az] = A;
     if (!owns(ctx.ox, ctx.oz, cx, cz)) continue;
+    // (TERRAIN INT2: an arch under a drive: its faces and parapets at the drive's outer edges, its deck the drive's profile)
+    const DA = HA_P1 ? cpDriveArch(A) : null, AA = DA ? DA.A : A, dkAt = DA ? DA.deckAt : deckAt;
     if (CPB33) {                                              // CPB33: the modelled arch near, the CP32 one far (cpBridges.js buildArchB)
-      const t = buildArchB(group, A, deckAt, groundAt);
+      const t = buildArchB(group, AA, dkAt, groundAt);
       if (t) { n++; tris += t; if (name) console.log(`[cp32m] ${name} built (CPB33)`); }
       continue;
     }
     const B = new LBin().frame(cx, 0, cz, ax, az), SN = new LBin().frame(cx, 0, cz, ax, az), DK = new LBin().frame(cx, 0, cz, ax, az);
-    const t = buildArch(B, SN, DK, A, deckAt, groundAt);
+    const t = buildArch(B, SN, DK, AA, dkAt, groundAt);
     if (!t) continue;
     for (const [b, m, nm] of [[B, M.schist, 'walls'], [SN, M.stone, 'dressings'], [DK, M.rock, 'soffit']]) { const mesh = b.mesh(m, 'cp32m:arch:' + nm); if (mesh) group.add(mesh); }
     n++; tris += B.tris + SN.tris + DK.tris;

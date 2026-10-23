@@ -5,7 +5,7 @@ message: >-
   cite it as below. Valdrada is developed and
   maintained by Mehmet Kerem Turkcan.
 type: software
-version: "0.5.1"
+version: "0.5.2"
 abstract: >-
   A city-scale digital twin of the five boroughs of New York City compiled from
   public municipal records. 1,085,937 buildings, joined to tax-lot records and

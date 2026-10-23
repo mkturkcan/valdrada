@@ -24,6 +24,49 @@ def read(J, B, i, raw=False):
     return arr
 
 
+def clip_keep(W, I, keep, cell=128.0):
+    """FARFACE (2026-10-22): the triangles over a set of cells (keys cx * 100000 + cz), cut exactly at the cell lines where
+    the set's edge crosses them, as the chunks' own export clips its buildings at a square's edges. Keeping a triangle by
+    its centroid left a wall across a block line half drawn (B_ packages: 21,864 open walls; R_: 1,240), a hole wherever
+    the neighbour block is drawn by an L3 chunk or the cells. W: world positions; returns the kept original triangles and
+    the new ones, as rows of (source triangle, three barycentric corners)."""
+    kk = np.array(sorted(keep), np.int64)
+    inset = lambda cx, cz: np.isin(cx * 100000 + cz, kk)
+    T = W[I]
+    lo = np.floor(T.min(1) / cell).astype(np.int64); hi = np.floor((T.max(1) - 1e-6) / cell).astype(np.int64)
+    c = T.mean(1); cin = inset(np.floor(c[:, 0] / cell).astype(np.int64), np.floor(c[:, 2] / cell).astype(np.int64))
+    one = (lo[:, 0] == hi[:, 0]) & (lo[:, 2] == hi[:, 2])
+    mixed = np.zeros(len(I), bool)
+    for t in np.nonzero(~one)[0]:
+        cs = [inset(cx, cz) for cx in range(lo[t, 0], hi[t, 0] + 1) for cz in range(lo[t, 2], hi[t, 2] + 1)]
+        mixed[t] = any(cs) and not all(cs)
+    whole = ~mixed & cin
+    new = []
+    for t in np.nonzero(mixed)[0]:
+        polys = [[np.eye(3)[0], np.eye(3)[1], np.eye(3)[2]]]
+        for ax, a0, a1 in ((0, lo[t, 0], hi[t, 0]), (2, lo[t, 2], hi[t, 2])):
+            for k in range(a0 + 1, a1 + 1):
+                x = k * cell; out = []
+                for poly in polys:
+                    for side in (-1, 1):
+                        q = []
+                        for i in range(len(poly)):
+                            u, v = poly[i], poly[(i + 1) % len(poly)]
+                            du, dv = (u @ T[t][:, ax] - x) * side, (v @ T[t][:, ax] - x) * side
+                            if du >= 0: q.append(u)
+                            if (du >= 0) != (dv >= 0): q.append(u + (v - u) * (du / (du - dv)))
+                        if len(q) >= 3: out.append(q)
+                polys = out
+        for poly in polys:
+            cc = np.mean([b @ T[t] for b in poly], 0)
+            if not inset(int(np.floor(cc[0] / cell)), int(np.floor(cc[2] / cell))): continue
+            for i in range(1, len(poly) - 1):
+                tri = np.array([poly[0], poly[i], poly[i + 1]])
+                g = np.cross((tri[1] - tri[0]) @ T[t], (tri[2] - tri[0]) @ T[t])
+                if g @ g > 1e-10: new.append((t, tri))
+    return I[whole], new
+
+
 def prep(src, dst, rect, only=None, mask_backdrop=False, keep=None):
     f = open(src, 'rb').read()
     L = struct.unpack('<I', f[12:16])[0]
@@ -42,6 +85,7 @@ def prep(src, dst, rect, only=None, mask_backdrop=False, keep=None):
     # ==== end R2B
     extra = bytearray(); base = len(B) + (-len(B)) % 4; pad0 = b'\0' * (base - len(B))
     st = {'tris_in': 0, 'tris_out': 0}
+    made = {}   # (FARFACE: the accessors this file adds, by index, with their data)
 
     def add(arr, comp, typ):
         data = np.ascontiguousarray(arr).tobytes()
@@ -50,7 +94,7 @@ def prep(src, dst, rect, only=None, mask_backdrop=False, keep=None):
         extra.extend(data + b'\0' * ((-len(data)) % 4))
         acc = {'bufferView': len(J['bufferViews']) - 1, 'componentType': comp, 'count': int(arr.shape[0]), 'type': typ}
         if typ == 'VEC2': acc['min'] = arr.min(0).astype(float).tolist(); acc['max'] = arr.max(0).astype(float).tolist()
-        J['accessors'].append(acc)
+        J['accessors'].append(acc); made[len(J['accessors']) - 1] = arr
         return len(J['accessors']) - 1
     # ==== R2B (2026-10-11): the water (an L6 chunk's `water` node, docs/specs/cell-package.md sections 7 and 12) is not
     # masked under the cells: the cells hold no water, land in them stands ~3 m over it and their river beds ~3.6 m under it
@@ -68,12 +112,11 @@ def prep(src, dst, rect, only=None, mask_backdrop=False, keep=None):
         for pr in mesh['primitives']:
             P = read(J, B, pr['attributes']['POSITION']) + org
             I = read(J, B, pr['indices'], raw=True).reshape(-1, 3).astype(np.int64) if 'indices' in pr else np.arange(len(P)).reshape(-1, 3)
-            st['tris_in'] += len(I)
+            st['tris_in'] += len(I); I0 = I
             if mi_ in water_meshes: st['water_tris'] += len(I)   # (R2B)
-            if keep is not None and mi_ not in water_meshes:   # (GB43: only the triangles over these cells, an edge package's own)
-                c = P[I].mean(1)
-                keys = np.floor(c[:, 0] / 128.0).astype(np.int64) * 100000 + np.floor(c[:, 2] / 128.0).astype(np.int64)
-                I = I[np.isin(keys, np.array(sorted(keep), np.int64))]
+            newt = []
+            if keep is not None and mi_ not in water_meshes:   # (GB43: only the triangles over these cells, an edge package's own;
+                I, newt = clip_keep(P, I, keep)                 # FARFACE: cut at the cells' lines, not kept by centroid)
             if rect is not None and mi_ not in water_meshes:
                 c = P[I].mean(1)
                 if isinstance(rect, set):   # (the drawn cells' squares: a load set's mask)
@@ -83,13 +126,30 @@ def prep(src, dst, rect, only=None, mask_backdrop=False, keep=None):
                     inside = (c[:, 0] > rect[0]) & (c[:, 0] < rect[2]) & (c[:, 2] > rect[1]) & (c[:, 2] < rect[3])
                 I = I[~inside]
             st['tris_out'] += len(I)
-            pr['indices'] = add(I.astype('<u4').reshape(-1), 5125, 'SCALAR')
+            if not newt: pr['indices'] = add(I.astype('<u4').reshape(-1), 5125, 'SCALAR')
             if '_lit' in pr['attributes']:
                 lit = read(J, B, pr['attributes']['_lit'])[:, 0]
                 if 'TEXCOORD_0' not in pr['attributes']: pr['attributes']['TEXCOORD_0'] = add(np.zeros((len(P), 2), '<f4'), 5126, 'VEC2')
                 # (BD40: the vertex's open-sky share, _ao, in TEXCOORD_1.y for the lane's far master's AO input; 0 where none)
                 aov = read(J, B, pr['attributes']['_ao'])[:, 0] if '_ao' in pr['attributes'] else np.zeros_like(lit)
                 pr['attributes']['TEXCOORD_1'] = add(np.stack([lit, aov], 1).astype('<f4'), 5126, 'VEC2')
+            if newt:   # (FARFACE: the cut triangles' corners appended to every attribute, interpolated; their indices after)
+                nv = len(P); src_t = np.array([t for t, _ in newt]); bary = np.stack([b for _, b in newt])   # (n, 3 corners, 3)
+                corners = I0[src_t]
+                for an, ai in list(pr['attributes'].items()):
+                    acc = J['accessors'][ai]; raw = made[ai] if ai in made else read(J, B, ai, raw=True)
+                    raw = raw.reshape(len(raw), -1)
+                    v = np.einsum('ncj,njk->nck', bary, raw[corners].astype(np.float64)).reshape(-1, raw.shape[1])
+                    if raw.dtype.kind in 'iu': v = np.clip(np.rint(v), np.iinfo(raw.dtype).min, np.iinfo(raw.dtype).max)
+                    full = np.concatenate([raw, v.astype(raw.dtype)])
+                    k_ = add(full, acc['componentType'], acc['type'])
+                    if acc.get('normalized'): J['accessors'][k_]['normalized'] = True
+                    if an == 'POSITION':
+                        J['accessors'][k_]['min'] = full.min(0).astype(float).tolist(); J['accessors'][k_]['max'] = full.max(0).astype(float).tolist()
+                    pr['attributes'][an] = k_
+                I = np.concatenate([I, nv + np.arange(3 * len(newt)).reshape(-1, 3)])
+                pr['indices'] = add(I.astype('<u4').reshape(-1), 5125, 'SCALAR')
+                st['tris_out'] += len(newt); st['cut_tris'] = st.get('cut_tris', 0) + len(newt)
     if drop_meshes:   # (R2B: the dropped nodes and their meshes out of the file, the kept nodes' mesh indices renumbered)
         keep_m = [i for i in range(len(J['meshes'])) if i not in drop_meshes]
         remap = {o: n for n, o in enumerate(keep_m)}

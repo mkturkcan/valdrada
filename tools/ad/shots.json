@@ -7609,6 +7609,342 @@
           ]
         }
       ]
+    },
+    "mnHhp79": {
+      "act": "mnterrain",
+      "time": "golden",
+      "duration": 5.0,
+      "ease": 0.1,
+      "warm": 240,
+      "fov": 55,
+      "flags": "terrain=p1&hhp=1&fall=0&gfx=saturation:1.16,contrast:0.2,motionBlur:0.5",
+      "title": "The Henry Hudson Parkway along Riverside Park, gliding north past the 79th Street rotunda",
+      "keys": [
+        {
+          "p": [
+            -73.9925,
+            40.779,
+            95
+          ],
+          "look": [
+            -73.9845,
+            40.785,
+            5
+          ]
+        },
+        {
+          "p": [
+            -73.99,
+            40.7825,
+            80
+          ],
+          "look": [
+            -73.983,
+            40.788,
+            5
+          ]
+        },
+        {
+          "p": [
+            -73.9872,
+            40.7862,
+            70
+          ],
+          "look": [
+            -73.981,
+            40.7915,
+            5
+          ]
+        }
+      ]
+    },
+    "mnFortWash": {
+      "act": "mnterrain",
+      "time": "golden",
+      "duration": 5.0,
+      "ease": 0.1,
+      "warm": 240,
+      "fov": 55,
+      "flags": "terrain=p1&hhp=1&fall=0&gfx=saturation:1.16,contrast:0.2,motionBlur:0.5",
+      "title": "Over the Hudson to the George Washington Bridge: Fort Washington Park's woods and the lighthouse",
+      "keys": [
+        {
+          "p": [
+            -73.956,
+            40.842,
+            110
+          ],
+          "look": [
+            -73.944,
+            40.85,
+            30
+          ]
+        },
+        {
+          "p": [
+            -73.9545,
+            40.8455,
+            100
+          ],
+          "look": [
+            -73.943,
+            40.853,
+            30
+          ]
+        },
+        {
+          "p": [
+            -73.953,
+            40.849,
+            95
+          ],
+          "look": [
+            -73.9415,
+            40.8565,
+            30
+          ]
+        }
+      ]
+    },
+    "mnFdrSchurz": {
+      "act": "mnterrain",
+      "time": "golden",
+      "duration": 5.0,
+      "ease": 0.1,
+      "warm": 240,
+      "fov": 55,
+      "flags": "terrain=p1&hhp=1&fall=0&gfx=saturation:1.16,contrast:0.2,motionBlur:0.5",
+      "title": "The FDR under Carl Schurz Park and its river wall, gliding south over the East River",
+      "keys": [
+        {
+          "p": [
+            -73.939,
+            40.781,
+            85
+          ],
+          "look": [
+            -73.944,
+            40.7765,
+            5
+          ]
+        },
+        {
+          "p": [
+            -73.9395,
+            40.778,
+            75
+          ],
+          "look": [
+            -73.945,
+            40.774,
+            5
+          ]
+        },
+        {
+          "p": [
+            -73.9405,
+            40.7748,
+            70
+          ],
+          "look": [
+            -73.9465,
+            40.7712,
+            5
+          ]
+        }
+      ]
+    },
+    "mnWestDrive": {
+      "act": "mnterrain",
+      "time": "golden",
+      "duration": 5.0,
+      "ease": 0.1,
+      "warm": 240,
+      "fov": 55,
+      "flags": "terrain=p1&hhp=1&fall=0&gfx=saturation:1.16,contrast:0.2,motionBlur:0.5",
+      "title": "A dive onto Central Park's West Drive",
+      "keys": [
+        {
+          "p": [
+            -73.976,
+            40.778,
+            160
+          ],
+          "look": [
+            -73.9705,
+            40.781,
+            15
+          ]
+        },
+        {
+          "p": [
+            -73.9735,
+            40.7798,
+            90
+          ],
+          "look": [
+            -73.97,
+            40.7825,
+            15
+          ]
+        },
+        {
+          "p": [
+            -73.9718,
+            40.7812,
+            55
+          ],
+          "look": [
+            -73.9692,
+            40.784,
+            12
+          ]
+        }
+      ]
+    },
+    "mnMorningside": {
+      "act": "mnterrain",
+      "time": "golden",
+      "duration": 5.0,
+      "ease": 0.1,
+      "warm": 240,
+      "fov": 55,
+      "flags": "terrain=p1&hhp=1&fall=0&gfx=saturation:1.16,contrast:0.2,motionBlur:0.5",
+      "title": "Up Morningside Park under its wooded cliff",
+      "keys": [
+        {
+          "p": [
+            -73.956,
+            40.803,
+            60
+          ],
+          "look": [
+            -73.9595,
+            40.808,
+            30
+          ]
+        },
+        {
+          "p": [
+            -73.9563,
+            40.8055,
+            75
+          ],
+          "look": [
+            -73.9598,
+            40.81,
+            30
+          ]
+        },
+        {
+          "p": [
+            -73.9566,
+            40.808,
+            95
+          ],
+          "look": [
+            -73.96,
+            40.812,
+            30
+          ]
+        }
+      ]
+    },
+    "mnHrdHighbridge": {
+      "act": "mnterrain",
+      "time": "golden",
+      "duration": 5.0,
+      "ease": 0.1,
+      "warm": 240,
+      "fov": 55,
+      "flags": "terrain=p1&hhp=1&fall=0&gfx=saturation:1.16,contrast:0.2,motionBlur:0.5",
+      "title": "The Harlem River Drive under Highbridge Park, gliding north to the High Bridge",
+      "keys": [
+        {
+          "p": [
+            -73.9275,
+            40.834,
+            75
+          ],
+          "look": [
+            -73.932,
+            40.839,
+            20
+          ]
+        },
+        {
+          "p": [
+            -73.9285,
+            40.8365,
+            70
+          ],
+          "look": [
+            -73.933,
+            40.842,
+            20
+          ]
+        },
+        {
+          "p": [
+            -73.9293,
+            40.839,
+            65
+          ],
+          "look": [
+            -73.9335,
+            40.8445,
+            25
+          ]
+        }
+      ]
+    },
+    "mnInwood": {
+      "act": "mnterrain",
+      "time": "golden",
+      "duration": 5.0,
+      "ease": 0.1,
+      "warm": 240,
+      "fov": 55,
+      "flags": "terrain=p1&hhp=1&fall=0&gfx=saturation:1.16,contrast:0.2,motionBlur:0.5",
+      "title": "Inwood Hill Park's woods down to the Harlem River and Spuyten Duyvil",
+      "keys": [
+        {
+          "p": [
+            -73.918,
+            40.874,
+            140
+          ],
+          "look": [
+            -73.9265,
+            40.8715,
+            20
+          ]
+        },
+        {
+          "p": [
+            -73.92,
+            40.8752,
+            120
+          ],
+          "look": [
+            -73.928,
+            40.8725,
+            20
+          ]
+        },
+        {
+          "p": [
+            -73.922,
+            40.8764,
+            105
+          ],
+          "look": [
+            -73.9295,
+            40.8735,
+            20
+          ]
+        }
+      ]
     }
   },
   "probes": {

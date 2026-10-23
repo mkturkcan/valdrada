@@ -34,6 +34,8 @@ function kitColliders() {
 import { tpPromenades, tpSeats } from '../city/tsqPlaza.js';
 import { bpPromenades, bpSeats } from '../city/bryantPark.js';
 import { cpPromenades, cpSeats, cpWater, cpKeepOut } from '../city/centralPark.js';
+import { CPD_ON, cpDriveNear, cpDriveWalks } from '../city/cpDrives.js';   // TERRAIN INT2: the rebuilt park drives
+import { HA_P1, haInCentralPark } from '../world/heightAuthority.js';
 import { vg37Blocked } from '../world/vg37.js';   // VG37 (GROUND): the mapped hedges and planted beds are no walk
 import { areaPromenades, areaSeats } from '../city/areas.js';
 
@@ -239,8 +241,13 @@ export class Peds {
     this._v = new THREE.Vector3(); this._s = new THREE.Vector3(); this._c = new THREE.Color();
     streamer.onTile((key, data) => {
       const list = [];
+      // TERRAIN INT2: Central Park's drives are rebuilt (city/cpDrives.js): their walkers walk the swept walks, half the
+      // carriageway + 1.75 m off the drive's smoothed centreline, both sides; the compile's drive lines carry none
+      const isDrive = (r) => { if (!CPD_ON || !HA_P1) return false; const m = r.pts[r.pts.length >> 1], q = cpDriveNear(m[0], m[2]); return !!q && q.d < 2 && haInCentralPark(m[0], m[2]); };
+      if (CPD_ON && HA_P1) for (const P of cpDriveWalks(data.ox ?? null, data.oz ?? null, key)) for (const side of [-1, 1]) for (const e of this._mkEdges(P.pts, P.off, side, 'street')) { e.busy = 2; list.push(e); }
       for (const r of data.roads) {
         if (r.rclass > 2 || r.level > 0 || r.pts.length < 2) continue;
+        if (isDrive(r)) continue;
         // clip the centreline back to the junction MOUTHS before offsetting:
         // inside a junction cap the perpendicular offset points down the cross
         // street's roadbed, not at a kerb (see _mkEdge)
@@ -265,6 +272,8 @@ export class Peds {
       // 2026-09-24: "pedestrians clipping into vehicles"). The carriageway parts are cut out (resampled every metre,
       // tested against the street centrelines' half widths); crossing a street is the kerb-to-kerb logic's job.
       const streets = [];
+      // (the rebuilt drives' carriageways cut the park paths crossing them, like the streets)
+      if (CPD_ON && HA_P1) for (const P of cpDriveWalks(null, null, key)) streets.push({ P: P.pts, hw: P.off - 1.75 + 0.4, x0: P.bb[0], z0: P.bb[1], x1: P.bb[2], z1: P.bb[3] });
       for (const r of data.roads) {
         if (r.rclass > 4 || r.noTraffic || r.level > 0 || r.pts.length < 2) continue;
         let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;

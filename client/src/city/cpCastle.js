@@ -18,6 +18,7 @@ import * as THREE from 'three';
 import { CBin, castleMat, plainMat, flatWall, roundWall, rubble, moulding, archRing, reveal, K, shade, nrm3, rng, fbm, vn, polyDist } from './cpCastleKit.js';
 import { CP_DATUM, cpRelief, cpDemToWorld, cpReliefReady } from './cpRelief.js';
 import { ROCKS, WATER } from './cpLandData.js';
+import { haCpCastle } from '../world/haAnchor.js';   // P1B: the castle's floor on the authority's terrace
 import { applyLightTrim, applyCityAO } from '../world/materials.js';
 import { buildVistaRock } from './cpVista.js';
 import { rockMat, tuftMat } from './cpRocksKit.js';
@@ -30,7 +31,11 @@ const toW = (u, w) => [OX + AX * u - AZ * w, OZ + AZ * u + AX * w];
 const toUW = (x, z) => { const ex = x - OX, ez = z - OZ; return [ex * AX + ez * AZ, -ex * AZ + ez * AX]; };
 const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
-export const castleFloorY = () => (cpReliefReady() ? cpDemToWorld(39.6, CASTLE.C[0], CASTLE.C[1]) : CP_DATUM + 6.0);
+// (P1B second pass, `?terrain=p1`: the floor is the castle terrace's, the 2017 bare earth on Vista Rock's top round it
+// (tools/terrain/anchor_levels.mjs, anchors.json cpCastle: the highest walk level on open ground within
+// 16 m, 43.2 m). The 39.6 m NAVD the flat park takes is the 3DEP ground under the castle's footprint, filled down from the
+// cliff on its east: 2.7 m under the terrace it opens onto)
+export const castleFloorY = () => { const h = haCpCastle(); return h !== null ? h : cpReliefReady() ? cpDemToWorld(39.6, CASTLE.C[0], CASTLE.C[1]) : CP_DATUM + 6.0; };
 
 // ---- the plan (castle frame; heights over the floor B) ----------------------------------------------------------------
 // keep and wing from OSM; their storeys from the photographs (the wing's parapet 4.6 m over the floor, the keep's 8.6 m,

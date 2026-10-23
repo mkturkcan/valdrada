@@ -10,6 +10,7 @@
 //   * the Reservoir's raised embankment with its stone coping, Conservatory Water's granite coping and promenade, and the
 //     small basins' copings.
 // `?cp32l=0` turns the part off (the compiled park comes back where this part changed it).
+import { HA_ON, haBaseAt, haCpWater } from '../world/haAnchor.js';   // P1 TERRAIN (`?terrain=p1`): the water bodies at the authority's levels
 import * as THREE from 'three';
 import earcut from 'earcut';
 import { ENV, applyLightTrim, applyStoneDetail, CP32L_GROUND } from '../world/materials.js';
@@ -58,7 +59,7 @@ function levelOf(b, x, z) {
     return Math.min(own, (bL - 0.03) * (1 - t) + own * t);
   }
   if (b.kind === 'basin') return lawnY(x, z) + 0.08;
-  return cpReliefReady() ? (MR_FLAT ? flatLevel(b) : cpDemToWorld(b.dem, x, z)) : CP_DATUM - b.flat;
+  return cpReliefReady() ? (MR_FLAT || HA_ON ? flatLevel(b) : cpDemToWorld(b.dem, x, z)) : CP_DATUM - b.flat;
 }
 // MR33 (the water worker; the owner's review of teaser 4): a lake is level. cpDemToWorld followed the 3DEP sample under each
 // point, so a body's surface wandered with the 14 m grid: the Pond's outline ran from -2.18 to +0.09 m (a wall of water at
@@ -67,7 +68,42 @@ function levelOf(b, x, z) {
 // now the median of its outline's levels (the Pond -2.07, the Lake -4.15, Turtle Pond 8.69, the Reservoir 8.89).
 // `?cpflat=0` restores the sampled levels.
 const MR_FLAT = !(Q && Q.get('cpflat') === '0');
+// P1 TERRAIN (`?terrain=p1`): the body's level is the authority's: the 2017 bare earth is hydro-flattened at the water's
+// surface, so the median of the ground 3 m and more inside the outline, + 0.28 (the drawn base lies the walk's 0.28 under
+// the bare earth). The 3DEP levels sat 2 m over (the Reservoir, Turtle Pond, Harlem Meer, the Pool) or under (the Pond)
+// that ground: water floating over its banks or drowned under them. Cached once the authority answers there.
+// (P1B second pass: the level computed once with every chunk under the park in, tools/terrain/anchor_levels.mjs into
+// anchors.json cpWater; computed here only where that is missing, and then it waits for every chunk under the body)
+// (P1B second pass: the water stands 2 cm over the drawn base where that lies on the bare earth's flattened surface, not
+// at the walk's level 0.28 m higher: where the 2017 water reached past the OSM shoreline, a bank there is that flattened
+// surface, and the walk-level water drowned it by up to 0.3 m; so the drawn ground meets the water on the 2017 waterline. A body the flight caught as no flat water (the Meer's inlet, 11 samples on
+// its cascade) is held under its own banks: at most the 10th percentile of the ground 0.5-2 m outside its outline.)
+function haLevel(b, compute) {
+  if (!compute) { const w = haCpWater(b.k); if (w !== null) return w; }
+  if (b.lvlHA !== undefined) return b.lvlHA;
+  const v = [], ring = [], st = Math.max(2, Math.min(12, Math.sqrt((b.box[2] - b.box[0]) * (b.box[3] - b.box[1])) / 12));
+  let miss = 0;
+  for (let x = b.box[0]; x <= b.box[2]; x += st) for (let z = b.box[1]; z <= b.box[3]; z += st) {
+    sdfAt(sdfOf(b), x, z, _lv);
+    if (_lv.d > -3) continue;
+    const g = haBaseAt(x, z);
+    if (g === null) miss++; else v.push(g);
+  }
+  if (miss || !v.length) return null;
+  for (let x = b.box[0] - 3; x <= b.box[2] + 3; x += 0.75) for (let z = b.box[1] - 3; z <= b.box[3] + 3; z += 0.75) {
+    sdfAt(sdfOf(b), x, z, _lv);
+    if (_lv.d < 0.5 || _lv.d > 2) continue;
+    const g = haBaseAt(x, z);
+    if (g !== null) ring.push(g);
+  }
+  v.sort((p, q) => p - q);
+  ring.sort((p, q) => p - q);
+  let lv = v[v.length >> 1];
+  if (ring.length >= 8) lv = Math.min(lv, ring[Math.floor(ring.length * 0.1)]);
+  return (b.lvlHA = lv + 0.02);
+}
 function flatLevel(b) {
+  if (HA_ON) { const h = haLevel(b); if (h !== null) return h; }
   if (b.lvl !== undefined) return b.lvl;
   const v = [];
   for (const R of [b.outer, ...b.holes]) for (const [x, z] of R) v.push(cpDemToWorld(b.dem, x, z));
@@ -270,6 +306,7 @@ export function cpWaterLevelY(key, x, z) {
   const b = BY_KEY.get(key);
   return b ? levelOf(b, x, z) : null;
 }
+export const cpHaLevel = (key, compute) => { const b = BY_KEY.get(key); return b ? haLevel(b, compute) : null; };   // (tools/terrain/anchor_levels.mjs)
 export const cpWaterBodies = () => BODIES.map((b) => ({ k: b.k, name: b.name, kind: b.kind, dem: b.dem, box: b.box }));
 // a body's deepest point (the farthest from every shore; its reflection probe stands over it) and that distance
 export const cpWaterInfo = (key) => { const b = BY_KEY.get(key); if (!b) return null; const S = sdfOf(b); return { x: S.cx, z: S.cz, deep: S.deep }; };
@@ -435,6 +472,7 @@ function bankOffset(b, x, z, d, w) {
   if (hm >= 1) return 0;
   let off;
   if (b.kind === 'reservoir') {
+    if (HA_ON) return 0;   // (P1B: the 2017 bare earth has the real embankment and its track: nothing raised over them)
     if (d < -0.5) return 0;   // (past the cut; the vertices on it, at d = 0, take the full lift)
     const top = L + 1.25, emb = d <= 7 ? top : top - (d - 7) / 3;
     off = Math.max(0, emb - G);
@@ -445,13 +483,15 @@ function bankOffset(b, x, z, d, w) {
     let Gp;
     if (u >= 0) {
       // the lawn the bank meets: the relief, lifted to 0.2 m over the water where the relief leaves it under it
-      const Gc = G + Math.max(0, L + 0.2 - G) * (1 - smooth(0.7, 1, u / (w + 0.3)));
+      // (P1B: and in the first 1.5 m from the water whatever the bank's width: a path at the water's edge stands over it)
+      const Gc = G + Math.max(0, L + 0.2 - G) * Math.max(1 - smooth(0.7, 1, u / (w + 0.3)), HA_ON ? 1 - smooth(1.5, 3, u) : 0);
       // a wet lip 6 cm over the water, then the lawn rising at BANK_TAN until it meets Gc (no crease where they meet),
       // eased back to the relief over the reach's last 2 m (a drop steeper than that, a rocky bank, stays steep there)
       Gp = smin(Gc, L + 0.06 + BANK_TAN * u, 0.6);
       Gp += (Gc - Gp) * smooth(R - 2, R, u);
     } else Gp = L + u * 0.9;
     off = Gp - G;
+    if (HA_ON && u >= 0) off = Math.max(0, off);   // (P1B: on the bare earth the real bank stands: raised where it is under the water's lip, never cut down)
   } else {
     const t = (d + 0.3) / (w + 0.3);
     if (t >= 1) return 0;

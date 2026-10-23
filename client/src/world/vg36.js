@@ -26,6 +26,7 @@ import * as THREE from 'three';
 import { FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { ENV, CP32L_GROUND, applyLightTrim, applyCityAO, applySnowCap } from './materials.js';
 import { initPits36 } from './vg36Pits.js';
+import { VEG_GROUND, vegGroundUpdate } from './vegP1.js';   // VEG P1 (terrain veg lane): no lawn blades on the woodland floor, dirt or rock
 
 const Q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams('');
 export const VG36 = Q.get('vg36') !== '0';
@@ -293,6 +294,7 @@ const CAP_VS = /* glsl */ `
 const CAP_FS = /* glsl */ `
   uniform vec4 vgRect;
   uniform sampler2D cp32lMask; uniform vec4 cp32lRect; uniform float cp32lOn;
+  uniform sampler2D vegMask; uniform vec4 vegRect; uniform float vegOn;
   varying float vY, vM;
   varying vec2 vXZ;
   ${NOISE}
@@ -311,6 +313,26 @@ const CAP_FS = /* glsl */ `
       if (cpUV.x > 0.0 && cpUV.y > 0.0 && cpUV.x < 1.0 && cpUV.y < 1.0) {
         vec4 cpM = texture2D(cp32lMask, cpUV);
         lawn *= (1.0 - smoothstep(0.15, 0.85, cpM.r)) * (1.0 - smoothstep(0.2, 0.8, cpM.g)) * (1.0 - smoothstep(0.3, 0.7, cpM.b));
+      }
+    }
+    if (lawn > 0.5 && vegOn > 0.5) {
+      // VEG P1 (world/vegP1.js VEG_GROUND): the parks' cover from the land cover and the LiDAR: no mown blades on the
+      // woodland floor (3), bare soil and dirt paths (4) or rock (5); the meadows (2) keep a thinner sward under their tufts
+      vec2 vgJ = (vec2(vgN(vXZ * 0.23 + 1.7), vgN(vXZ * 0.23 + 6.1)) - 0.5) * 1.6;
+      vec2 vgUV = (vXZ + vgJ - vegRect.xy) * vegRect.zw;
+      if (vgUV.x > 0.0 && vgUV.y > 0.0 && vgUV.x < 1.0 && vgUV.y < 1.0) {
+        float vgC = floor(texture2D(vegMask, vgUV).r * 255.0 + 0.5);
+        // (TERRAIN GRADE: a mapped lawn takes the raster's woodland, soil or rock only where that ground is the majority
+        // round it, 8 taps out to 8 m: scattered pixels in a lawn never mottle it)
+        float vgNat = (vgC > 2.5 && vgC < 5.5) ? 1.0 : 0.0;
+        for (int q = 0; q < 8; q++) {
+          float an = float(q) * 0.785398, rr = 4.0 + 4.0 * fract(float(q) * 0.618);
+          float cq = floor(texture2D(vegMask, vgUV + vec2(cos(an), sin(an)) * rr * vegRect.zw).r * 255.0 + 0.5);
+          if (cq > 2.5 && cq < 5.5) vgNat += 1.0;
+        }
+        if (vgNat < 5.0) vgC = 1.0;
+        if (vgC > 2.5 && vgC < 5.5) lawn = 0.0;
+        else if (vgC > 1.5 && vgC < 2.5) lawn *= 0.6;
       }
     }
     gl_FragColor = vec4(lawn, vY - vgRect.w, 1.0, vM / 32.0);
@@ -352,7 +374,8 @@ class LawnField {
     this.rect = { value: new THREE.Vector4(0, 0, 1 / FIELD_M, 0) };   // shared with the blade materials (the field's live rect)
     this.capRect = { value: new THREE.Vector4(0, 0, 1 / FIELD_M, 0) };
     this.capMat = new THREE.ShaderMaterial({
-      uniforms: { vgRect: this.capRect, cp32lMask: CP32L_GROUND.mask, cp32lRect: CP32L_GROUND.rect, cp32lOn: CP32L_GROUND.on },
+      uniforms: { vgRect: this.capRect, cp32lMask: CP32L_GROUND.mask, cp32lRect: CP32L_GROUND.rect, cp32lOn: CP32L_GROUND.on,
+        vegMask: VEG_GROUND.mask, vegRect: VEG_GROUND.rect, vegOn: VEG_GROUND.on },
       vertexShader: CAP_VS, fragmentShader: CAP_FS, side: THREE.DoubleSide,
     });
     this.scene = new THREE.Scene();
@@ -503,6 +526,7 @@ export function initVeg36(engine, streamer) {
     frame++;
     const cx = cam.position.x, cz = cam.position.z;
     if (CP32L_GROUND.mask.value !== maskSeen) { maskSeen = CP32L_GROUND.mask.value; dirty = true; }
+    try { if (vegGroundUpdate(cx, cz)) dirty = true; } catch (e) { /* the veg lane's mask is optional */ }
     // the lens's ground: the field's base height
     const gy = streamer.terrainAt ? streamer.terrainAt(cx, cz) : null;
     const far = (cx - field.cx) ** 2 + (cz - field.cz) ** 2 > RECENTRE * RECENTRE;
