@@ -193,7 +193,8 @@ app.whenReady().then(() => {
       let p = decodeURIComponent(u.pathname);
       if (p === '/' || p === '') p = '/index.html';
       const f = path.normalize(path.join(root, p));
-      if (!f.startsWith(root)) return new Response('forbidden', { status: 403 });
+      const rel = path.relative(root, f);
+      if (rel.startsWith('..') || path.isAbsolute(rel)) return new Response('forbidden', { status: 403 });
       return net.fetch(pathToFileURL(f).toString());
     });
   }
