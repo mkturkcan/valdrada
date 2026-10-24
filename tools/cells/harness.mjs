@@ -46,7 +46,7 @@ export async function startVite() {
 export async function startBrowser(W = 1600, H = 900) {
   return chromium.launch({
     headless: true,
-    args: [process.platform === 'win32' ? '--use-angle=d3d11' : '--use-angle=vulkan', ...(process.platform === 'win32' ? [] : ['--js-flags=--max-old-space-size=16384']),
+    args: [process.platform === 'win32' ? '--use-angle=d3d11' : process.platform === 'darwin' ? '--use-angle=metal' : '--use-angle=vulkan', ...(process.platform === 'win32' ? [] : ['--js-flags=--max-old-space-size=16384']),
       '--enable-gpu', '--ignore-gpu-blocklist', '--force_high_performance_gpu', '--disable-gpu-vsync', '--disable-frame-rate-limit', `--window-size=${W},${H}`,
       // 2D canvases in software: on the GPU the same painter gives different pixels from one call to the next (a red brick
       // painted twice in one page, seed 21: two hashes; in software one hash across page loads), so painted textures
