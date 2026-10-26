@@ -15,21 +15,20 @@ For building the application and its content from source, see [Building the Unre
 
 | Component | Requirement |
 |---|---|
-| Operating system | Linux x86-64 (tested on Ubuntu 22.04, kernel 6.8). Release 0.5.1 ships the Linux build only; on Windows 10/11 x64 the client is built from source as the [build guide](ue-client-build.md#windows) describes |
-| GPU | A GPU with hardware ray tracing and 64-bit atomics for Nanite and Lumen: NVIDIA RTX (Turing or newer) or AMD Radeon RX 6000 or newer. Tested on NVIDIA RTX 6000 Ada (48 GB), where that run used 15.3 GB of GPU memory |
+| Operating system | Linux x86-64 (tested on Ubuntu 22.04, kernel 6.8). Release 0.6.0 ships the Linux build only; on Windows 10/11 x64 the client is built from source as the [build guide](ue-client-build.md#windows) describes |
+| GPU | A GPU with hardware ray tracing and 64-bit atomics for Nanite and Lumen: NVIDIA RTX (Turing or newer) or AMD Radeon RX 6000 or newer. Tested on NVIDIA RTX 6000 Ada (48 GB): with two places loaded at 1280 × 720 the GPU's memory peaked at 7.6 GiB with `--quality low` and 13.4 GiB with `--quality high` |
 | Driver | Linux: the NVIDIA proprietary driver with its Vulkan ICD (tested with 580.159.03). Windows: a current vendor driver with Direct3D 12 |
 | Memory | 16 GB or more: in a run at 1280 × 720 with two places loaded, the renderer held 13.1 GB and the core 0.8 GB |
-| Disk | Linux: 52.3 GB installed (the renderer's content 32.8 GB, the kit tables 15.5 GB, the core with the city's tiles 3.7 GB); the download is kept until the install has finished, and the script asks for 88 GB free |
+| Disk | Linux: 47.0 GB installed (the renderer's content 27.6 GB, the kit tables 15.5 GB, the core with the city's tiles 3.7 GB); the download is kept until the install has finished, and the script asks for 78 GB free |
 | Python | 3.8 or later for the `valdrada` package; `numpy` is optional and used by most examples |
-| Network | The download, 35.4 GB in 32 files for Linux; afterwards none, unless the core and the renderer run on different machines |
+| Network | The download, 30.2 GB in 32 files for Linux; afterwards none, unless the core and the renderer run on different machines |
 
 The core alone (`--core-only`) needs no GPU: it simulates, answers map queries and moves actors, and answers sensor
 requests with the error `needs_renderer` until a renderer is attached.
 
 ## Download and verify
 
-The current Unreal client is release 0.5.1: release 0.5.2 changed the browser client and its data and did not rebuild
-the Unreal client, so its files stay on the 0.5.1 release and the commands below name that version. A release consists
+The current Unreal client is release 0.6.0. A release consists
 of a manifest, `ValdradaUE-<version>-<platform>.json`, and the files it lists, published as assets of the [GitHub
 release](https://github.com/mkturkcan/valdrada/releases) and mirrored in the Hugging Face dataset
 `mehmetkeremturkcan/valdrada-ue`. `fetch_valdrada_ue.py`, published with them, downloads every file, resumes
@@ -37,17 +36,17 @@ interrupted downloads, checks each file against the SHA256 of the manifest, join
 and unpacks the archives. It needs Python 3.8 or later and nothing else.
 
 ```bash
-curl -LO https://github.com/mkturkcan/valdrada/releases/download/v0.5.1/fetch_valdrada_ue.py
-python3 fetch_valdrada_ue.py --version 0.5.1       # for this system, into ./ValdradaUE-0.5.1-<platform>
-python3 fetch_valdrada_ue.py --version 0.5.1 --dest ~/ValdradaUE
-python3 fetch_valdrada_ue.py --version 0.5.1 --mirror huggingface  # from the Hugging Face copy
+curl -LO https://github.com/mkturkcan/valdrada/releases/download/v0.6.0/fetch_valdrada_ue.py
+python3 fetch_valdrada_ue.py --version 0.6.0       # for this system, into ./ValdradaUE-0.6.0-<platform>
+python3 fetch_valdrada_ue.py --version 0.6.0 --dest ~/ValdradaUE
+python3 fetch_valdrada_ue.py --version 0.6.0 --mirror huggingface  # from the Hugging Face copy
 ```
 
-On Windows, once a Windows build is published (release 0.5.1 has none; build it as the [build guide](ue-client-build.md#windows)
+On Windows, once a Windows build is published (release 0.6.0 has none; build it as the [build guide](ue-client-build.md#windows)
 describes), in PowerShell:
 
 ```powershell
-Invoke-WebRequest https://github.com/mkturkcan/valdrada/releases/download/v0.5.1/fetch_valdrada_ue.py -OutFile fetch_valdrada_ue.py
+Invoke-WebRequest https://github.com/mkturkcan/valdrada/releases/download/v0.6.0/fetch_valdrada_ue.py -OutFile fetch_valdrada_ue.py
 python fetch_valdrada_ue.py --version <version>
 ```
 
@@ -83,17 +82,17 @@ The installed folder:
 ```
 
 The launcher starts the core, waits until its world is ready, starts the renderer connected to it, and stops both when
-either exits, on Ctrl+C or on SIGTERM. Measured on Linux with an RTX 6000 Ada: the core is ready in 4 to 9 s and the
-renderer attached 8 s after the start; the cells round W 120th St and Amsterdam Ave were loaded 58.5 s later, and a tick
-with an RGB and a depth camera at 1280 × 720 then took 0.25 s. A place far from the last one takes longer: Times Square
-was still loading when `world.wait_until_loaded()` returned at its default limit of 180 s.
+either exits, on Ctrl+C or on SIGTERM. Measured on Linux with an RTX 6000 Ada in release 0.6.0's smoke test
+(`ue_client/packaging/smoke_test.py`, installed release, `--quality low`): the core was ready in 3.6 s, the renderer
+attached 11 s after the launcher started it, `world.wait_until_loaded()` returned 4.7 s after the camera was placed at W 120th St and Amsterdam Ave and 4.0 s after it moved to Times Square, and the first tick with an
+RGB and a depth camera at 1280 × 720 took 2.4 to 2.6 s and the following ones 0.16 to 0.39 s.
 
 | Option | Default | |
 |---|---|---|
 | `--port N` | 2000 | the API port; the renderer connects to the same port |
 | `--host ADDR` | 127.0.0.1 | the address the core listens on (`0.0.0.0` to accept other machines) |
 | `--res WxH` | 1280x720 | the window and the default RGB camera size |
-| `--quality Q` | high | `low`, `medium`, `high` or `cinematic`: the renderer's tier and the core's crowd detail |
+| `--quality Q` | high | `low`, `medium`, `high` or `cinematic`: the renderer's graphics tier (the console variables of `Data/tiers.json`, made from the persistent city's `tools/ue/persist_tiers.json`: streaming pools, virtual shadow maps, Lumen, ray tracing, view distance) and the core's crowd detail |
 | `--offscreen` | off | render without a window (servers, containers) |
 | `--fullscreen` | off | a full screen window |
 | `--gpu N` | | the GPU the renderer uses (0 is the first) |

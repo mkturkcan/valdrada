@@ -41,7 +41,7 @@ export const GROUND_SOUPS = ['terrP1', 'grass', 'grassU'];
 const edgeKinds = () => [...HA_PAVED, 'rbal'];   // (the paving, and the rail corridors' ballast: the ground meets its edge too)
 const SEP = { rbal: 0.3, asphalt: 0, gutter: 0, apron: 0, sidewalk: 0.135, path: 0.155, plaza: 0.135, brick: 0.135, gravel: 0.155 };
 
-// ---- the cover (world/vegP1.js's class mask, 0.5 m): 1 lawn, 2 meadow, 3 woodland floor, 4 soil, 5 rock, 6 paved ...
+// ---- the cover (world/vegP1.js's class mask, 0.5 m): 1 lawn, 2 meadow, 3 woodland floor, 4 soil, 5 rock, 6 paved ... 9 rail
 const COVER = new Map();
 function coverDir() {
   if (isNode) return (process.env.TERRAIN_P1_DIR || decodeURIComponent(new URL('../../public/data/terrain_p1/', import.meta.url).pathname)).replace(/terrain_p1\/?$/, '') + 'veg_p1/cover/';
@@ -69,24 +69,28 @@ async function decodeR(b) {
     else if (type === 'IEND') break;
     p += 12 + len;
   }
-  const raw = await inflate(parts), stride = w * 4, out = new Uint8Array(w * h * 4);
+  // (the PNG filters work byte by byte against the same byte of the pixel to the left and above, so the red channel
+  // unfilters on its own: only it is reconstructed, straight into R; the missing neighbours of the first row and pixel read 0)
+  const raw = await inflate(parts), stride = w * 4, R = new Uint8Array(w * h);
   for (let y = 0; y < h; y++) {
-    const f = raw[y * (stride + 1)], src = y * (stride + 1) + 1, o = y * stride, u = o - stride;
-    for (let i = 0; i < stride; i++) {
-      const x = raw[src + i], a = i >= 4 ? out[o + i - 4] : 0, c = y > 0 ? out[u + i] : 0, d = y > 0 && i >= 4 ? out[u + i - 4] : 0;
-      let v;
-      if (f === 0) v = x; else if (f === 1) v = x + a; else if (f === 2) v = x + c; else if (f === 3) v = x + ((a + c) >> 1);
-      else { const pp = a + c - d, pa = Math.abs(pp - a), pb = Math.abs(pp - c), pc = Math.abs(pp - d); v = x + (pa <= pb && pa <= pc ? a : pb <= pc ? c : d); }
-      out[o + i] = v & 255;
+    const f = raw[y * (stride + 1)], src = y * (stride + 1) + 1, o = y * w, u = o - w, top = y > 0;
+    if (f === 0) { for (let i = 0; i < w; i++) R[o + i] = raw[src + 4 * i]; }
+    else if (f === 1) { for (let i = 0; i < w; i++) R[o + i] = raw[src + 4 * i] + (i > 0 ? R[o + i - 1] : 0); }
+    else if (f === 2) { for (let i = 0; i < w; i++) R[o + i] = raw[src + 4 * i] + (top ? R[u + i] : 0); }
+    else if (f === 3) { for (let i = 0; i < w; i++) R[o + i] = raw[src + 4 * i] + (((i > 0 ? R[o + i - 1] : 0) + (top ? R[u + i] : 0)) >> 1); }
+    else {
+      for (let i = 0; i < w; i++) {
+        const x = raw[src + 4 * i], a = i > 0 ? R[o + i - 1] : 0, c = top ? R[u + i] : 0, d = top && i > 0 ? R[u + i - 1] : 0;
+        const pp = a + c - d, pa = Math.abs(pp - a), pb = Math.abs(pp - c), pc = Math.abs(pp - d);
+        R[o + i] = x + (pa <= pb && pa <= pc ? a : pb <= pc ? c : d);
+      }
     }
   }
-  const R = new Uint8Array(w * h);
-  for (let i = 0; i < w * h; i++) R[i] = out[4 * i];
   return { w, h, R };
 }
 export async function gradeCoverLoad(tx, tz) {
   const k = `${tx}_${tz}`;
-  if (!COVER.has(k)) COVER.set(k, decodeR(await readBytes(coverDir() + k + '.png')).catch(() => null));
+  if (!COVER.has(k)) COVER.set(k, readBytes(coverDir() + k + '.png').then(decodeR).catch(() => null));   // (the pending decode is kept at once: a tile assembling meanwhile waits on it, not a second decode)
   const v = await COVER.get(k);
   COVER.set(k, v);
   return v;
@@ -335,16 +339,39 @@ export function gradeApply(tile, ST, st = {}, pre = null) {
   // every triangle that has it, here and in the neighbour tile alike (the same edge, the same stations): no cracks
   const inBand = (x, z) => { const k = `${Math.round(x * 1000)},${Math.round(z * 1000)}`; let E = memo.get(k); if (E === undefined) { E = env(x, z); memo.set(k, E); } return !!E; };
   const ekey = (ax, az, bx, bz) => { const p = `${Math.round(ax * 1000)},${Math.round(az * 1000)}`, q = `${Math.round(bx * 1000)},${Math.round(bz * 1000)}`; return p < q ? p + '|' + q : q + '|' + p; };
+  // (PERF: the marked edges by their ends' millimetres as numbers, the same edges as ekey's strings; a corner past 2 km
+  // from the tile's origin takes the string)
+  const edgeSet = () => {
+    const N = new Map(), T = new Set();
+    let size = 0;
+    const pk = (x, z) => { const rx = Math.round(x * 1000), rz = Math.round(z * 1000); return rx > -2097152 && rx < 2097152 && rz > -2097152 && rz < 2097152 ? (rx + 2097152) * 4194304 + (rz + 2097152) : NaN; };
+    return {
+      get size() { return size; },
+      add(ax, az, bx, bz) {
+        const p = pk(ax, az), q = pk(bx, bz);
+        if (p !== p || q !== q) { const k = ekey(ax, az, bx, bz); if (!T.has(k)) { T.add(k); size++; } return; }
+        const lo = p < q ? p : q, hi = p < q ? q : p;
+        let m = N.get(lo); if (!m) N.set(lo, (m = new Set()));
+        if (!m.has(hi)) { m.add(hi); size++; }
+      },
+      has(ax, az, bx, bz) {
+        const p = pk(ax, az), q = pk(bx, bz);
+        if (p !== p || q !== q) return T.has(ekey(ax, az, bx, bz));
+        const m = N.get(p < q ? p : q);
+        return !!m && m.has(p < q ? q : p);
+      },
+    };
+  };
   let refined = 0;
   for (const name of GROUND_SOUPS) {
     let a = S[name], b = pre && pre[name] && pre[name].length === (a ? a.length : -1) ? pre[name] : null;
     if (!a || a.length < 9) continue;
     for (let round = 0; round < 3; round++) {
-      const mark = new Set();
+      const mark = edgeSet();
       for (let i = 0; i + 8 < a.length; i += 9) for (let k = 0; k < 3; k++) {
         const p = i + 3 * k, q = i + 3 * ((k + 1) % 3);
         const L = Math.hypot(a[q] - a[p], a[q + 2] - a[p + 2]);
-        if (L > 1.2 && inBand((a[p] + a[q]) / 2, (a[p + 2] + a[q + 2]) / 2)) mark.add(ekey(a[p], a[p + 2], a[q], a[q + 2]));
+        if (L > 1.2 && inBand((a[p] + a[q]) / 2, (a[p + 2] + a[q + 2]) / 2)) mark.add(a[p], a[p + 2], a[q], a[q + 2]);
       }
       if (!mark.size) break;
       const out = [], outB = [];
@@ -352,10 +379,10 @@ export function gradeApply(tile, ST, st = {}, pre = null) {
       const emit = (T) => {
         for (let k = 0; k < 3; k++) {
           const P = T[k], Q = T[(k + 1) % 3], R = T[(k + 2) % 3];
-          if (!mark.has(ekey(P[0], P[2], Q[0], Q[2]))) continue;
+          if (!mark.has(P[0], P[2], Q[0], Q[2])) continue;
           const M = [(P[0] + Q[0]) / 2, (P[1] + Q[1]) / 2, (P[2] + Q[2]) / 2, (P[3] + Q[3]) / 2];
           // (the halves keep the winding; their halves of the split edge are not marked, the other edges keep their marks)
-          const sub = (A, B, C) => { const s0 = mark.has(ekey(A[0], A[2], B[0], B[2])); emit([A, B, C]); return s0; };
+          const sub = (A, B, C) => { const s0 = mark.has(A[0], A[2], B[0], B[2]); emit([A, B, C]); return s0; };
           sub(P, M, R); sub(M, Q, R);
           return;
         }
@@ -688,6 +715,8 @@ export function gradeCut(tile, st = {}) {
   if (GRADE_OFF || !tile || !tile.S) return null;
   const [ox, oz] = tile.header.origin, S = tile.S, K = cutters(tile), nearSh = shoreNear(tile);
   let cutTris = 0, made = 0, dropped = 0;
+  const seenAt = new Int32Array(K.list.length);
+  let stamp = 0;
   const inCP = (x, z) => haInCentralPark(x + ox, z + oz);
   for (const name of GROUND_SOUPS) {
     const a = S[name];
@@ -697,12 +726,17 @@ export function gradeCut(tile, st = {}) {
       const keep = () => { for (let k = 0; k < 9; k++) out.push(a[i + k]); };
       if (!nonVert(a, i)) { keep(); continue; }
       const x0 = Math.min(a[i], a[i + 3], a[i + 6]), x1 = Math.max(a[i], a[i + 3], a[i + 6]), z0 = Math.min(a[i + 2], a[i + 5], a[i + 8]), z1 = Math.max(a[i + 2], a[i + 5], a[i + 8]);
-      const seen = new Set(), cand = [];
-      for (let j = Math.floor(z0 / K.C); j <= Math.floor(z1 / K.C); j++) for (let k = Math.floor(x0 / K.C); k <= Math.floor(x1 / K.C); k++) for (const ci of K.H.get(j * 4096 + k) || []) {
-        if (seen.has(ci)) continue; seen.add(ci);
+      const cand = [];
+      stamp++;   // (PERF: a cutter met in an earlier bucket of this triangle carries its stamp, in place of a set)
+      for (let j = Math.floor(z0 / K.C); j <= Math.floor(z1 / K.C); j++) for (let k = Math.floor(x0 / K.C); k <= Math.floor(x1 / K.C); k++) {
+        const hl = K.H.get(j * 4096 + k);
+        if (hl) for (let h = 0; h < hl.length; h++) {
+        const ci = hl[h];
+        if (seenAt[ci] === stamp) continue; seenAt[ci] = stamp;
         const c = K.list[ci];
         if (c.x1 < x0 || c.x0 > x1 || c.z1 < z0 || c.z0 > z1) continue;
         cand.push(c);
+        }
       }
       if (!cand.length || inCP((a[i] + a[i + 3] + a[i + 6]) / 3, (a[i + 2] + a[i + 5] + a[i + 8]) / 3)) { keep(); continue; }
       // the ground's plane (for the deck test at a cutter's middle)
@@ -794,6 +828,8 @@ export function gradeStrips(tile, st = {}) {
       const near = [];
       for (const i of l) {
         const e = E[i], dx = e.bx - e.ax, dz = e.bz - e.az, L2 = dx * dx + dz * dz;
+        // (PERF: more than 1.06 m off a proper edge's box on an axis: farther than 1.05 m from it)
+        if (L2 > 0 && (x < (e.ax < e.bx ? e.ax : e.bx) - 1.06 || x > (e.ax > e.bx ? e.ax : e.bx) + 1.06 || z < (e.az < e.bz ? e.az : e.bz) - 1.06 || z > (e.az > e.bz ? e.az : e.bz) + 1.06)) continue;
         const t = Math.max(0, Math.min(1, ((x - e.ax) * dx + (z - e.az) * dz) / L2)), px = e.ax + dx * t, pz = e.az + dz * t, d = Math.hypot(x - px, z - pz);
         // (on the ground side of the edge)
         if (d > 1.05 || (x - px) * e.nx + (z - pz) * e.nz < -0.02) continue;
@@ -867,9 +903,9 @@ export function gradeBaseClasses(tile) {
   }
   const cls = new Map();
   for (const [r, c] of acc) {
-    const lawn = c[1] + c[2], paved = c[6], nat = c[3] + c[4] + c[5], tot = lawn + paved + nat;
+    const lawn = c[1] + c[2], paved = c[6], nat = c[3] + c[4] + c[5], rail = c[9], tot = lawn + paved + nat + rail;
     if (tot <= 0 || nat > 0.25 * tot) { cls.set(r, 0); continue; }
-    cls.set(r, lawn >= paved ? 5 : 16);
+    cls.set(r, rail > lawn && rail > paved ? 19 : lawn >= paved ? 5 : 16);   // (9: the borough sets' rail ground, the beds' ballast)
   }
   const out = new Uint8Array(nT);
   for (let t = 0; t < nT; t++) {

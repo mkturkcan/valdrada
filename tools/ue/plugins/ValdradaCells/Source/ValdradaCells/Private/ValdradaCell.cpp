@@ -1,4 +1,5 @@
 #include "ValdradaCell.h"
+#include "Engine/CollisionProfile.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Engine/StaticMesh.h"
@@ -82,6 +83,10 @@ int32 AValdradaCell::Build()
 			if (!MatPaths[M].IsEmpty())
 				if (UMaterialInterface* Mi = LoadObject<UMaterialInterface>(nullptr, *MatPaths[M])) C->SetMaterial(M, Mi);
 		C->SetCastShadow((Flags & 1u) != 0);
+		// (no collision: a physics body per instance kept the game thread minutes in Chaos's pending spatial queue
+		// before the first frame, as in the persistent city's kit; renders trace nothing)
+		C->SetCollisionEnabled(ECollisionEnabled::NoCollision); C->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
+		C->SetGenerateOverlapEvents(false); C->SetCanEverAffectNavigation(false);
 		C->SetupAttachment(RootComponent);
 		C->NumCustomDataFloats = int32(NCustom);
 		TArray<FTransform> Xf; Xf.Reserve(N);

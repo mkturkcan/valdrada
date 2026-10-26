@@ -23,7 +23,7 @@ const isNode = typeof process !== 'undefined' && !!(process.versions && process.
 export async function haPreload(x0, z0, x1, z1) {
   if (!HA_ON || !(await haInit())) return false;
   const ps = [];
-  for (let tz = Math.floor(z0 / TILE); tz <= Math.floor(z1 / TILE); tz++) for (let tx = Math.floor(x0 / TILE); tx <= Math.floor(x1 / TILE); tx++) ps.push(haTileReady(tx, tz));
+  for (let tz = Math.floor(z0 / TILE); tz <= Math.floor(z1 / TILE); tz++) for (let tx = Math.floor(x0 / TILE); tx <= Math.floor(x1 / TILE); tx++) ps.push(haTileReady(tx, tz, true));   // (the relief only: a tile's grade data loads with the tile)
   await Promise.all(ps);
   return true;
 }
@@ -289,7 +289,7 @@ export async function haAnchorBridges(B) {
     const inR = D.map(([x, , z]) => haInRegion(x, z));
     const first = inR.indexOf(true), last = inR.lastIndexOf(true);
     if (first < 0) continue;
-    await Promise.all([...new Set(D.filter((_, i) => inR[i]).map(([x, , z]) => `${Math.floor(x / TILE)}_${Math.floor(z / TILE)}`))].map((q) => { const [tx, tz] = q.split('_').map(Number); return haTileReady(tx, tz); }));
+    await Promise.all([...new Set(D.filter((_, i) => inR[i]).map(([x, , z]) => `${Math.floor(x / TILE)}_${Math.floor(z / TILE)}`))].map((q) => { const [tx, tz] = q.split('_').map(Number); return haTileReady(tx, tz, true); }));
     const S = [0];
     for (let i = 1; i < D.length; i++) S.push(S[i - 1] + Math.hypot(D[i][0] - D[i - 1][0], D[i][2] - D[i - 1][2]));
     const wet = (i) => !b.ground || b.ground[i] === null || b.ground[i] === undefined;   // over the water (the flat record's ground is null there)
@@ -716,7 +716,59 @@ function cutData(tile, tx, tz) {
   return { roads, rail: rail.filter((r) => r.fW !== null) };
 }
 // the nearest station segment of the tile's cut roads to (x, z): { road, i, t, d, yC, fW } or null past maxD
+// (PERF: the station segments by 8 m cell of their boxes, per record, built on first use; a query reads the segments of the
+// cells within its reach (the widest band + maxD + 3, past which the box test below skips a segment) in the roads' and
+// stations' order, so the nearest and its ties come out as from the full walk)
+const CUT_IX = new WeakMap();
+function cutIndex(D) {
+  let G = CUT_IX.get(D);
+  if (G !== undefined) return G;
+  G = null;
+  if (D.roads.length < 1024 && D.roads.every((R) => R.st.length < 1048576 && Number.isFinite(R.band) && R.st.every((p) => Number.isFinite(p.x) && Number.isFinite(p.z)))) {
+    const H = new Map();
+    let band = 0, bad = false;
+    D.roads.forEach((R, r) => {
+      band = Math.max(band, R.band);
+      const S = R.st;
+      for (let i = 0; i + 1 < S.length && !bad; i++) {
+        const a = S[i], b = S[i + 1];
+        const i0 = Math.floor(Math.min(a.x, b.x) / 8), i1 = Math.floor(Math.max(a.x, b.x) / 8), j0 = Math.floor(Math.min(a.z, b.z) / 8), j1 = Math.floor(Math.max(a.z, b.z) / 8);
+        if (!(i1 - i0 <= 64 && j1 - j0 <= 64)) { bad = true; break; }
+        for (let j = j0; j <= j1; j++) for (let k = i0; k <= i1; k++) { const q = j * 65536 + k; let l = H.get(q); if (!l) H.set(q, (l = [])); l.push(r * 1048576 + i); }
+      }
+    });
+    if (!bad) G = { H, band };
+  }
+  CUT_IX.set(D, G);
+  return G;
+}
 function cutNear(D, x, z, maxD) {
+  const G = D.rail !== undefined && Number.isFinite(x) && Number.isFinite(z) ? cutIndex(D) : null;   // (a tile's record, kept)
+  if (G) {
+    const rq = G.band + maxD + 3;
+    if (!(rq < 256)) return cutNearAll(D, x, z, maxD);
+    const ids = [];
+    for (let j = Math.floor((z - rq) / 8); j <= Math.floor((z + rq) / 8); j++) for (let k = Math.floor((x - rq) / 8); k <= Math.floor((x + rq) / 8); k++) { const l = G.H.get(j * 65536 + k); if (l) for (const id of l) ids.push(id); }
+    if (!ids.length) return null;
+    ids.sort((u, w) => u - w);
+    let best = null, bk = Infinity, last = -1;
+    for (const id of ids) {
+      if (id === last) continue;
+      last = id;
+      const R = D.roads[Math.floor(id / 1048576)], i = id % 1048576, S = R.st, lim = R.band + maxD;
+      const a = S[i], b = S[i + 1];
+      if ((a.x - x > lim + 3 && b.x - x > lim + 3) || (x - a.x > lim + 3 && x - b.x > lim + 3) || (a.z - z > lim + 3 && b.z - z > lim + 3) || (z - a.z > lim + 3 && z - b.z > lim + 3)) continue;
+      const dx = b.x - a.x, dz = b.z - a.z, L2 = dx * dx + dz * dz || 1e-9, t = Math.max(0, Math.min(1, ((x - a.x) * dx + (z - a.z) * dz) / L2));
+      const d = Math.hypot(a.x + dx * t - x, a.z + dz * t - z);
+      if (d > lim || d - R.band >= bk) continue;
+      bk = d - R.band;
+      best = { road: R, band: R.band, i, t, d, yC: a.yC + (b.yC - a.yC) * t, fW: a.fW === null || b.fW === null ? null : a.fW + (b.fW - a.fW) * t, px: a.x + dx * t, pz: a.z + dz * t, cov: t < 0.5 ? a.cov : b.cov };
+    }
+    return best;
+  }
+  return cutNearAll(D, x, z, maxD);
+}
+function cutNearAll(D, x, z, maxD) {
   let best = null, bk = Infinity;
   for (const R of D.roads) {
     const S = R.st, lim = R.band + maxD;

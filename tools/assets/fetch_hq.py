@@ -40,7 +40,11 @@ SETS = [
     ('metal_plate_02', 'polyhaven', 'cast and wrought iron: railings, lamp posts, fences, Bow Bridge'),
     ('Grass004', 'ambientcg', 'lawns: Sheep Meadow, the Great Lawn, Bryant Park'),
     # R9-HQ end
+    # BRIDGE (2026-10-23): the bridges' painted steel (pbrLib metal_painted: the GWB, the Harlem and East River bridges),
+    # its paint's scratches, roughness and normal; the albedo desaturated (GREY) so the bridge's own tint sets the colour
+    ('PaintedMetal002', 'ambientcg', 'painted steel: the bridges (metal_painted)'),
 ]
+GREY = {'PaintedMetal002'}   # (BRIDGE: sets whose albedo is used as luminance only, alb_grey)
 LICENCE = {'polyhaven': 'CC0 1.0 (https://polyhaven.com/license)', 'ambientcg': 'CC0 1.0 (https://docs.ambientcg.com/license/)'}   # (R9-HQ: ambientCG)
 UA = {'User-Agent': 'valdrada-hq-fetch/1.0'}
 
@@ -191,6 +195,14 @@ def main():
             rec = fetch_polyhaven(sid, A.out, A.res) if src == 'polyhaven' else fetch_ambientcg(sid, A.out, A.res) if src == 'ambientcg' else None   # (R9-HQ)
         except Exception as e:
             print(f'HQ {sid}: FAILED {e}'); continue
+        if sid in GREY and rec['files'].get('alb'):   # (BRIDGE: the albedo's luminance alone; the tint gives the paint its colour)
+            g_ = os.path.splitext(rec['files']['alb'])[0] + '_grey.jpg'
+            a_ = np.asarray(Image.open(rec['files']['alb']).convert('L'), np.float32) / 255.0
+            l_ = np.where(a_ <= 0.04045, a_ / 12.92, ((a_ + 0.055) / 1.055) ** 2.4)
+            l_ = np.clip(l_ * (0.8 / max(float(l_.mean()), 1e-3)), 0, 1)   # (mean 0.8 linear: the tint times it is the paint)
+            s_ = np.where(l_ <= 0.0031308, l_ * 12.92, 1.055 * l_ ** (1 / 2.4) - 0.055)
+            Image.fromarray((s_ * 255 + 0.5).astype(np.uint8), 'L').convert('RGB').save(g_, quality=95)
+            rec['files']['alb'] = g_; rec['albedo_mean'] = mean_linear(g_)
         rec['use'] = what
         man[sid] = rec
         json.dump(man, open(jp, 'w'), indent=1)

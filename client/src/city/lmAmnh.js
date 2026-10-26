@@ -22,27 +22,35 @@ import { LM_GLASS } from './tk/tkParams.js';
 const O = [-260, 250];
 const TAU = Math.PI * 2;
 
+// the museum's own sets (mat/pbrLib.js amnh_*): neutral maps at 0.75 of white, so a writer's tint is the target albedo / 0.75
+const srl = (v) => (v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)), lsr = (v) => (v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055);
+const am = (set, hex) => surfMat(set, '#' + [1, 3, 5].map((i) => Math.round(255 * lsr(Math.min(1, srl(parseInt(hex.slice(i, i + 2), 16) / 255) / 0.75)))).map((v) => v.toString(16).padStart(2, '0')).join(''));
 function M() {
   return {
-    pink: surfMat('granite_pink', '#a98b7e'),        // the 77th Street granite (rock-faced, warm)
-    pinkD: surfMat('granite_pink', '#96796d'),       // its darker courses and plinth
-    pinkT: surfMat('granite_pink', '#c2a99b'),       // dressed trim: hoods, sills, strings
-    buff: surfMat('granite_pink', '#bba496'),        // the Central Park West wings (lighter)
+    pink: am('amnh_granite', '#a98b7e'),        // the 77th Street granite (rock-faced, warm)
+    pinkD: am('amnh_granite', '#8f7569'),       // its darker courses and plinth
+    pinkT: am('amnh_granite', '#bba395'),       // dressed trim: hoods, sills, strings
+    buff: am('amnh_granite', '#b49e90'),        // the Central Park West wings (lighter)
     buffT: surfMat('stone_lime', '#d2c4b4'),
     mem: surfMat('stone_lime_ashlar', '#d8d0c2'),    // the Memorial's granite
     memT: surfMat('stone_lime', '#e0d9cc'),
-    tile: surfMat('terracotta_cream', '#ad5c45'),    // red clay tile roofs
-    tileC: surfMat('terracotta_cream', '#8f4a38'),   // their ridge and hip tiles
-    slate: surfMat('granite_grey', '#686c74'),
-    copper: surfMat('panel_alu', '#84b9a2'),         // verdigris (the tower kit's copper)
-    copperD: surfMat('panel_alu', '#5e8f7a'),
+    // (tile, slate, copper, granite: the museum's own sets, their HQ maps in Unreal by the set's name (ue_families.json hq.pbr))
+    tile: am('amnh_tile', '#5e4238'),      // red clay tile roofs
+    tileC: am('amnh_tile', '#4c362e'),    // their ridge and hip tiles
+    slate: am('amnh_slate', '#4e5257'),
+    copper: am('amnh_copper', '#4b6c5f'),         // verdigris (the tower kit's copper)
+    copperD: am('amnh_copper', '#34503f'),        // its darker trim, and the standing seams
+    memb: surfMat('roof_membrane', '#aeaba3'),       // the ranges' membrane roofs (light grey, two weathers)
+    membD: surfMat('roof_membrane', '#94918a'),
+    plant: surfMat('panel_alu', '#a3a6a8'),          // roof plant: galvanised casings
+    plantD: surfMat('panel_alu', '#6c7073'),
     brick: surfMat('brick_red', '#8c4c3c'),
     brickD: surfMat('brick_brown', '#6e4436'),
     stoneG: surfMat('granite_grey', '#9a968e'),
     roof: surfMat('roof_membrane', '#8c8a84'),
     conc: surfMat('concrete_smooth', '#dedcd6'),
     pave: surfMat('granite_grey', '#a6a199'),
-    gild: surfMat('granite_pink', '#e4d8ce'),       // the Gilder Center's Milford pink granite (pale)
+    gild: am('amnh_granite', '#d2c3b8'),       // the Gilder Center's Milford pink granite (pale)
     frame: partMat('alu_bronze'),
     mull: partMat('alu_clear'),
     steel: partMat('steel_black'),
@@ -177,6 +185,77 @@ function defaultFloors(yTop, fh) {
   return out;
 }
 
+// ------------------------------------------------------------------------------------------- roofs
+// a repeatable hash in [0, 1) of a few numbers (the roof plant's layout stays put between bakes)
+function hh(...a) { let h = 2166136261; for (const v of a) { h ^= Math.round(v * 97) & 0xffffffff; h = Math.imul(h, 16777619) >>> 0; } return (h % 100000) / 100000; }
+// a flat range roof as the aerial reference shows them: a light membrane laid in strips, a parapet with its coping inside the
+// walls' line, the plant (casings with louvres, duct runs, vents) and, over the galleries, rows of skylight lanterns.
+// o.sky: skylight lanterns along the long axis; o.noPar: no parapet (the deck is inside another build); o.plant: casings per 100 m2
+function roofDeck(B, K, gx0, gx1, gn0, gn1, y, o = {}) {
+  const w = gx1 - gx0, d = gn1 - gn0, area = w * d, seed = hh(gx0, gn0, y);
+  // the membrane in strips (two weathers) along the long axis
+  const alongX = w >= d, sw = 3.2, n = Math.max(1, Math.round((alongX ? d : w) / sw));
+  const L = alongX ? w : d, np2 = Math.max(1, Math.round(L / 7));
+  for (let k = 0; k < n; k++) for (let q = 0; q < np2; q++) {
+    // strips in sheets of ~7 m, each its own weather (the patched, re-laid membrane the aerials show)
+    const a = k / n, b = (k + 1) / n, c0 = q / np2, c1 = (q + 1) / np2, m = hh(seed, k) < 0.35 ? K.membD : K.memb;
+    const r = alongX ? [[gx0 + c0 * w, gn0 + a * d], [gx0 + c1 * w, gn0 + a * d], [gx0 + c1 * w, gn0 + b * d], [gx0 + c0 * w, gn0 + b * d]]
+      : [[gx0 + a * w, gn0 + c0 * d], [gx0 + b * w, gn0 + c0 * d], [gx0 + b * w, gn0 + c1 * d], [gx0 + a * w, gn0 + c1 * d]];
+    const S = B.S(m), f = 0.72 + 0.44 * hh(seed, k, q), tr = S.tr || [1, 1, 1];
+    S.tr = [tr[0] * f, tr[1] * f, tr[2] * f];
+    B.polyW(S, r.map(([gx, gn]) => { const [x, z] = B.W(gx, gn); return [x, B.y0 + y, z]; }), [0, 1, 0]);
+  }
+  // the parapet: its inner face, top and the coping (the outer face is the facade's own parapet or wall)
+  if (!o.noPar) {
+    const hp = o.hp ?? 0.85;
+    for (const F of B.rectFaces(gx0, gx1, gn0, gn1)) {
+      kbox(B.S(K.stoneG), F, 0, F.L, y, y + hp, -0.4, 0.02, 0, 4);
+      kbox(B.S(K.pinkT), F, -0.05, F.L + 0.05, y + hp, y + hp + 0.14, -0.5, 0.1, 0.02, 0);
+    }
+  }
+  // skylight lanterns: glazed hips on low upstands, in a row along the long axis
+  if (o.sky && Math.min(w, d) > 6) {
+    const L = alongX ? w : d, Wd = alongX ? d : w, nl = Math.max(1, Math.floor((L - 3) / 7)), lw = Math.min(4.2, Wd * 0.4);
+    for (let k = 0; k < nl; k++) {
+      const c = (k + 0.5) * (L - 2) / nl + 1, h = 2.6;
+      if (alongX) skylightRoof(B, K, gx0 + c - h, gx0 + c + h, gn0 + d / 2 - lw / 2, gn0 + d / 2 + lw / 2, y + 0.02, false);
+      else skylightRoof(B, K, gx0 + w / 2 - lw / 2, gx0 + w / 2 + lw / 2, gn0 + c - h, gn0 + c + h, y + 0.02, true);
+    }
+  }
+  // the plant: casings (louvred band, a lid), a duct run to the nearest parapet, round vents
+  const np = Math.min(9, Math.floor(area / 100 * (o.plant ?? 0.35)));
+  for (let k = 0; k < np; k++) {
+    const pw = 1.6 + hh(seed, k, 1) * 3.2, pd = 1.4 + hh(seed, k, 2) * 2.2, ph = 1.1 + hh(seed, k, 3) * 1.3;
+    let gx = gx0 + 1.6 + hh(seed, k, 4) * Math.max(0.1, w - 3.2 - pw), gn = gn0 + 1.6 + hh(seed, k, 5) * Math.max(0.1, d - 3.2 - pd);
+    if (o.sky) { if (alongX) gn = hh(seed, k, 6) < 0.5 ? gn0 + 1.2 : gn1 - 1.2 - pd; else gx = hh(seed, k, 6) < 0.5 ? gx0 + 1.2 : gx1 - 1.2 - pw; }
+    if (gx + pw > gx1 - 0.8 || gn + pd > gn1 - 0.8) continue;
+    const F = B.F(gx, gn, gx + pw, gn);
+    kbox(B.S(K.plant), F, 0, pw, y, y + ph, -pd, 0, 0.04, 4);
+    kbox(B.S(K.plantD), F, 0.15, pw - 0.15, y + ph * 0.45, y + ph * 0.85, 0.0, 0.03, 0, 4 | 8);
+    kbox(B.S(K.plantD), F, -0.08, pw + 0.08, y + ph, y + ph + 0.1, -pd - 0.08, 0.08, 0.02, 0);
+    if (hh(seed, k, 7) < 0.6) {   // a fan on the lid
+      const [cx, cz] = B.W(gx + pw / 2, gn + pd / 2), rf = Math.min(pw, pd) * 0.3;
+      lathe(B, K.plantD, cx, cz, [[rf, y + ph + 0.1], [rf, y + ph + 0.45], [rf * 0.9, y + ph + 0.45]], 12);
+    }
+    if (hh(seed, k, 8) < 0.5) {   // a duct to the parapet
+      const Fd = B.F(gx + pw / 2 - 0.4, gn, gx + pw / 2 + 0.4, gn);
+      kbox(B.S(K.plant), Fd, 0, 0.8, y + 0.2, y + 0.9, 0, gn - gn0 - 0.6, 0.03, 4);
+    }
+  }
+  for (let k = 0; k < Math.min(6, Math.floor(area / 160)); k++) {
+    const [cx, cz] = B.W(gx0 + 1 + hh(seed, k, 9) * (w - 2), gn0 + 1 + hh(seed, k, 10) * (d - 2));
+    lathe(B, K.plantD, cx, cz, [[0.16, y], [0.16, y + 0.7], [0.3, y + 0.75], [0.3, y + 0.9], [0, y + 0.95]], 8);
+  }
+}
+// a stone chimney stack on a roof at grid (gx, gn) from y0 to y1: shaft, a corbelled cap, two pots
+function chimney(B, K, gx, gn, y0, y1, w = 1.3, d = 0.8) {
+  const F = B.F(gx - w / 2, gn - d / 2, gx + w / 2, gn - d / 2);
+  kbox(B.S(K.pink), F, 0, w, y0, y1, -d, 0, 0.02, 4);
+  kbox(B.S(K.pinkT), F, -0.12, w + 0.12, y1 - 0.5, y1 - 0.25, -d - 0.12, 0.12, 0.02, 0);
+  kbox(B.S(K.pinkT), F, -0.06, w + 0.06, y1 - 0.25, y1, -d - 0.06, 0.06, 0.02, 0);
+  for (const s of [0.3, 0.7]) { const [cx, cz] = B.W(gx - w / 2 + w * s, gn); lathe(B, K.tileC, cx, cz, [[0.16, y1], [0.13, y1 + 0.6], [0.17, y1 + 0.7], [0, y1 + 0.7]], 10); }
+}
+
 // ------------------------------------------------------------------------------------------- towers
 // a round tower at grid (gx, gn): radius r, walls to yW (windows in rows), a corbelled eave, a cone (stone or tile) to yC
 function roundTower(B, K, gx, gn, r, yW, yC, o = {}) {
@@ -217,7 +296,8 @@ function roundTower(B, K, gx, gn, r, yW, yC, o = {}) {
   const roofM = o.roof === 'tile' ? K.tile : o.roof === 'slate' ? K.slate : K.pinkT;
   lathe(B, roofM, cx, cz, [[rr + 0.15, yW], [rr + 0.15, yW + 0.15], [rr - 0.2, yW + 0.6]], n * 2);
   coursedCone(B, roofM, cx, cz, rr - 0.2, yW + 0.6, yC, n * 2, o.roof === 'tile' ? 0.34 : 0.55, 0.045, 0.22);
-  lathe(B, K.copperD, cx, cz, [[0.32, yC - 0.1], [0.36, yC + 0.25], [0.18, yC + 0.5], [0.3, yC + 0.75], [0.12, yC + 1.1], [0.05, yC + 2.2], [0, yC + 2.4]], 12);
+  const fk = Math.max(1, r / 4.75);   // (the finial grows with the tower: a collar, a ball, a spike)
+  lathe(B, K.copperD, cx, cz, [[0.32, yC - 0.1], [0.36, yC + 0.25], [0.18, yC + 0.5], [0.3, yC + 0.75], [0.12, yC + 1.1], [0.05, yC + 2.2], [0, yC + 2.4]].map(([q, y]) => [q * fk, yC + (y - yC) * fk]), 12);
   B.collide(gx - r, gx + r, gn - r, gn + r, 0, yW);
 }
 
@@ -255,10 +335,12 @@ function front77(B, K) {
   for (const [gx0, gx1] of [[15.4, 62.5], [-84.1, -37.1]]) {
     const yT = 22.0;
     block(B, gx0, gx1, yN, -22, [romWing(K, yT), false, brickBlock(K, yT, { wall: K.pink }), false], K.pink, yT);
-    const R = hipRoof(B, K.slate, K.copperD, gx0 - 0.6, gx1 + 0.6, yN - 0.6, -21.4, yT, 0.82, { gable: true, ch: 0.3, flatTop: 1.6, deckMat: K.copper });
+    const R = hipRoof(B, K.slate, K.copperD, gx0 - 0.6, gx1 + 0.6, yN - 0.6, -21.4, yT, 0.82, { gable: true, ch: 0.3, flatTop: 1.6, deckMat: K.copper, mottle: 0.2, streak: 0.25, mw: 0.9, gutter: K.copperD });
     // dormers on the street slope, one over every other bay
     const F = B.F(gx0 - 0.6, yN - 0.6, gx1 + 0.6, yN - 0.6), L = F.L;
     for (let u = 3.4; u < L - 3; u += 5.6) dormer(B, F, K.pinkT, K.slate, K.win, u - 1.0, u + 1.0, yT, 0.82, 1.8, 2.4, { gp: 0.85 });
+    // the stone chimney stacks on the back slope
+    for (const gx of [gx0 + 5.5, (gx0 + gx1) / 2, gx1 - 5.5]) chimney(B, K, gx, -25.5, 26.0, 33.2);
     // gable end walls stand against the pavilions; a copper ridge vent
     void R;
   }
@@ -278,10 +360,13 @@ function front77(B, K) {
         quadY(B.S(K.pinkT), F, 3, F.L - 3, 11.5, -2.2, 0, -1);
       }
     }
-    hipRoof(B, K.tile, K.tileC, gx0 - 0.7, gx1 + 0.7, yN - 0.7, gn1 + 0.7, yT, 0.86, { ch: 0.34 });
+    hipRoof(B, K.tile, K.tileC, gx0 - 0.7, gx1 + 0.7, yN - 0.7, gn1 + 0.7, yT, 0.86, { mottle: 0.36, streak: 0.35, mw: 1.0, gutter: K.copperD, crest: K.copperD, ch: 0.34 });
     // dormers in the red roof (front)
     const F = B.F(gx0 - 0.7, yN - 0.7, gx1 + 0.7, yN - 0.7);
     for (const u of [12, 27.2, 42.4]) dormer(B, F, K.pinkT, K.tile, K.win, u - 1.4, u + 1.4, yT, 0.86, 2.4, 3.2, { gp: 0.9 });
+    for (const u of [19.6, 34.8]) dormer(B, F, K.copper, K.tile, K.win, u - 0.8, u + 0.8, yT, 0.86, 7.2, 1.9, { gp: 0.9 });   // the upper row
+    for (const Fh of [B.F(gx1 + 0.7, yN - 0.7, gx1 + 0.7, gn1 + 0.7), B.F(gx0 - 0.7, gn1 + 0.7, gx0 - 0.7, yN - 0.7)])
+      for (const u of [Fh.L / 2 - 4.2, Fh.L / 2 + 4.2]) dormer(B, Fh, K.pinkT, K.tile, K.win, u - 1.1, u + 1.1, yT, 0.86, 2.6, 2.6, { gp: 0.9 });
     // the round towers at its front corners
     roundTower(B, K, -32.1, -46.0, 4.75, 29.0, 39.5, { roof: 'tile', n: 20 });
     roundTower(B, K, 10.3, -46.3, 4.75, 29.0, 39.5, { roof: 'tile', n: 20 });
@@ -293,20 +378,25 @@ function front77(B, K) {
     const yT = 25.0;
     const gn0 = -43.6, gn1 = -12;
     block(B, gx0, gx1, gn0, gn1, [romPavilion(K, yT), gx0 > 0 ? romPavilion(K, yT) : false, brickBlock(K, yT, { wall: K.pink }), gx0 < 0 ? romPavilion(K, yT) : false], K.pink, yT);
-    const R = hipRoof(B, K.tile, K.tileC, gx0 - 0.7, gx1 + 0.7, gn0 - 0.7, gn1 + 0.7, yT, 0.9, { ch: 0.34 });
+    const R = hipRoof(B, K.tile, K.tileC, gx0 - 0.7, gx1 + 0.7, gn0 - 0.7, gn1 + 0.7, yT, 0.9, { mottle: 0.36, streak: 0.35, mw: 1.0, gutter: K.copperD, crest: K.copperD, ch: 0.34 });
     lantern(B, K, lx, (gn0 + gn1) / 2, R.yR - 1.2, 2.6, 3.6);
     // a stepped gable dormer on the street slope
     const F = B.F(gx0 - 0.7, gn0 - 0.7, gx1 + 0.7, gn0 - 0.7);
     dormer(B, F, K.pink, K.tile, K.win, F.L / 2 - 2.2, F.L / 2 + 2.2, yT, 0.9, 1.0, 4.6, { gp: 1.0 });
+    // dormers along the long slopes, two rows
+    for (const Fl of [B.F(gx1 + 0.7, gn0 - 0.7, gx1 + 0.7, gn1 + 0.7), B.F(gx0 - 0.7, gn1 + 0.7, gx0 - 0.7, gn0 - 0.7)]) {
+      for (let u = 5.5; u < Fl.L - 5; u += 5.2) dormer(B, Fl, K.pinkT, K.tile, K.win, u - 0.9, u + 0.9, yT, 0.9, 2.2, 2.4, { gp: 0.9 });
+      for (let u = 8.1; u < Fl.L - 7; u += 5.2) dormer(B, Fl, K.copper, K.tile, K.win, u - 0.6, u + 0.6, yT, 0.9, 6.4, 1.6, { gp: 0.9 });
+    }
   }
   // the round corner towers (Central Park West and Columbus Avenue)
-  roundTower(B, K, 90.6, -45.3, 6.2, 27.5, 40.5, { n: 26 });
-  roundTower(B, K, -112.2, -44.7, 6.3, 27.5, 40.5, { n: 26 });
+  roundTower(B, K, 90.6, -45.3, 6.2, 27.5, 40.5, { n: 26, roof: 'tile' });   // (clay tile cones like the pavilions beside them)
+  roundTower(B, K, -112.2, -44.7, 6.3, 27.5, 40.5, { n: 26, roof: 'tile' });
   // behind the wings: flat ranges
   block(B, 15.4, 62.5, -22, -3, [false, false, brickBlock(K, 24, { parapet: true }), brickBlock(K, 24)], K.brick, 24);
-  B.deck(K.roof, B.rect(15.4, 62.5, -22, -3), 24.0);
+  roofDeck(B, K, 15.4, 62.5, -22, -3, 24.0, { sky: true });
   block(B, -84.1, -37.1, -22, -3, [false, brickBlock(K, 22), brickBlock(K, 22, { parapet: true }), false], K.brick, 22);
-  B.deck(K.roof, B.rect(-84.1, -37.1, -22, -3), 22.0);
+  roofDeck(B, K, -84.1, -37.1, -22, -3, 22.0, { sky: true });
   B.collide(-106.6, 85.3, -43.6, -3, 0, 25);
 }
 
@@ -360,21 +450,21 @@ function cpw(B, K) {
     const yT = 23.5, gx0 = gn0 < 0 ? 66 : 74;
     const P = cpwWing(K, yT);
     block(B, gx0, gF, gn0, gn1, [gn0 < 0 ? false : cpwWing(K, yT), P, gn0 > 0 ? cpwWing(K, yT) : false, brickBlock(K, yT, { wall: K.buff })], K.buff, yT);
-    hipRoof(B, K.tile, K.tileC, gx0 - 0.6, gF + 0.7, gn0 - (gn0 < 0 ? 0 : 0.7), gn1 + (gn0 < 0 ? 0 : 0.7), yT, 0.78, { ch: 0.34, gable: gn0 < 0 });
+    hipRoof(B, K.tile, K.tileC, gx0 - 0.6, gF + 0.7, gn0 - (gn0 < 0 ? 0 : 0.7), gn1 + (gn0 < 0 ? 0 : 0.7), yT, 0.78, { mottle: 0.36, mw: 1.0, gutter: K.copperD, crest: K.copperD, ch: 0.34, gable: gn0 < 0 });
     B.collide(gx0, gF, gn0, gn1, 0, yT + 6);
   }
   // the north wing's courtyard range with its glass roof, and the brick tower at the 81st Street end
   block(B, 60, 74, 92, 130, [false, false, brickBlock(K, 20, { wall: K.buff }), brickBlock(K, 20)], K.brick, 20);
   skylightRoof(B, K, 60, 74, 92, 130, 20, true);
   block(B, 73.3, 79.1, 134.1, 139.8, [brickBlock(K, 38), brickBlock(K, 38), brickBlock(K, 38, { parapet: true }), brickBlock(K, 38)], K.brick, 38);
-  B.deck(K.roof, B.rect(73.3, 79.1, 134.1, 139.8), 38);
+  roofDeck(B, K, 73.3, 79.1, 134.1, 139.8, 38, { plant: 0 });
   // the Memorial
   memorial(B, K);
 }
 
 // a ridge of glass over a range: glazed slopes on steel ribs (along gn when alongN)
 function skylightRoof(B, K, gx0, gx1, gn0, gn1, y, alongN) {
-  B.deck(K.roof, B.rect(gx0, gx1, gn0, gn1), y);
+  B.deck(K.membD, B.rect(gx0, gx1, gn0, gn1), y);
   const n = alongN ? 1 : 1;
   void n;
   const inset = 1.2;
@@ -498,7 +588,7 @@ function memorial(B, K) {
     opening(B, Fx, { u0: Fx.L * 0.35, u1: Fx.L * 0.65, y0: 11.5, ys: 15.0, arch: 'seg', h: 2.0, d: 0.6, wall: K.mem, trim: K.memT, glass: K.win, frame: K.frame, mull: 2, info: { ws: 720 } });
     mould(B, Fx, K.memT, PROF.cornice(yTop, 0.6, 1.0), 0, Fx.L, 1, 1);
   }
-  B.deck(K.roof, B.rect(gB, gF, gn0, gn1), yTop - 0.2);
+  roofDeck(B, K, gB, gF, gn0, gn1, yTop - 0.2, { noPar: true, plant: 0.15 });
   // the broad steps across the front (to the sidewalk), the end pavilions' bumps (gx 85.3..90.9)
   for (let s = 0; s < 8; s++) {
     const g = gF + 0.45 * (8 - s);
@@ -511,7 +601,7 @@ function memorial(B, K) {
     { wall: K.mem, trim: K.memT, glass: K.win, frame: K.frame, yTop: 27, bay: 5.4, margin: 0.8, ch: 0.72, p: 0.012, c: 0.01, joint: 1.8,
       floors: [{ sill: 4.0, head: 7.5, w: 1.6, arch: null }, { sill: 11.2, head: 15.0, w: 1.6, arch: 'round' }, { sill: 19, head: 21.6, w: 1.4, arch: null }], cornice: { P: 0.6, H: 1.0 } },
     { wall: K.mem, trim: K.memT, glass: K.win, frame: K.frame, yTop: 27, bay: 5.4, margin: 0.8, ch: 0.72, p: 0.012, c: 0.01, joint: 1.8, floors: [], cornice: { P: 0.6, H: 1.0 } }, false], K.mem, 27);
-    B.deck(K.roof, B.rect(gB, 90.9, g0, g1), 27);
+    roofDeck(B, K, gB, 90.9, g0, g1, 27);
   }
   // the hall behind: walls above the wings with thermal windows, the copper roof
   {
@@ -529,7 +619,7 @@ function memorial(B, K) {
       for (const o of ops) opening(B, Fh, o);
       mould(B, Fh, K.memT, PROF.cornice(yH, 0.7, 1.0), 0, L, 1, 1);
     });
-    hipRoof(B, K.copper, K.copperD, hx0 - 0.5, hx1 + 0.5, hn0 - 0.5, hn1 + 0.5, yH, 0.42, { ch: 0.6, t: 0.03, capW: 0.2 });
+    hipRoof(B, K.copper, K.copperD, hx0 - 0.5, hx1 + 0.5, hn0 - 0.5, hn1 + 0.5, yH, 0.42, { mottle: 0.4, streak: 0.9, mw: 0.6, streakMat: K.copperD, gutter: K.copperD, ch: 0.6, t: 0.03, capW: 0.2, seam: 0.8, seamMat: K.copperD });
     B.collide(hx0, gF, hn0, hn1, 0, yH + 4);
   }
 }
@@ -554,7 +644,7 @@ function columbus(B, K) {
   const P = romWing(K, yT);
   P.bay = 5.0;
   block(B, gW, -92, -12, 31.9, [false, brickBlock(K, yT, { wall: K.pink }), false, P], K.pink, yT);
-  hipRoof(B, K.tile, K.tileC, gW - 0.7, -91.4, -12, 32.6, yT, 0.85, { ch: 0.34, gable: true, gableMat: K.pink });
+  hipRoof(B, K.tile, K.tileC, gW - 0.7, -91.4, -12, 32.6, yT, 0.85, { mottle: 0.36, mw: 1.0, gutter: K.copperD, crest: K.copperD, ch: 0.34, gable: true, gableMat: K.pink });
   const F = B.F(gW - 0.7, 32.6, gW - 0.7, -12);
   for (let u = 3.0; u < F.L - 2; u += 5.0) dormer(B, F, K.pinkT, K.tile, K.win, u - 0.9, u + 0.9, yT, 0.85, 1.6, 2.4);
   B.collide(gW, -92, -12, 31.9, 0, yT + 6);
@@ -566,12 +656,12 @@ function interior(B, K) {
   {
     const yT = 26;
     block(B, -21.4, 0, -10, 30, [false, brickBlock(K, yT), false, brickBlock(K, yT)], K.brick, yT);
-    hipRoof(B, K.copper, K.copperD, -22.0, 0.6, -10, 30, yT, 0.95, { gable: true, gableMat: K.brick, ch: 0.5, t: 0.025 });
+    hipRoof(B, K.copper, K.copperD, -22.0, 0.6, -10, 30, yT, 0.95, { mottle: 0.4, streak: 0.9, mw: 0.6, streakMat: K.copperD, gutter: K.copperD, gable: true, gableMat: K.brick, ch: 0.5, t: 0.025, seam: 0.75, seamMat: K.copperD });
     const Fe = B.F(0.6, -10, 0.6, 30), Fw = B.F(-22.0, 30, -22.0, -10);
     for (const Fx of [Fe, Fw]) for (let u = 3; u < Fx.L - 2; u += 4.4) dormer(B, Fx, K.copper, K.copper, K.win, u - 0.9, u + 0.9, yT, 0.95, 1.4, 2.3);
     // the brick block at its north end with its own copper hip
     block(B, -26.4, 4.0, 30, 46, [false, brickBlock(K, 31), brickBlock(K, 31), brickBlock(K, 31)], K.brick, 31);
-    hipRoof(B, K.copper, K.copperD, -27.0, 4.6, 29.4, 46.6, 31, 0.8, { ch: 0.5, t: 0.025 });
+    hipRoof(B, K.copper, K.copperD, -27.0, 4.6, 29.4, 46.6, 31, 0.8, { mottle: 0.4, streak: 0.9, mw: 0.6, streakMat: K.copperD, gutter: K.copperD, ch: 0.5, t: 0.025, seam: 0.75, seamMat: K.copperD });
     B.collide(-26.4, 4, -10, 46, 0, 31);
   }
   // the octagon (gx -2, gn 60) with its low copper pyramid
@@ -593,16 +683,16 @@ function interior(B, K) {
   {
     const yT = 34;
     block(B, 5, 62.5, 30, 67, [brickBlock(K, yT, { wall: K.brickD, parapet: true }), false, brickBlock(K, yT, { wall: K.brickD, parapet: true }), brickBlock(K, yT, { wall: K.brickD, parapet: true })], K.brickD, yT);
-    B.deck(K.roof, B.rect(5, 62.5, 30, 67), yT);
+    roofDeck(B, K, 5, 62.5, 30, 67, yT, { plant: 0.5 });
     block(B, 20, 45, 40, 58, [brickBlock(K, 39, { wall: K.brickD, floors: [] }), brickBlock(K, 39, { wall: K.brickD, floors: [] }), brickBlock(K, 39, { wall: K.brickD, floors: [] }), brickBlock(K, 39, { wall: K.brickD, floors: [] })], K.brickD, 39);
-    B.deck(K.roof, B.rect(20, 45, 40, 58), 39);
+    roofDeck(B, K, 20, 45, 40, 58, 39, { plant: 0.6 });
     B.collide(5, 62.5, 30, 67, 0, yT);
   }
   // the slate pyramid hall (gx 10..48, gn -3..30)
   {
     const yT = 21;
     block(B, 10, 48, -3, 30, [false, brickBlock(K, yT), false, brickBlock(K, yT)], K.brick, yT);
-    hipRoof(B, K.slate, K.copperD, 9.4, 48.6, -3.6, 30.6, yT, 0.62, { ch: 0.32 });
+    hipRoof(B, K.slate, K.copperD, 9.4, 48.6, -3.6, 30.6, yT, 0.62, { mottle: 0.2, streak: 0.25, mw: 0.9, gutter: K.copperD, ch: 0.32 });
     B.collide(10, 48, -3, 30, 0, yT + 8);
   }
   // the court ranges: flat roofs, a copper deck with skylights over the west range
@@ -610,17 +700,17 @@ function interior(B, K) {
   B.deck(K.copper, B.rect(-84.1, -48, -3, 15), 20.0);
   for (let g = -80; g < -50; g += 6) skylightRoof(B, K, g, g + 4, 0, 12, 20.05, true);
   block(B, -92, -48, 15, 31.9, [false, brickBlock(K, 22), brickBlock(K, 22, { parapet: true }), false], K.brick, 22);
-  B.deck(K.roof, B.rect(-92, -48, 15, 31.9), 22);
+  roofDeck(B, K, -92, -48, 15, 31.9, 22, { sky: true });
   block(B, -48, -21.4, -3, 16, [false, false, brickBlock(K, 18), false], K.brick, 18);
-  B.deck(K.roof, B.rect(-48, -21.4, -3, 16), 18);
+  roofDeck(B, K, -48, -21.4, -3, 16, 18, { sky: true });
   block(B, 62.5, 66, -12, 30, [false, false, false, brickBlock(K, 22)], K.brick, 22);
-  B.deck(K.roof, B.rect(62.5, 66, -12, 30), 22);
+  roofDeck(B, K, 62.5, 66, -12, 30, 22);
   block(B, 48, 62.5, -3, 30, [false, false, false, false], K.brick, 0);
   // the courts' floors (paved)
   B.deck(K.pave, B.rect(48, 62.5, -3, 30), 0.25);
   // between the Memorial hall and the cube
   block(B, 54.8, 74, 67, 92, [false, false, brickBlock(K, 20, { wall: K.buff }), false], K.buff, 20);
-  B.deck(K.roof, B.rect(54.8, 74, 67, 92), 20);
+  roofDeck(B, K, 54.8, 74, 67, 92, 20);
 }
 
 // ------------------------------------------------------------------------------------------- the Rose Center
@@ -711,7 +801,7 @@ function gilder(B, K) {
     const y0 = k * hb, y1 = y0 + hb;
     const off = 0.35 * Math.sin(k * 1.7);
     const ring = offsetPoly(plan, off - k * 0.12);
-    const ringT = offsetPoly(plan, off - k * 0.12 + 0.55);
+    const ringT = offsetPoly(plan, off - k * 0.12 + 0.95);
     // each band: its face, a rounded nose (the band's top projecting), openings cut in the lower bands
     for (let i = 0; i < ring.length; i++) {
       const a = ring[i], b = ring[(i + 1) % ring.length], at = ringT[i], bt = ringT[(i + 1) % ring.length];
@@ -737,7 +827,8 @@ function gilder(B, K) {
     B.deck(K.gild, ringT.map(([gx, gn]) => B.W(gx, gn)), y1);
   }
   // the roof: a membrane deck with a low glass lantern
-  B.deck(K.conc, offsetPoly(plan, -1.0).map(([gx, gn]) => B.W(gx, gn)), bands * hb + 0.05);
+  B.deck(K.pave, offsetPoly(plan, -1.0).map(([gx, gn]) => B.W(gx, gn)), bands * hb + 0.05);
+  B.deck(am('amnh_sedum', '#56683f'), offsetPoly(plan, -3.2).map(([gx, gn]) => B.W(gx, gn)), bands * hb + 0.3);   // the planted roof
   skylightRoof(B, K, -80, -55, 50, 75, bands * hb + 0.1, true);
   B.collide(-107, -33, 33, 92, 0, bands * hb);
 }
@@ -776,7 +867,7 @@ export function buildAmnhNorth(ctx) {
     P.cornice = { P: 0.6, H: 0.9 }; P.hood = true; P.trim = K.stoneG;
     block(B, -84, -50, 92, 127, [false, P, P, P], K.brick, yT);
     for (const g of [99, 109.5, 120]) skylightRoof(B, K, -81, -53, g - 3.5, g + 3.5, yT, false);
-    B.deck(K.roof, B.rect(-84, -50, 92, 127), yT - 0.02);
+    roofDeck(B, K, -84, -50, 92, 127, yT - 0.02, { plant: 0, noPar: true });
     B.collide(-84, -50, 92, 127, 0, yT);
   }
   // the 81st Street terrace (gx -50..21.5, gn 90..128.6): a granite deck over the lower lobby, its glazed north front
@@ -806,11 +897,11 @@ export function buildAmnhNorth(ctx) {
   {
     const yT = 12.5;
     block(B, -36, 54.8, 70, 90, [false, false, brickBlock(K, yT, { wall: K.stoneG, trim: K.conc, bay: 4.2, parapet: true }), false], K.stoneG, yT);
-    B.deck(K.roof, B.rect(-36, 54.8, 70, 90), yT);
+    roofDeck(B, K, -36, 54.8, 70, 90, yT, { sky: true });
     block(B, -48, -21.4, 16, 32, [false, false, brickBlock(K, 18, { parapet: true }), false], K.brick, 18);
-    B.deck(K.roof, B.rect(-48, -21.4, 16, 32), 18);
+    roofDeck(B, K, -48, -21.4, 16, 32, 18);
     block(B, -36, -26.4, 32, 70, [false, false, false, brickBlock(K, 20)], K.brick, 20);
-    B.deck(K.roof, B.rect(-36, -26.4, 32, 70), 20);
+    roofDeck(B, K, -36, -26.4, 32, 70, 20);
   }
   return B.group('amnhNorth');
 }

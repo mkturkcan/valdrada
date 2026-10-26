@@ -20,9 +20,11 @@ The Python package has no required dependencies and runs on any machine that can
 
 ## Windows
 
-**Release.** Download `Valdrada-0.5.2-win64.zip` and `Valdrada-0.5.2-win64-tiles.zip` from the
-[releases page](https://github.com/mkturkcan/valdrada/releases) and extract both into the same place: both hold the
-folder `Valdrada_0.5.2_win64`, and the second only its `Content/tiles/`. The folder contains:
+**Release.** Download `Valdrada-0.6.0-win64.zip`, `Valdrada-0.6.0-win64-tiles.zip`,
+`Valdrada-0.6.0-win64-terrain1.zip` and `Valdrada-0.6.0-win64-terrain2.zip` from the
+[releases page](https://github.com/mkturkcan/valdrada/releases) and extract them into the same place: all hold the
+folder `Valdrada_0.6.0_win64`, the second only its `Content/tiles/` and the last two only its `Content/data/terrain_p1/`
+(the measured ground, read with `?terrain=p1`; the server runs without them). The folder contains:
 
 | Path | Contents |
 |---|---|
@@ -62,7 +64,7 @@ cd valdrada
 (cd server && npm install)
 ls server/node_modules/electron/dist/electron        # the runtime; if missing: (cd server && node node_modules/electron/install.js)
 pip install -U "huggingface_hub>=1.0"
-hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.5.2 --include "Content/*" --local-dir .
+hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.6.0 --include "Content/*" --local-dir .
 cd server
 env -u ELECTRON_RUN_AS_NODE npx electron . --content ../Content
 ```
@@ -165,6 +167,7 @@ node server/build.mjs --platform win32 --link --zip
 | `--zip` | also write `release/Valdrada-<version>-<platform>.zip` |
 | `--out DIR` | the output directory (default `release/`) |
 
-For 0.5.2 the folder held 6,815 files (5.9 GB) and one archive of it was 2,399.9 MiB, over the 2 GiB that
-GitHub accepts for a release asset, so the release is published as two archives, the second holding `Content/tiles/`. To check a Windows build on Linux, serve its `Content/` with the
+For 0.6.0 the folder held 10,191 files (10.4 GB) and one archive of it was 4,113.9 MiB, over the 2 GiB that
+GitHub accepts for a release asset, so the release is published as four archives: the second holds `Content/tiles/` and
+the third and fourth `Content/data/terrain_p1/`. To check a Windows build on Linux, serve its `Content/` with the
 Linux runtime, as in the headless section, and run an example against it.

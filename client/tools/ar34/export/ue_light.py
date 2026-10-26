@@ -327,8 +327,11 @@ def apply(side, dest, cfg, world):
                     except Exception as e: out.setdefault('cloud_shadow_errors', []).append(f'{p_}: {e}')
                 out['cloud_shadows'] = True
             sp(slc, 'source_type', unreal.SkyLightSourceType.SLS_CAPTURED_SCENE)
-            sp(slc, 'real_time_capture', True)
-            out['physsky'] = {'clouds': bool(cfg.get('clouds')), 'sky_light': 'captured, real time'}
+            sp(slc, 'real_time_capture', not cfg.get('skycap_static'))
+            if cfg.get('skycap_static'):   # (FP18 flip A/B: the sky light captured once, not every tick)
+                try: slc.recapture_sky()
+                except Exception as e: out['skycap_error'] = str(e)
+            out['physsky'] = {'clouds': bool(cfg.get('clouds')), 'sky_light': 'captured once' if cfg.get('skycap_static') else 'captured, real time'}
         except Exception as e:
             out['physsky_error'] = f'{type(e).__name__}: {e}'
     elif cfg.get('physsky') and cfg.get('clouds') and mode == 'night':

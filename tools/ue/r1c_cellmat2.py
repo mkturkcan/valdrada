@@ -21,7 +21,7 @@ EXPORT = os.path.abspath(os.path.join(HERE, '..', '..', 'client', 'tools', 'ar34
 PROJECT = os.path.join(EXPORT, 'ue_project', 'BoundlessUE.uproject')
 UE_ROOT = os.environ.get('UE_ROOT', '/data0/projectnyc_aux/ue/UE_5.8')
 CELLCACHE = '/data0/projectnyc_aux/cellcache'
-VERSION = 8   # (8: S125, the dresser's roof decks too; 7: S125, the anti-tiling, tone and weathering; 6: GB43 KIT, the kit instances' custom data; 2: the facade kit's per-vertex tint, FkOn; 3: the vertex colour as RGB; 4: the vertex alpha as opacity, UseVCA;
+VERSION = 9   # (9: WINFAR, the kit cladding's knee under 0.42; 8: S125, the dresser's roof decks too; 7: S125, the anti-tiling, tone and weathering; 6: GB43 KIT, the kit instances' custom data; 2: the facade kit's per-vertex tint, FkOn; 3: the vertex colour as RGB; 4: the vertex alpha as opacity, UseVCA;
 # 5: the take's night (MPC_r1c.Night, keyed in the take's sequence by r1c_actors.py) for what three.js switches by ENV.night:
 # night-only parts, the room fills' night dimming, the kit interiors' light share and their own light by day and night, the
 # kit's window glass (its vertex colour is its reflection, dirt and opacity, not a colour), the kit shops' atlas; and the
@@ -119,6 +119,9 @@ if (kit > 0.5) {
     albedo *= fk;
 }
 if (FkOn > 0.5) albedo *= max(float3(UV1.x, UV1.y, UV2.x), 0.0);   // (the facade kit's tint per vertex: aFkTr in UV 1-2, r1c_glbuv.py)
+// (v9 WINFAR: the kit's cladding held under 0.42 albedo with a soft knee: a white-panel tower (aFkTr near 1 on #bfc3c7 aluminium)
+// clipped to a blank slab in the golden grade, its windows lost against it from 400 m)
+if (FkOn > 0.5) { float lk = dot(albedo, float3(0.2126, 0.7152, 0.0722)); if (lk > 0.30) albedo *= (0.30 + 0.12 * (1.0 - exp(-(lk - 0.30) / 0.12))) / lk; }
 // S125: the tone over metres (roofs and walls of the buildings: the world-mapped sets and the kit's boxes)
 float3 wm = WP * 0.01;
 float wallS = (S125K > 0.5 && (World > 0.5 || kit > 0.5) && abs(nW.z) < 0.5 && Glass < 0.5 && Unlit < 0.5 && SelfLv < 0.5) ? 1.0 : 0.0;
@@ -421,6 +424,15 @@ def ta31_table(atlas_png, W_=4096.0, H_=2048.0):
     return out, len(cells)
 
 
+# WINFAR (2026-10-24): the PBR sets the HQ map and the page's previews lack (35 of 61 in the library: the kit's metals and
+# panels, glazed brick, the stone and granite variants, terracotta, painted wood, membrane roofs), each to its family's set
+PBR_ALIAS = {'brick_white_glazed': 'brick_painted', 'tile_glazed': 'brick_painted', 'terracotta_cream': 'stone_lime',
+             'wood_painted': 'stucco', 'roof_membrane': 'concrete_smooth', 'roof_epdm': 'concrete_smooth', 'cobble_belgian': 'granite_grey',
+             'stainless': 'concrete_precast'}
+PBR_ALIAS_PREFIX = (('alu_', 'concrete_precast'), ('panel_', 'concrete_precast'), ('steel_', 'metal_painted'), ('stone_lime', 'stone_lime'),
+                    ('granite_', 'granite_grey'))
+
+
 def cell_records(cells):
     """{sanitised material name: three record (+ _kind ground, + _fount: FOUNT45's fountains)} over the world's cell glbs"""
     R = {}
@@ -598,6 +610,15 @@ def in_engine():
              'orm': need(tex_path(tx.get('roughnessMap') or tx.get('metalnessMap')), False)}
         pb = ((r.get('userData') or {}).get('pbr') or {})
         sid = (HQ.get('pbr') or {}).get(pb.get('name')) if pb else None
+        # (WINFAR: a PBR set with neither an HQ set nor a page preview bound as a flat colour, the kit's white aluminium
+        # cladding a windowless white slab from the air; such a set takes its family's HQ set, its colour kept as the mean)
+        if pb and pb.get('name') and not sid and not os.path.exists(os.path.join(EXPORT, '..', '..', '..', 'public', 'textures', 'pbr', pb['name'], 'preview.jpg')):
+            al_ = PBR_ALIAS.get(pb['name'])
+            if al_ is None:
+                for pre_, a_ in PBR_ALIAS_PREFIX:
+                    if pb['name'].startswith(pre_): al_ = a_; break
+            sid = (HQ.get('pbr') or {}).get(al_) if al_ else None
+            if sid and sid in HQM: P['alias'] = al_; P['amean'] = list((HQM[sid].get('albedo_mean') or [0.5, 0.5, 0.5])[:3])
         if sid and sid in HQM:
             f = HQM[sid].get('files') or {}
             P['map'] = need(f.get('alb'), True); P['nrm'] = need(f.get('nrm'), False); P['orm'] = need(f.get('arm'), False)
@@ -656,6 +677,7 @@ def in_engine():
         if eal.find_asset_data(ap).asset_class_path.asset_name != 'MaterialInstanceConstant': continue
         nm = ap.split('/')[-1].split('.')[0]
         if nm.startswith('lod16'): continue   # (lane B's far city: r1c_lodmat.py's masters)
+        if nm.endswith('_nan'): continue   # (2026-10-25: the packed facades' copies; bd_tilefac.py binds them from their instance)
         k = find(nm)
         r = recs.get(k) or {}
         if not r:
@@ -927,6 +949,13 @@ def in_engine():
         if pbn and not P.get('map') and min(col) > 0.9:   # (a PBR set with no texture of its own here: its kind's albedo)
             g = 0.06 if 'epdm' in pbn or 'black' in pbn or 'tar' in pbn else 0.55 if 'membrane' in pbn or 'white' in pbn else 0.35
             col = [g, g, g]
+        if P.get('alias'):   # (WINFAR: the set's own colour as the aliased map's mean, a pale cladding held under 0.48: at 0.78 a
+            # sunlit white-panel tower clipped to a blank slab in the golden grade)
+            lum_ = 0.2126 * col[0] + 0.7152 * col[1] + 0.0722 * col[2]
+            k_ = min(1.0, 0.48 / lum_) if lum_ > 0.48 else 1.0
+            am_ = P.get('amean') or [0.5, 0.5, 0.5]
+            col = [min(4.0, col[i] * k_ / max(am_[i], 0.05)) for i in range(3)]
+            T['pbr_alias'] = T.get('pbr_alias', 0) + 1
         vv('Color', col)
         if r.get('vertexColors'): sv('UseVC', 1)
         if tname in ('roofSilver', 'roofBlack', 'roofGravel'): sv('RoofDeck', 1)   # (S125 v8)
@@ -949,6 +978,10 @@ def in_engine():
         if P.get('world'): sv('World', 1); sv('Size', P['world']); T['pbr_hq'] += 1
         if P.get('hq'): sv('OrmAO', 1)
         sv('RoughK', r.get('roughness', 0.8) if r.get('roughness') is not None else 0.8)
+        if pbn.startswith('glass_'):   # (WINFAR: the kit's curtain-wall glass sets (opaque, 0.03 in the page) a dark body with a
+            # sheen above the presets' 0.6 trace limit, as the far shells' glass (v9): at 0.03 a tower mirrored the open sky as
+            # a blank white box from the air (nyc_aerials_ue13 230 s, East Harlem's glass towers)
+            sv('RoughK', 0.62); vv('Color', [c * 0.12 for c in col]); T['glass_dark'] = T.get('glass_dark', 0) + 1
         sv('MetalK', r.get('metalness', 0.0) or 0.0)
         em = r.get('emissive') or [0, 0, 0]
         if any(em) or tx.get('emissiveMap'):

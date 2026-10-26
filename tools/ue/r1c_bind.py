@@ -25,10 +25,10 @@ def main():
     import argparse
     import r1c_cellmat2
     ap = argparse.ArgumentParser()
-    ap.add_argument('--world-dest', required=True); ap.add_argument('--cells', required=True); ap.add_argument('--out', required=True)
+    ap.add_argument('--world-dest', required=True); ap.add_argument('--cells', required=True); ap.add_argument('--out', required=True); ap.add_argument('--records', default=None)
     a = ap.parse_args()
     out = os.path.abspath(a.out); os.makedirs(out, exist_ok=True)
-    rp = os.path.join(out, 'records.json'); json.dump(r1c_cellmat2.cell_records(a.cells), open(rp, 'w'))
+    rp = os.path.join(out, 'records.json'); json.dump(json.load(open(a.records)) if a.records else r1c_cellmat2.cell_records(a.cells), open(rp, 'w'))   # (--records: a prepared set, e.g. tools/ue/rebind_pbr.sh)
     cm = {'world_dest': a.world_dest, 'records': rp, 'result': os.path.join(out, 'cellmat2.json'), 'hide': [], 'hide_generated_alpha': False, 'lib_from': []}
     cmp_ = os.path.join(out, 'cellmat2_cfg.json'); json.dump(cm, open(cmp_, 'w'), indent=1)
     env = dict(os.environ, R1C_CELLMAT2_CFG=cmp_, **{'UE-LocalDataCachePath': os.environ.get('BXUE_DDC', '/data0/projectnyc_aux/ue/ddc'), 'UE-SharedDataCachePath': 'None'})

@@ -27,7 +27,7 @@ client/public/tiles_*/
 client/public/tiles_*
 client/public/models/
 client/public/textures/
-# Manhattan's measured ground (?terrain=p1, ?hhp=1): the page data, in the dataset's Content/data/
+# The measured ground of the five boroughs (?terrain=p1, ?hhp=1): the page data, in the dataset's Content/data/
 client/public/data/terrain_p1/
 client/public/data/terrain_p1a/
 client/public/data/terrain_grade/

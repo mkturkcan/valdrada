@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { StaticPool } from './staticPool.js';
 import { assembleTile } from './assemble.js';
-import { HA_P1, haTerrainAt } from './heightAuthority.js';
+import { HA_P1, haTerrainAt, haFarRelief } from './heightAuthority.js';
 import { haSetSurface, haAnchorBridges } from './haAnchor.js';   // P1 TERRAIN: the re-anchored builders stand on this streamer's surfaces
 import { FAR_UNIFORMS, NEAR_MASK_N } from './materials.js';
 import { TILE, MACRO } from '../shared/geo.js';
@@ -274,6 +274,14 @@ export class Streamer {
           pos = p2; col = c2;
         }
       } catch (e) { console.warn('[lf39] macro', e); }
+      // five boroughs (P1 terrain): the far boxes and ground on the same relief as the near tiles (heightAuthority's far grid;
+      // per vertex, so a wall's foot and head lift alike and every base meets the ground)
+      if (HA_P1 && pos && haFarRelief(0, 0) !== null) {
+        const [ox, oz] = header.origin, p2 = new Float32Array(pos.length);
+        for (let i = 0; i < pos.length; i += 3) { p2[i] = pos[i]; p2[i + 2] = pos[i + 2]; p2[i + 1] = pos[i + 1] + haFarRelief(pos[i] + ox, pos[i + 2] + oz); }
+        pos = p2;
+        if (terr) { const n = 33, t2 = new Float32Array(terr.length); for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) t2[j * n + i] = terr[j * n + i] + haFarRelief(ox + (i / 32) * MACRO, oz + (j / 32) * MACRO); terr = t2; }
+      }
       const g = new THREE.BufferGeometry();
       g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
       g.setAttribute('color', new THREE.BufferAttribute(col, 4, true));

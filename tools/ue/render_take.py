@@ -24,6 +24,8 @@ import argparse, contextlib, fcntl, glob, hashlib, json, os, re, shutil, subproc
 from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(HERE, '..', 'city'))
+import pconf; pconf.apply()   # (CITY 2026-10-25: config/pipeline.json's flags as defaults; an env value that differs is logged)
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 EXPORT = os.path.join(ROOT, 'client', 'tools', 'ar34', 'export')
 PROJECT = os.path.join(EXPORT, 'ue_project', 'BoundlessUE.uproject')
@@ -550,10 +552,30 @@ def _load_root_v2(keys, root, src, imp, logf, S):
         S['matlib'] = matlib.ensure(md, logf + '.matlib')
         _imp_levels(ks, root, os.path.join(CC, src), os.path.join(CC, imp), os.path.join(CC, 'tmp'), logf, 'ccv', ('--tree-from', TREES_FROM, '--matlib', matlib.INDEX))
         shutil.rmtree(md, ignore_errors=True)
+        if root == CCB_ROOT and os.environ.get('UE_NANITE_FACADES', '1') == '1': S['nanite_facades'] = nanite_facades(ks, root, logf)
     S['ccv_imported_new'] = claimed(set(keys), imp, imported, work, 'import')
     S['ccv_import_s'] = round(time.time() - t, 1)
 
 
+
+
+def nanite_facades(keys, root, logf):
+    """2026-10-25 (docs/notes/ue-persistent-city.md): the new blocks' tile facades on Nanite: their eight UV sets packed
+    into UV 1-3 and the vertex colour, the slots on the packed master's instances (ValdradaWorldEditor's commandlet
+    ValdradaNaniteFacades); a facade it cannot pack stays as imported (non-Nanite, the unpacked master)"""
+    croot = os.path.join(EXPORT, 'ue_project', 'Content', root[len('/Game/'):])
+    paths = []
+    for k in keys:
+        for f in glob.glob(os.path.join(croot, k, '*', 'StaticMeshes', 'g*.uasset')):
+            rel = f[len(croot):-len('.uasset')]; paths.append(f'{root}{rel}.{os.path.basename(rel)}')
+    if not paths: return {'meshes': 0}
+    lst = os.path.join(CC, 'tmp', f'nanfac_{os.getpid()}.txt'); open(lst, 'w').write('\n'.join(paths) + '\n')
+    out = lst[:-4] + '.json'
+    with editor_slot():
+        run([os.path.join(UE_ROOT, 'Engine', 'Binaries', 'Linux', 'UnrealEditor-Cmd'), PROJECT, '-run=ValdradaNaniteFacades', f'-list={lst}', f'-out={out}',
+             '-unattended', '-nosplash', '-nullrhi', '-stdout', '-FullStdOutLogOutput'], logf + '.nanfac', env=ue_env())
+    try: R = json.load(open(out)); R.pop('hist', None); return R
+    except Exception: return {'error': 'no result'}
 
 
 CF_ROOT = '/Game/CF'   # GB43: the far city's cache: one level per masked package, keyed by its content
@@ -585,6 +607,10 @@ def cf_far(fard, logf, S):
             code, _ = run(['python3', os.path.join(HERE, 'r1c_lodmat.py'), '--dest', ','.join(f'{CF_ROOT}/{fk}' for fk in unbound),
                            '--fw14', os.path.join(CELLCACHE, 'tex', 'daab9257ff80ba32fbedb2bd.png'), '--night', '0', '--wink', '3', '--out', out], logf + '.cfmat')
         if code or not os.path.exists(os.path.join(out, 'lodmat.json')): return
+        if os.path.exists(os.path.join(HERE, 'bd_cover_mat.py')):   # (NJCOVER: the covered backdrop ground on its own duplicate master)
+            with editor_slot():
+                code, _ = run(['python3', os.path.join(HERE, 'bd_cover_mat.py'), '--dest', ','.join(f'{CF_ROOT}/{fk}' for fk in unbound), '--out', out + '_cov'], logf + '.cfcov')
+            if code: return
         for fk in unbound:
             jp = os.path.join(CC, 'far_imp', fk + '.json'); j = json.load(open(jp)); j['mat'] = msig; json.dump(j, open(jp, 'w'))
     S['cf_bound_new'] = claimed(set(fkeys.values()), 'far_mat', bound, bind_far, 'far materials (see the bind log)')
@@ -643,8 +669,11 @@ def city_world(I):
             if bnan[b_] is not None: return bnan[b_] / max(ncell[b_], 1)
         try: return int(json.load(open(os.path.join(CC, 'impu', cells[k]['key'] + '.json'))).get('nanite') or 0)
         except Exception: return 60
-    cut = CB.city_cut(I['loadset'], cells, far, json.load(open(CB.LOD_INDEX)), budget=NANITE_BUDGET, cost=nanite_of,
-                      reach=float(os.environ.get('UE_NEAR_M', '5000')) if blocks else None)
+    reach_ = float(os.environ.get('UE_NEAR_M', '5000')); maxc_ = int(os.environ.get('UE_MAX_CELLS', '5000')); lodi_ = json.load(open(CB.LOD_INDEX))
+    while True:   # (trailer12, 2026-10-23: a world of 6,554 cells (lfBroadway125 whole) crashed the take's render at its first frames, 'Attempt to create zero-sized buffer FRayTracingScene::SceneBuffer'; ue11's ranges of up to 5,104 cells rendered: the near reach shrinks until the cut holds at most UE_MAX_CELLS cells, the rest drawn by the far city)
+        cut = CB.city_cut(I['loadset'], cells, far, lodi_, budget=NANITE_BUDGET, cost=nanite_of, reach=reach_ if blocks else None)
+        if not blocks or len(cut['cells']) <= maxc_ or reach_ <= 1500: break
+        log(f'city cut: {len(cut["cells"])} cells at a {reach_:.0f} m reach, over {maxc_}: the reach shrinks'); reach_ -= 250
     levels = list(dict.fromkeys(blocks[bk_(k)]['level'] if bk_(k) in blocks else cells[k]['level'] for k in cut['cells'])) + [f'{CF_ROOT}/{far[n]}/L' for n in cut['far']]
     levels = list(dict.fromkeys(levels))   # (GB43: two packages of one content share a level; a level added twice stops the take's editor)
     gone = [l for l in levels if not os.path.exists(os.path.join(EXPORT, 'ue_project', 'Content', l[len('/Game/'):] + '.umap'))]
@@ -862,13 +891,19 @@ def build_take(I, W, tkey, tdir, settings, logf):
     return {'status': 'ok', 'key': tkey, 'level': level, 'manifest': keep, 'side': side, 'night': I['night'], 'stages': S, 'made': time.ctime()}, None
 
 
-def patch_manifest(src, dst, rawdir, a, b):
-    """the take's manifest for one render: its output folder and frame range (a..b inclusive)"""
+def patch_manifest(src, dst, rawdir, a, b, cvars=None):
+    """the take's manifest for one render: its output folder and frame range (a..b inclusive), and the settings' cvars
+    on the job (set or added: the take's key leaves them out)"""
     J = json.load(open(src))
     hit = 0
     def walk(o):
         nonlocal hit
         if isinstance(o, dict):
+            if cvars and isinstance(o.get('CVars'), dict) and isinstance(o['CVars'].get('__Value'), list):
+                L = o['CVars']['__Value']; have = {e['Name']['__Value']: e for e in L if isinstance(e, dict) and 'Name' in e}
+                for k, v in cvars.items():
+                    if k in have: have[k]['Value']['__Value'] = float(v); have[k]['bIsEnabled']['__Value'] = 1
+                    else: L.append({'Name': {'__Type': 'StrProperty', '__Value': k}, 'Value': {'__Type': 'FloatProperty', '__Value': float(v)}, 'bIsEnabled': {'__Type': 'BoolProperty', '__Value': 1}})
             if 'OutputDirectory' in o and 'CustomEndFrame' in o:
                 o['OutputDirectory']['__Value']['Path']['__Value'] = rawdir
                 o['CustomEndFrame']['__Value'] = int(b) + 1
@@ -933,7 +968,7 @@ def main():
     lock = open(os.path.join(UECACHE, 'locks', f'{a.shot}.lock' if tag == 'all' else f'{a.shot}_{tag}.lock'), 'w'); fcntl.flock(lock, fcntl.LOCK_EX)
     runid = time.strftime('%Y%m%d-%H%M%S'); rdir = os.path.join(UECACHE, 'runs', f'{a.shot}_{runid}' if tag == 'all' else f'{a.shot}_{tag}_{runid}'); os.makedirs(rdir)
     logf = os.path.join(rdir, 'render_take.log')
-    if CITYMODE and tag != 'all':   # (a part's world is cut from its own frames: the near blocks and far chunks they draw)
+    if CITYMODE and tag != 'all' and os.environ.get('UE_RANGE_WORLD', 'own') != 'shot':   # (a part's world is cut from its own frames: the near blocks and far chunks they draw; trailer12, 2026-10-22: UE_RANGE_WORLD=shot draws every range with the whole shot's world, no brightness seams at range boundaries)
         LS_ = json.load(open(I['loadset'])); fr_ = LS_['frames'][fa:fb]
         LS_['frames'] = fr_; u_ = set(c for f in fr_ for c in (f.get('cells') or []))
         LS_['union']['cells'] = sorted(u_); LS_['union']['cellsMissing'] = sorted(set(LS_['union'].get('cellsMissing') or []) & u_)
@@ -986,7 +1021,9 @@ def main():
         os.makedirs(os.path.join(UECACHE, 'settings'), exist_ok=True)
         sp_ = os.path.join(UECACHE, 'settings', f'{sk_}.json')
         if not os.path.exists(sp_): json.dump(S_, open(sp_, 'w'), indent=1)
-        a.settings = sp_; xkey = {'settings': sk_}
+        # (FP18, 2026-10-22: the console variables and the notes are left out of the take's key: patch_manifest sets the
+        # settings' cvars on the render's job, so a cvar-only variant reuses its preset's take, ~10 min an A/B, not ~45)
+        a.settings = sp_; xkey = {'settings': sha({k: v for k, v in S_.items() if k != 'cvars' and not k.startswith('_')})[:16]}
     if take_no_peds(a.shot): xkey['nopeds'] = 1
     tkey = sha({**xkey, 'world': wkey, 'usd': I['usd'], 'usd_files': usd_list, 'harvest': I['harvest'], 'light': fsha(os.path.join(I['harvest'], 'light_static.json')),
                 'tools': {n: fsha(os.path.join(HERE, n)) for n in TAKE_TOOLS}, 'export': {n: fsha(os.path.join(EXPORT, n)) for n in EXPORT_TOOLS}})[:16]
@@ -996,12 +1033,15 @@ def main():
     rec['take_key'] = tkey
     tlock = open(os.path.join(UECACHE, 'locks', f'take_{tkey}.lock'), 'w'); fcntl.flock(tlock, fcntl.LOCK_EX)   # (S125: parts of one shot)
     if not TK and os.path.exists(tj): TK = json.load(open(tj))
-    if TK and TK.get('status') == 'ok' and os.path.exists(TK['manifest']):
+    cv_now = json.load(open(a.settings)).get('cvars') or {}
+    # (a take built by a variant with a cvar this run's settings lack would carry it in its manifest: built again)
+    if TK and TK.get('status') == 'ok' and os.path.exists(TK['manifest']) and set(TK.get('cvars_built') or {}) <= set(cv_now):
         rec['take'] = 'reused'; log('take', tkey, 'reused')
     else:
         log('take', tkey, 'building (actors and light from', I['usd'] + ')')
         TK, err = build_take(I, W, tkey, tdir, a.settings, logf)
         if err: log('take failed at', err, '(log', logf + ')'); json.dump({'status': 'failed', 'at': err}, open(tj, 'w')); sys.exit(4)
+        TK['cvars_built'] = cv_now
         json.dump(TK, open(tj, 'w'), indent=1); rec['take'] = 'built'; rec['take_s'] = TK['stages']['secs']
     fcntl.flock(tlock, fcntl.LOCK_UN)
     # the far city's night windows follow the take (the world is shared by times of day); a cache world's far masters read
@@ -1013,7 +1053,7 @@ def main():
     # the render
     raw = os.path.join(rdir, 'raw'); os.makedirs(raw)
     rel = f'MovieRenderPipeline/rt_{a.shot}_{runid}.utxt' if tag == 'all' else f'MovieRenderPipeline/rt_{a.shot}_{tag}_{runid}.utxt'
-    if not patch_manifest(TK['manifest'], os.path.join(SAVED, rel), raw, fa, fb - 1): log('render: the manifest has no output setting'); sys.exit(5)
+    if not patch_manifest(TK['manifest'], os.path.join(SAVED, rel), raw, fa, fb - 1, json.load(open(a.settings)).get('cvars') or {}): log('render: the manifest has no output setting'); sys.exit(5)
     env = ue_env(); env['DRI_PRIME'] = f'pci-0000_{a.gpu_pci}_00_0'
     W_, H_ = json.load(open(a.settings)).get('res', '2560x1440').split('x')
     gl = open(os.path.join('/data0/projectnyc_aux/tmp/ue_gpu_locks', f'pci-0000_{a.gpu_pci}_00_0.lock'), 'a+')

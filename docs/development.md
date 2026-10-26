@@ -22,20 +22,24 @@ subway entrances) and `?tn38=0` (junction turns kept on the carriageway). A feat
 can be bisected by turning flags off in the URL, for example `http://127.0.0.1:5219/?gf38=0&tn38=0`, without
 checking out older code. Node tools that import a module have no `location`, so every flag is on there.
 
-Manhattan's measured ground is off by default in 0.5.2. `?terrain=p1` lays the island on the 2017 bare earth LiDAR
-through a height authority (client/src/world/heightAuthority.js), with the ground graded to every paving edge and the
-parks' woodland from the LiDAR canopy, and `?hhp=1` adds the highways: the Henry Hudson Parkway from 72nd to 135th
-Street as designed alignments with its structures, the FDR Drive's covered and stacked stretches as one structure
-each, and with `?terrain=p1` the shores from mapped polygons. The `terrain=p1&hhp=1` pair is the combination the 0.5.2
-Manhattan video was rendered with. Their parts can be turned off one at a time under the same rule (`?terrainGrade=0`,
-`?vegp1=0`, `?hhpkit=0`), and the data they read (`client/public/data/terrain_p1`, `terrain_p1a`, `terrain_grade`,
-`veg_p1` and `hhp_p2`) ships in the dataset's `Content/data/`. The flagged ground is built in the page tile by tile
-and is meant for offline renders through the cell bake: served from the 0.5.2 release folder on an RTX 6000 Ada, a
-view of Central Park's west side took about 14 minutes to become ready and drew under two frames a second while it
-settled. Two parts are on by default, as other new features are: the Central Park drives built on their smoothed
-centrelines (`?cpDrives=0`) and one placement rule that keeps trees and street furniture out of buildings and
-carriageways (`?placeGuard=0`). Node tools and the cell bake take the environment variables named in each module
-(`TERRAIN_P1=1`, `HHP_P2=1`, `tools/cells/bake.mjs --terrain p1 --hhp`).
+The measured ground is off by default in 0.6.0. `?terrain=p1` lays the city on the 2017 bare earth LiDAR through a
+height authority (client/src/world/heightAuthority.js), with the ground graded to every paving edge and the parks'
+woodland from the LiDAR canopy; the data set shipped in `client/public/data/terrain_p1` covers the five boroughs (4.9 GB,
+3,625 files), and `?terrainData=<folder under data/>` reads another set. `?hhp=1` adds the highways: the Henry Hudson
+Parkway from 72nd to 135th Street as designed alignments with its structures, the FDR Drive's covered and stacked
+stretches as one structure each, and with `?terrain=p1` the shores from mapped polygons. With `?terrain=p1` the seawall
+kit sweeps the shore walls as coursed granite or concrete with copings, rails and fittings (`?seawall=0`). The
+`terrain=p1&hhp=1` pair is the combination the Manhattan videos were rendered with. Their parts can be turned off one at
+a time under the same rule (`?terrainGrade=0`, `?vegp1=0`, `?hhpkit=0`), and the data they read
+(`client/public/data/terrain_p1`, `terrain_p1a`, `terrain_grade`, `veg_p1` and `hhp_p2`) ships in the dataset's
+`Content/data/`. The flagged ground is built in the page tile by tile and is meant for offline renders through the cell
+bake: served from the 0.5.2 release folder on an RTX 6000 Ada, a view of Central Park's west side took about 14 minutes
+to become ready and drew under two frames a second while it settled. Parts that are on by default, as other new
+features are: the marina kit, docks, gangways, pilings and moored boats from the mapped dock lines (`?marina=0`); the
+Central Park drives built on their smoothed centrelines (`?cpDrives=0`); and one placement rule that keeps trees and
+street furniture out of buildings and carriageways (`?placeGuard=0`). Node tools and the cell bake take the environment
+variables named in each module (`TERRAIN_P1=1`, `HHP_P2=1`, `MARINA=0`, `SEAWALL=0`, `tools/cells/bake.mjs --terrain p1
+--hhp`).
 
 ## Tests
 

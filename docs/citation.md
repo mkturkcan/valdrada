@@ -8,7 +8,7 @@ Valdrada, the compiled city or imagery rendered with it, please cite Valdrada it
   author  = {Turkcan, Mehmet Kerem},
   title   = {{Valdrada}: a real-data, real-time digital twin of New York City},
   year    = {2026},
-  version = {0.5.2},
+  version = {0.6.0},
   url     = {https://github.com/mkturkcan/valdrada}
 }
 ```

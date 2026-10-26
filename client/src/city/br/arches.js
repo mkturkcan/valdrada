@@ -7,6 +7,7 @@
 import { Frame } from './frame.js';
 import * as M from './mats.js';
 import { slab, laneLines, crossBeams, lateralX, railing, block, taper, memberSO } from './parts.js';
+import { layoutBays, viaduct, abutWall, pier as stonePier } from './masonry.js';
 
 function road(bag, F, asph, lw, ly, steelD, a, b, half, y, lanes) {
   slab(bag, F, asph, a, b, -half, half, y, 0.3, 6);
@@ -46,14 +47,25 @@ export function buildDeckArch(rec, bag, S) {
     // the skewbacks: masonry blocks under the ribs' ends
     for (const s of [s0, s1]) {
       const g = F.groundAt(s), base = g === null ? -3 : g - 0.5;
-      block(bag, F, stoneD, s - 5, s + 5, S.ribs[0] - 3, S.ribs[S.ribs.length - 1] + 3, base, ys + 1.5);
+      block(bag, F, S.viaduct ? M.graniteN() : stoneD, s - 5, s + 5, S.ribs[0] - 3, S.ribs[S.ribs.length - 1] + 3, base, ys + 1.5);
     }
   }
-  // the deck the whole length: plate girders under the roadway, the floor, the road, lights
+  // HB25 (S.viaduct): the masonry arches beside the steel spans (br/masonry.js): laid out from the steel span's end piers
+  // outward at the bridge's spans, a solid abutment wall past the last arch where the deck nears the ground, plain bents
+  // where the arches cannot stand (a street or highway in the way of every pier); the steel deck only where no masonry is
   const a = 0, b = F.L;
-  for (const o of S.ribs) slab(bag, F, steel, a, b, o - 0.3, o + 0.3, (s) => y(s) - 0.3, (S.deckDepth ?? 2.2) - 0.3, 8, { top: false });
-  crossBeams(bag, F, steelD, a, b, 5.0, -half, half, (s) => y(s) - 0.3, 0.35, 1.0);
-  road(bag, F, asph, lw, ly, steelD, a, b, half, y, S.lanes ?? 2);
+  let girderRuns = [[a, b]];
+  if (S.viaduct) girderRuns = masonryApproaches(rec, bag, F, S, y);
+  // the deck: plate girders under the roadway, the floor, the road (a walkway's paving), lights
+  for (const [ga, gb] of girderRuns) {
+    for (const o of S.ribs) slab(bag, F, steel, ga, gb, o - 0.3, o + 0.3, (s) => y(s) - 0.3, (S.deckDepth ?? 2.2) - 0.3, 8, { top: false });
+    crossBeams(bag, F, steelD, ga, gb, 5.0, -half, half, (s) => y(s) - 0.3, 0.35, 1.0);
+  }
+  if (S.walk) {
+    const pave = M.paving(S.paveHex ?? 0x9a6a58);
+    slab(bag, F, pave, a, b, -half, half, y, 0.3, 6);
+    for (const [ga, gb] of girderRuns) for (const sg of [-1, 1]) railing(bag, F, steelD, ga, gb, sg * (half + 0.1), y, 1.25, 2.4, 0.07);
+  } else road(bag, F, asph, lw, ly, steelD, a, b, half, y, S.lanes ?? 2);
   if (S.upper) {   // a second roadway over the first (the Henry Hudson's upper level)
     const yu = (s) => y(s) + S.upper;
     road(bag, F, asph, lw, ly, steelD, a, b, half, yu, S.lanes ?? 2);
@@ -66,14 +78,50 @@ export function buildDeckArch(rec, bag, S) {
   const inArch = (s) => spans.some(([p, q]) => s > p && s < q);
   const under = (rec.under || []).filter((u) => u[2] < 0.5);
   const free = (s) => !under.some((u) => s > u[0] - 2 && s < u[1] + 2);
+  const inMasonry = (s) => S.viaduct && !girderRuns.some(([p, q]) => s >= p && s <= q);
   for (let s = 8; s < F.L - 4; s += S.bay ?? 24) {
-    if (inArch(s) || !free(s)) continue;
+    if (inArch(s) || !free(s) || inMasonry(s)) continue;
     const g = F.groundAt(s), base = g === null ? -3 : g - 0.5, top = y(s) - (S.deckDepth ?? 2.2);
     if (top - base < 2.5) continue;
-    if (S.masonry) taper(bag, F, stone, s, 0, base, top, 2.6, half + 1.2, 2.2, half + 0.8);
+    if (S.masonry) taper(bag, F, S.viaduct ? M.graniteN() : stone, s, 0, base, top, 2.6, half + 1.2, 2.2, half + 0.8);
     else { for (const o of S.ribs.length > 1 ? [S.ribs[0], S.ribs[S.ribs.length - 1]] : [-half + 1, half - 1]) taper(bag, F, steel, s, o, base, top, 0.6, 0.5, 0.5, 0.4); memberSO(bag, F, steelD, s, -half, top - 0.5, s, half, top - 0.5, 0.8, 1.0); }
   }
   void conc;
+}
+
+// HB25: the masonry approaches of a deck arch (S.viaduct: { spans, nMain, pier, half, cover, ch, endT, wallHex, trimHex,
+// ringHex, max }); returns the runs left to the steel deck (the steel spans and any run of plain bents)
+function masonryApproaches(rec, bag, F, S, y) {
+  const V = S.viaduct, lay = rec.layout, yTop = (s) => y(s) - 0.35;
+  const G = M.graniteN();
+  const Mm = { wall: G, ring: G, vault: G, pier: G, trim: G, rail: M.paint(S.steelD ?? S.steel) };
+  const ground = (s) => { const g = F.groundAt(s); return g === null ? -2.5 : g; };
+  const archs = lay.arches.slice().sort((p, q) => p[0] - q[0]);
+  const e0 = archs[0][0] - V.endT / 2 - 1, e1 = archs[archs.length - 1][1] + V.endT / 2 + 1;
+  const spec = { ...V, walk: !!S.walk, under: rec.under || [] };
+  const runs = [[e0 - V.endT / 2, e1 + V.endT / 2]];
+  // the end piers the steel arch springs beside (and the piers between two steel arches), ground to the cornice
+  const tall = [e0, e1];
+  for (let i = 0; i + 1 < archs.length; i++) tall.push((archs[i][1] + archs[i + 1][0]) / 2);
+  for (const s of tall) {
+    const g = Math.min(ground(s - V.endT / 2), ground(s), ground(s + V.endT / 2)) - 1.0;
+    stonePier(bag, F, Mm.pier, s, g, yTop(s) - 0.9, V.endT / 2, V.half + 0.4, 0.01, (V.ch ?? 0.62) * 1.4);
+    block(bag, F, Mm.trim, s - V.endT / 2 - 0.2, s + V.endT / 2 + 0.2, -V.half - 0.6, V.half + 0.6, yTop(s) - 0.9, yTop(s) - 0.35);
+    for (const sg of [-1, 1]) block(bag, F, Mm.wall, s - V.endT / 2, s + V.endT / 2, sg > 0 ? V.half - 0.3 : -V.half - 0.1, sg > 0 ? V.half + 0.1 : -V.half + 0.3, yTop(s) - 0.35, y(s) + (V.parapet ?? 1.0) + 0.3);
+  }
+  for (const [sStart, dir] of [[e0, -1], [e1, 1]]) {
+    const { piers, end } = layoutBays(F, rec, V, sStart, dir, yTop);
+    if (piers.length >= 2) viaduct(bag, F, Mm, piers, y, spec);
+    // past the last arch: plain bents while the deck is still too high for a wall, then the abutment wall to the bank
+    let s = end + dir * (V.pier / 2), sW = s;
+    while (sW > 1 && sW < F.L - 1 && y(sW) - ground(sW) > (V.wallMax ?? 16)) sW += dir * 2;
+    const lo = Math.min(s, sW), hi = Math.max(s, sW);
+    if (hi - lo > 2) runs.push([lo, hi]);
+    let sE = sW;
+    while (sE > 0.5 && sE < F.L - 0.5 && y(sE) - ground(sE) > 0.6) sE += dir * 2;
+    abutWall(bag, F, Mm, Math.min(sW, sE), Math.max(sW, sE), y, spec);
+  }
+  return runs;
 }
 
 // a through arch (the Bayonne Bridge): two trussed ribs rising over the deck from abutments at the shores, the deck hung
@@ -121,8 +169,14 @@ export function buildThroughArch(rec, bag, S) {
 const deck = (o) => (rec, bag) => buildDeckArch(rec, bag, o);
 export const buildHenryHudson = deck({ steel: 0x9aacb6, steelD: 0x7d8e98, width: 19.5, lanes: 2, ribs: [-7.5, 7.5], ribW: 1.6, ribD: 3.4, springY: 5, crownGap: 1.2, deckDepth: 2.4, upper: 7.6, bay: 30 });
 export const buildHamilton = deck({ steel: 0x7d918a, steelD: 0x64776f, width: 28.0, lanes: 3, ribs: [-11, -3.7, 3.7, 11], ribW: 1.4, ribD: 3.0, springY: 4, crownGap: 1.0, deckDepth: 2.6, bay: 28 });
-export const buildWashington = deck({ steel: 0x7c7f7d, steelD: 0x636664, width: 25.0, lanes: 3, ribs: [-11.5, -6.9, -2.3, 2.3, 6.9, 11.5], ribW: 1.0, ribD: 3.0, springY: 6, crownGap: 1.0, deckDepth: 2.2, masonry: true, bay: 20 });
-export const buildHighBridge = deck({ steel: 0xc0c4c4, steelD: 0x9ea2a2, width: 7.0, lanes: 1, ribs: [-2.6, 2.6], ribW: 1.0, ribD: 2.6, springY: 6, crownGap: 0.8, deckDepth: 1.8, masonry: true, bay: 24 });
+// the Washington Bridge (1888): two 510 ft (155 m) steel arches of six ribs on granite piers, granite approach arches
+export const buildWashington = deck({ steel: 0x7c7f7d, steelD: 0x636664, width: 25.0, lanes: 3, ribs: [-11.5, -6.9, -2.3, 2.3, 6.9, 11.5], ribW: 1.0, ribD: 3.0, springY: 6, crownGap: 1.0, deckDepth: 2.2, masonry: true, bay: 20,
+  viaduct: { spans: [18.3], pier: 3.8, endT: 9.0, half: 13.0, cover: 2.4, ch: 0.66, wallHex: 0x8d8981, trimHex: 0x9f9b92, ringHex: 0x96928a, vaultHex: 0x7e7a72, parapet: 1.1, max: 8 } });
+// the High Bridge: the 1928 steel arch (450 ft, 137 m) over the river between the 1848 granite piers, the remaining masonry
+// arches on the banks (80 ft spans by the river, 50 ft beyond; ten in all), a brick walkway between iron rails
+export const buildHighBridge = deck({ steel: 0xb2b4ae, steelD: 0x8c8f8a, width: 7.0, lanes: 1, ribs: [-2.6, 2.6], ribW: 1.0, ribD: 2.6, springY: 6, crownGap: 0.8, deckDepth: 1.8, masonry: true, bay: 24,
+  walk: true, paveHex: 0x8f6656,
+  viaduct: { spans: [24.4, 15.2], nMain: 3, pier: 4.6, endT: 7.0, half: 4.3, cover: 2.0, ch: 0.62, wallHex: 0x8a8276, trimHex: 0x9c958a, ringHex: 0x938c80, vaultHex: 0x7a746a, parapet: 1.0, max: 10 } });
 // the Bayonne Bridge (Othmar Ammann, 1931; the roadway raised 2019): a steel two-hinged through arch of 1,675 ft
 // (510.5 m), its top 325 ft (99 m) over the Kill van Kull, two trussed ribs 74 ft apart, deeper at the skewbacks than at
 // the crown; grey paint

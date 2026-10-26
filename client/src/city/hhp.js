@@ -359,24 +359,116 @@ function blendEnd(c, k, dy, len = 30) {
 }
 
 // ---------------------------------------------------------------- the surface
+// (PERF: the 16 m cell's station segments, cut down to those that can answer a point in its 2 m sub-cell at all: a point
+// is a segment's hit only within its paved width plus the margin of its line (hhpHits), or a station's within 1.5 m along
+// and that width across (hitsWide); a segment farther than that bound from the sub-cell is left out of its list. The lists
+// keep the cell's order, so every caller sees the same hits in the same order. Built on first use, per bound of the margin
+// (3 m, 8 m); a larger margin reads the whole cell.)
+const FINE = 2, FINE_M = [3, 8], FINE_L = [new Map(), new Map(), new Map(), new Map()];
+let SEG_R = null;   // per [chain][segment]: [hits reach at margin 0, its growth per metre of margin, station reach (hypot 1.5, W)]
+function segReach() {
+  segTerms();
+  SEG_R = HHP_CH.map((c) => {
+    const R = new Float64Array(Math.max(0, c.n - 1) * 3);
+    for (let i = 0; i + 1 < c.n; i++) {
+      const dx = c.X[i + 1] - c.X[i], dz = c.Z[i + 1] - c.Z[i], dl = Math.hypot(dx, dz);
+      const W = Math.max(Math.abs(c.WL[i]), Math.abs(c.WR[i]), Math.abs(c.WL[i + 1]), Math.abs(c.WR[i + 1]));
+      // (the offset o is the distance across the segment times the cosine of its line's normal to the segment's)
+      const px = dl > 0 ? -dz / dl : 0, pz = dl > 0 ? dx / dl : 0;
+      const g0 = px * c.NX[i] + pz * c.NZ[i], g1 = px * c.NX[i + 1] + pz * c.NZ[i + 1];
+      const nm = Math.max(Math.hypot(c.NX[i], c.NZ[i]), Math.hypot(c.NX[i + 1], c.NZ[i + 1]));
+      const k = dl > 1e-3 && g0 * g1 > 0 ? Math.min(Math.abs(g0), Math.abs(g1)) / (nm * 1.0001) : 0;
+      if (k < 0.05) { R[3 * i] = Infinity; R[3 * i + 1] = 0; }
+      else { R[3 * i] = 0.02 * dl + (W + 0.02 * dl) / k + 0.01; R[3 * i + 1] = 1 / k; }
+      R[3 * i + 2] = Math.hypot(1.5, Math.max(Math.abs(c.WL[i]), Math.abs(c.WR[i]))) * 1.0001 + 0.01;   // (+ the margin, below)
+    }
+    return R;
+  });
+}
+const FINE_LAST = [NaN, null, NaN, null, NaN, null, NaN, null];   // (per list: the last sub-cell asked and its list)
+function fineList(x, z, margin, wide) {
+  if (!GRID.size) return undefined;   // (not loaded yet: nothing cached)
+  if (!SEG_R) segReach();
+  const m = margin <= FINE_M[0] ? 0 : margin <= FINE_M[1] ? 1 : -1;
+  if (m < 0) return GRID.get(Math.floor(x / CELL) * 100003 + Math.floor(z / CELL));
+  const fx = Math.floor(x / FINE), fz = Math.floor(z / FINE), key = (fx + 50000) * 100000 + (fz + 50000), li = 2 * m + (wide ? 1 : 0);
+  if (FINE_LAST[2 * li] === key) return FINE_LAST[2 * li + 1];
+  const C = FINE_L[li];
+  let F = C.get(key);
+  if (F === undefined) { F = fineBuild(x, z, fx, fz, m, wide); C.set(key, F); }
+  FINE_LAST[2 * li] = key; FINE_LAST[2 * li + 1] = F;
+  return F;
+}
+// (no hhpHits and no hitsWide hits at (x, z) for any margin up to M, FINE_M[0] or FINE_M[1]: both its lists are empty)
+function fineEmpty(x, z, M) {
+  const F = fineList(x, z, M, false);
+  if (F && F.length) return false;
+  const W = fineList(x, z, M, true);
+  return !(W && W.length);
+}
+function fineBuild(x, z, fx, fz, m, wide) {
+  const L = GRID.get(Math.floor(x / CELL) * 100003 + Math.floor(z / CELL));
+  if (!L) return null;
+  let F;
+  const M = FINE_M[m], bx0 = fx * FINE, bx1 = bx0 + FINE, bz0 = fz * FINE, bz1 = bz0 + FINE;
+  F = [];
+  for (let k = 0; k < L.length; k += 2) {
+    const ci = L[k], i = L[k + 1], c = HHP_CH[ci], R = SEG_R[ci];
+    let r, x0, x1, z0, z1;
+    if (wide) { r = R[3 * i + 2] + M; x0 = x1 = c.X[i]; z0 = z1 = c.Z[i]; }
+    else { r = R[3 * i] + M * R[3 * i + 1]; x0 = Math.min(c.X[i], c.X[i + 1]); x1 = Math.max(c.X[i], c.X[i + 1]); z0 = Math.min(c.Z[i], c.Z[i + 1]); z1 = Math.max(c.Z[i], c.Z[i + 1]); }
+    if (x1 + r < bx0 || x0 - r > bx1 || z1 + r < bz0 || z0 - r > bz1) continue;
+    // (and along its own axis: the sub-cell's corners all before or past the reach along the line)
+    const ax = c.X[i], az = c.Z[i];
+    let ux, uz, a0, a1;
+    if (wide) { ux = c.TX[i]; uz = c.TZ[i]; a0 = -1.5; a1 = 1.5; }
+    else { const dx = c.X[i + 1] - ax, dz = c.Z[i + 1] - az, dl = Math.hypot(dx, dz); if (!(dl > 1e-3)) { F.push(ci, i); continue; } ux = dx / dl; uz = dz / dl; a0 = -0.02 * dl; a1 = 1.02 * dl; }
+    const p00 = (bx0 - ax) * ux + (bz0 - az) * uz, p10 = (bx1 - ax) * ux + (bz0 - az) * uz, p01 = (bx0 - ax) * ux + (bz1 - az) * uz, p11 = (bx1 - ax) * ux + (bz1 - az) * uz;
+    if (Math.max(p00, p10, p01, p11) < a0 * 1.0001 - 0.01 || Math.min(p00, p10, p01, p11) > a1 * 1.0001 + 0.01) continue;
+    F.push(ci, i);
+  }
+  return F;
+}
 // the paving at (x, z): every chain whose paved width covers the point; the one nearest yHint (or the highest) wins.
 // Returns { c, i, t, o, y } (station segment i..i+1 at fraction t, offset o right of the centre line) or null
+let H_T = 0, H_O = 0, H_Y = 0, H_TR = 0, H_WL = 0, H_WR = 0;   // (segHit's answer; the widths at the foot, hit or not)
+// (PERF: a segment's plan terms, as segHit takes them from the chain's stations, 13 a segment; the chains' plans are fixed
+// once loaded, their profiles (Y, E) are read live)
+let SEG_T = null;
+function segTerms() {
+  SEG_T = HHP_CH.map((c) => {
+    const T = new Float64Array(Math.max(0, c.n - 1) * 13);
+    for (let i = 0; i + 1 < c.n; i++) {
+      const ax = c.X[i], az = c.Z[i], dx = c.X[i + 1] - ax, dz = c.Z[i + 1] - az, o = 13 * i;
+      T[o] = ax; T[o + 1] = az; T[o + 2] = dx; T[o + 3] = dz; T[o + 4] = dx * dx + dz * dz || 1e-9;
+      T[o + 5] = c.NX[i]; T[o + 6] = c.NX[i + 1] - c.NX[i]; T[o + 7] = c.NZ[i]; T[o + 8] = c.NZ[i + 1] - c.NZ[i];
+      T[o + 9] = c.WL[i]; T[o + 10] = c.WL[i + 1] - c.WL[i]; T[o + 11] = c.WR[i]; T[o + 12] = c.WR[i + 1] - c.WR[i];
+    }
+    return T;
+  });
+}
+function segHit(c, i, x, z, margin, ci) {
+  const T = SEG_T[ci], s = 13 * i;
+  const ax = T[s], az = T[s + 1], dx = T[s + 2], dz = T[s + 3], L2 = T[s + 4];
+  const t = ((x - ax) * dx + (z - az) * dz) / L2;
+  if (t < -0.02 || t > 1.02) return false;
+  const tc = Math.max(0, Math.min(1, t));
+  const nx = T[s + 5] + T[s + 6] * tc, nz = T[s + 7] + T[s + 8] * tc, nl = Math.hypot(nx, nz) || 1;
+  const o = ((x - ax - dx * tc) * nx + (z - az - dz * tc) * nz) / nl;
+  const wl = T[s + 9] + T[s + 10] * tc, wr = T[s + 11] + T[s + 12] * tc;
+  H_WL = wl; H_WR = wr;
+  if (o < -wl - margin || o > wr + margin) return false;
+  H_T = tc; H_O = o; H_TR = t;
+  H_Y = c.Y[i] + (c.Y[i + 1] - c.Y[i]) * tc + (c.E[i] + (c.E[i + 1] - c.E[i]) * tc) * o;
+  return true;
+}
 export function hhpHits(x, z, margin = 0) {
   const out = [];
-  const L = GRID.get(Math.floor(x / CELL) * 100003 + Math.floor(z / CELL));
+  const L = fineList(x, z, margin, false);
   if (!L) return out;
   for (let k = 0; k < L.length; k += 2) {
     const c = HHP_CH[L[k]], i = L[k + 1];
-    const ax = c.X[i], az = c.Z[i], dx = c.X[i + 1] - ax, dz = c.Z[i + 1] - az, L2 = dx * dx + dz * dz || 1e-9;
-    const t = ((x - ax) * dx + (z - az) * dz) / L2;
-    if (t < -0.02 || t > 1.02) continue;
-    const tc = Math.max(0, Math.min(1, t));
-    const nx = c.NX[i] + (c.NX[i + 1] - c.NX[i]) * tc, nz = c.NZ[i] + (c.NZ[i + 1] - c.NZ[i]) * tc, nl = Math.hypot(nx, nz) || 1;
-    const o = ((x - ax - dx * tc) * nx + (z - az - dz * tc) * nz) / nl;
-    const wl = c.WL[i] + (c.WL[i + 1] - c.WL[i]) * tc, wr = c.WR[i] + (c.WR[i + 1] - c.WR[i]) * tc;
-    if (o < -wl - margin || o > wr + margin) continue;
-    const y = c.Y[i] + (c.Y[i + 1] - c.Y[i]) * tc + (c.E[i] + (c.E[i + 1] - c.E[i]) * tc) * o;
-    out.push({ c, i, t: tc, o, y, tr: t });
+    if (segHit(c, i, x, z, margin, L[k])) out.push({ c, i, t: H_T, o: H_O, y: H_Y, tr: H_TR });
   }
   return out;
 }
@@ -449,6 +541,18 @@ function tileRoads(tile, ox, oz) {
     out.push({ ...r, pts, _idx: k++ });
   }
   return out;
+}
+// (PERF: is (x, z) more than lim plus 1 cm off the road line's box on an axis, so farther than lim from the line?)
+const ROAD_BOX = new WeakMap();
+function roadFar(r, x, z, lim) {
+  let B = ROAD_BOX.get(r);
+  if (!B) {
+    B = [Infinity, -Infinity, Infinity, -Infinity];
+    for (const p of r.pts) { if (!(Number.isFinite(p[0]) && Number.isFinite(p[2]))) { B = null; break; } B[0] = Math.min(B[0], p[0]); B[1] = Math.max(B[1], p[0]); B[2] = Math.min(B[2], p[2]); B[3] = Math.max(B[3], p[2]); }
+    if (B && r.pts.length < 2) B = null;
+    ROAD_BOX.set(r, B || false);
+  }
+  return !!B && lim < Infinity && (x < B[0] - lim - 0.01 || x > B[1] + lim + 0.01 || z < B[2] - lim - 0.01 || z > B[3] + lim + 0.01);
 }
 // distance in plan from (x, z) to a road's line, and its height there (strict: not past the line's ends)
 function nearRoad(r, x, z, strict = false) {
@@ -532,13 +636,13 @@ export function hhpPre(tile, ox, oz, terrTile = false) {
   // 2. the sections: a compiled ground triangle on the paving (or within a kerb's reach of it) is the parkway's when it
   // lies on a cut record's ribbon or at the chain's flat-city height, and on no kept road's ribbon at its height (the
   // streets under the decks, the junctions' own paving)
-  const onKept = (x, z, y) => { for (const r of keptRoads) { if (r.rclass === 5) continue; const [d, ry] = nearRoad(r, x, z, true); if (d < r.width / 2 - 0.2 && Math.abs(ry - y) < 1.0) return true; } return false; };
+  const onKept = (x, z, y) => { for (const r of keptRoads) { if (r.rclass === 5 || roadFar(r, x, z, r.width / 2 - 0.2)) continue; const [d, ry] = nearRoad(r, x, z, true); if (d < r.width / 2 - 0.2 && Math.abs(ry - y) < 1.0) return true; } return false; };
   // inside the paving: anything at the chain's flat-city height (-0.3 .. +0.6 m: the compiled ribbon's edges, the ground
   // fill's slivers, another compiled road laid across it) goes, except a kept road's paving within 25 m of a ramp's
   // compiled end (the junction it meets); and a cut record's ribbon goes at its own height (its raised decks)
   const nearJunction = (h) => h.c.loop || h.c.ends.some((e, k) => e.type === 'compiled' && (k === 0 ? h.c.S[h.i] < 25 : h.c.S[h.c.n - 1] - h.c.S[h.i] < 25));   // (the circle meets its streets all round)
   const onMine = (x, z, y, pad) => {
-    for (const r of mineRoad) { const [d, ry] = nearRoad(r, x, z); if (d < r.width / 2 + pad && Math.abs(ry - y) < 1.6 && !onKept(x, z, y)) return true; }   // (its end caps too: the junction mouths' paving)
+    for (const r of mineRoad) { if (roadFar(r, x, z, r.width / 2 + pad)) continue; const [d, ry] = nearRoad(r, x, z); if (d < r.width / 2 + pad && Math.abs(ry - y) < 1.6 && !onKept(x, z, y)) return true; }   // (its end caps too: the junction mouths' paving)
     // the replaced segments' compiled ribbons and cut trenches (walls 0.25 m off the edges, a kerb strip): within 1.5 m of
     // their CSCL lines' edges, at any compiled height, unless a kept road's paving lies there at that height
     // (a ramp's trench anywhere; the parkway's own ribbon not under its decks, where the ground stays)
@@ -1415,20 +1519,27 @@ function blendGround(tile, ox, oz) {
   let B0 = tile.S.terrP1;
   if (B0 && B0.length >= 9) {
     // (not past a chain's first or last station: its paving is drawn to there and no further)
-    const under = (x, z, y) => hhpHits(x, z, -0.02).some((h) => y > h.y - 2.0 && y < h.y + 0.6 && !(h.i === 0 && h.tr < 0) && !(h.i === h.c.n - 2 && h.tr > 1));
+    const under = (x, z, y) => {
+      const L = fineList(x, z, -0.02, false);
+      if (L) for (let k = 0; k < L.length; k += 2) {
+        const c = HHP_CH[L[k]], i = L[k + 1];
+        if (segHit(c, i, x, z, -0.02, L[k]) && y > H_Y - 2.0 && y < H_Y + 0.6 && !(i === 0 && H_TR < 0) && !(i === c.n - 2 && H_TR > 1)) return true;
+      }
+      return false;
+    };
     // (a triangle touching the paving is split to 1 m first: a narrow gap between two pavings, the strip between the
     // carriageways or a gore, keeps its ground instead of going with a triangle whose corners all lie on paving)
     const fine = [];
-    const sub = (P, d) => {
+    const sub = (P, d, uv0 = null) => {   // (uv0: the corners' answers, known to a piece from its parent's)
       const e = Math.max(Math.hypot(P[0][0] - P[1][0], P[0][2] - P[1][2]), Math.hypot(P[1][0] - P[2][0], P[1][2] - P[2][2]), Math.hypot(P[2][0] - P[0][0], P[2][2] - P[0][2]));
-      const uv = P.map((p) => under(p[0] + ox, p[2] + oz, p[1]));
+      const uv = uv0 || P.map((p) => under(p[0] + ox, p[2] + oz, p[1]));
       const mids = [[0, 1], [1, 2], [2, 0]].map(([a2, b2]) => [(P[a2][0] + P[b2][0]) / 2, (P[a2][1] + P[b2][1]) / 2, (P[a2][2] + P[b2][2]) / 2]).concat([[(P[0][0] + P[1][0] + P[2][0]) / 3, (P[0][1] + P[1][1] + P[2][1]) / 3, (P[0][2] + P[1][2] + P[2][2]) / 3]]);
       const mu = mids.map((p) => under(p[0] + ox, p[2] + oz, p[1]));
       const straddle = (uv.some(Boolean) && !uv.every(Boolean)) || (uv.every(Boolean) && mu.some((v) => !v)) || (!uv.some(Boolean) && mu.some(Boolean));   // (or across a gap between two pavings, or a paving's tip in it)
       if (d < 9 && ((e > 1.0 && (uv.some(Boolean) || mu.some(Boolean))) || (straddle && e > 0.3))) {   // (an edge's pieces to 0.3 m: a corner of paving cuts no ground off past it)
         const m = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
         const ab = m(P[0], P[1]), bc = m(P[1], P[2]), ca = m(P[2], P[0]);
-        sub([P[0], ab, ca], d + 1); sub([ab, P[1], bc], d + 1); sub([ca, bc, P[2]], d + 1); sub([ab, bc, ca], d + 1);
+        sub([P[0], ab, ca], d + 1, [uv[0], mu[0], mu[2]]); sub([ab, P[1], bc], d + 1, [mu[0], uv[1], mu[1]]); sub([ca, bc, P[2]], d + 1, [mu[2], mu[1], uv[2]]); sub([ab, bc, ca], d + 1, [mu[0], mu[1], mu[2]]);
         return;
       }
       for (const p of P) fine.push(p[0], p[1], p[2]);
@@ -1459,6 +1570,7 @@ function blendGround(tile, ox, oz) {
       const x = b[k] + ox, z = b[k + 2] + oz, y = b[k + 1];
       const md = name === 'terrP1' ? hhpMedianAt(x, z) : null;
       if (md && y > md.y - 0.15 && y < md.y + 1.5) { if (!out) out = Float32Array.from(b); out[k + 1] = md.y - 0.15; n++; continue; }
+      if (fineEmpty(x, z, 3)) continue;   // (PERF: no segment within reach at a margin to 3 m: none of the hits below)
       if (name === 'terrP1') {
         // under any paving (decks too): 0.15 m under it; in its first 0.6 m outside an edge: under the edge's skirt
         const hin = hhpHits(x, z, -0.05).filter((h) => y > h.y - 0.15 && y < h.y + 1.5)[0];
@@ -1497,7 +1609,7 @@ function blendGround(tile, ox, oz) {
 // hhpHits, and outside a bend (a point past both neighbouring segments' ends) the nearest station's own section
 function hitsWide(x, z, margin) {
   const hs = hhpHits(x, z, margin);
-  const L = GRID.get(Math.floor(x / CELL) * 100003 + Math.floor(z / CELL));
+  const L = fineList(x, z, margin, true);
   if (!L) return hs;
   for (let k = 0; k < L.length; k += 2) {
     const c = HHP_CH[L[k]], j = L[k + 1];
@@ -1508,6 +1620,54 @@ function hitsWide(x, z, margin) {
   }
   return hs;
 }
+// (PERF: hitsWide(x, z, margin).some(h => y in (h.y + lo, h.y + hi)), without building the hits)
+const WIDE_SEEN = [];
+function wideAnyY(x, z, margin, y, lo, hi) {
+  const F = fineList(x, z, margin, false);
+  WIDE_SEEN.length = 0;
+  if (F) for (let k = 0; k < F.length; k += 2) {
+    const c = HHP_CH[F[k]];
+    if (!segHit(c, F[k + 1], x, z, margin, F[k])) continue;
+    if (y > H_Y + lo && y < H_Y + hi) return true;
+    WIDE_SEEN.push(c);
+  }
+  const L = fineList(x, z, margin, true);
+  if (!L) return false;
+  for (let k = 0; k < L.length; k += 2) {
+    const c = HHP_CH[L[k]], j = L[k + 1];
+    if (WIDE_SEEN.includes(c)) continue;
+    const dx = x - c.X[j], dz = z - c.Z[j], o = dx * c.NX[j] + dz * c.NZ[j], along = dx * c.TX[j] + dz * c.TZ[j];
+    if (Math.abs(along) > 1.5 || o < -c.WL[j] - margin || o > c.WR[j] + margin) continue;
+    const yh = c.Y[j] + c.E[j] * o;
+    if (y > yh + lo && y < yh + hi) return true;
+    WIDE_SEEN.push(c);   // (hitsWide takes one station of a chain)
+  }
+  return false;
+}
+// (PERF: hitsWide(x, z, m) for several margins m <= 8 from one scan: a segment's foot, offset and widths do not depend on the
+// margin, the 8 m lists hold every segment and station a smaller margin can hit, in the same order)
+const W3_O = [], W3_WL = [], W3_WR = [], W3_H = [];
+function hitsWideEach(x, z, ms) {
+  const F = fineList(x, z, 8, false), L = fineList(x, z, 8, true);
+  W3_H.length = 0; W3_O.length = 0; W3_WL.length = 0; W3_WR.length = 0;
+  if (F) for (let k = 0; k < F.length; k += 2) {
+    const c = HHP_CH[F[k]], i = F[k + 1];
+    if (segHit(c, i, x, z, 8, F[k])) { W3_H.push({ c, i, t: H_T, o: H_O, y: H_Y, tr: H_TR }); W3_WL.push(H_WL); W3_WR.push(H_WR); }
+  }
+  return ms.map((margin) => {
+    const hs = [];
+    for (let q = 0; q < W3_H.length; q++) { const o = W3_H[q].o; if (!(o < -W3_WL[q] - margin || o > W3_WR[q] + margin)) hs.push(W3_H[q]); }   // (the margins share the hit records: read only)
+    if (!L) return hs;
+    for (let k = 0; k < L.length; k += 2) {
+      const c = HHP_CH[L[k]], j = L[k + 1];
+      if (hs.some((h) => h.c === c)) continue;
+      const dx = x - c.X[j], dz = z - c.Z[j], o = dx * c.NX[j] + dz * c.NZ[j], along = dx * c.TX[j] + dz * c.TZ[j];
+      if (Math.abs(along) > 1.5 || o < -c.WL[j] - margin || o > c.WR[j] + margin) continue;
+      hs.push({ c, i: Math.min(j, c.n - 2), t: 0, o, y: c.Y[j] + c.E[j] * o });
+    }
+    return hs;
+  });
+}
 function clampCorridor(tile, ox, oz) {
   let n = 0;
   // (a large ground triangle reaching over the band, its corners all outside it: split to 2 m first, so the band's lines
@@ -1515,19 +1675,21 @@ function clampCorridor(tile, ox, oz) {
   for (const name of HA_GROUND.concat(['terrP1'])) {
     const b = tile.S[name];
     if (!b || b.length < 9) continue;
-    const near = (x, z, y) => hitsWide(x + ox, z + oz, 3.0).some((h) => y > h.y - 3 && y < h.y + 15);
+    const near = (x, z, y) => wideAnyY(x + ox, z + oz, 3.0, y, -3, 15);
     const outA = [];
     let any = 0;
-    const sub = (P, d) => {
+    const band = (p) => wideAnyY(p[0] + ox, p[2] + oz, 1.5, p[1], -3, 15);
+    const sub = (P, d, bv0 = null) => {   // (bv0: the corners' answers, taken once in the parent)
       const e = Math.max(Math.hypot(P[0][0] - P[1][0], P[0][2] - P[1][2]), Math.hypot(P[1][0] - P[2][0], P[1][2] - P[2][2]), Math.hypot(P[2][0] - P[0][0], P[2][2] - P[0][2]));
-      const bandV = P.map((p) => hitsWide(p[0] + ox, p[2] + oz, 1.5).some((h) => p[1] > h.y - 3 && p[1] < h.y + 15));
+      const bandV = bv0 || P.map(band);
       const strad = bandV.some(Boolean) && !bandV.every(Boolean);
       if (d < 9 && (e > 2.0 || (strad && e > 0.3))) {   // (a piece across the band's line to 0.3 m: no edge crosses it twice)
         const m = (a, c) => [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2, (a[2] + c[2]) / 2];
         const ab = m(P[0], P[1]), bc = m(P[1], P[2]), ca = m(P[2], P[0]), ce = [(P[0][0] + P[1][0] + P[2][0]) / 3, (P[0][1] + P[1][1] + P[2][1]) / 3, (P[0][2] + P[1][2] + P[2][2]) / 3];
         if (strad || [...P, ab, bc, ca, ce].some((p) => near(p[0], p[2], p[1]))) {
           any++;
-          sub([P[0], ab, ca], d + 1); sub([ab, P[1], bc], d + 1); sub([ca, bc, P[2]], d + 1); sub([ab, bc, ca], d + 1);
+          const vab = band(ab), vbc = band(bc), vca = band(ca);
+          sub([P[0], ab, ca], d + 1, [bandV[0], vab, vca]); sub([ab, P[1], bc], d + 1, [vab, bandV[1], vbc]); sub([ca, bc, P[2]], d + 1, [vca, vbc, bandV[2]]); sub([ab, bc, ca], d + 1, [vab, vbc, vca]);
           return;
         }
       }
@@ -1542,16 +1704,17 @@ function clampCorridor(tile, ox, oz) {
   }
   // (a triangle crossing the band's outer line is split on it first, so the clamp below is exact inside the band)
   for (const MB of [1.5, 0.8]) {   // (split on the band's line, then on the flat verge's)
-  const inBand = (x, z, y) => hitsWide(x, z, MB).some((h) => y > h.y - 3 && y < h.y + 15);
+  const inBand = (x, z, y) => wideAnyY(x, z, MB, y, -3, 15);
   for (const name of HA_GROUND.concat(['terrP1'])) {
     const b = tile.S[name];
     if (!b || b.length < 9) continue;
     const pieces = [];
     let split = 0;
     for (let i = 0; i + 8 < b.length; i += 9) {
+      const i0 = inBand(b[i] + ox, b[i + 2] + oz, b[i + 1]), i1 = inBand(b[i + 3] + ox, b[i + 5] + oz, b[i + 4]), i2 = inBand(b[i + 6] + ox, b[i + 8] + oz, b[i + 7]);
+      if (i0 === i1 && i1 === i2) { for (let k = 0; k < 9; k++) pieces.push(b[i + k]); continue; }   // (PERF: corners first, no arrays)
       const P = [0, 1, 2].map((k) => [b[i + k * 3] + ox, b[i + k * 3 + 1], b[i + k * 3 + 2] + oz]);
-      const ins = P.map((p) => inBand(p[0], p[2], p[1]));
-      if (ins.every(Boolean) || !ins.some(Boolean)) { for (let k = 0; k < 9; k++) pieces.push(b[i + k]); continue; }
+      const ins = [i0, i1, i2];
       split++;
       for (const want of [true, false]) {
         const poly = [];
@@ -1578,12 +1741,14 @@ function clampCorridor(tile, ox, oz) {
     for (let k = 0; k + 2 < b.length; k += 3) {
       const x = b[k] + ox, z = b[k + 2] + oz, y = b[k + 1];
       let lim = Infinity;
+      if (fineEmpty(x, z, 8)) continue;   // (PERF: no segment or station within reach at a margin to 8 m: no hits below, no limit)
       // (a deck point over another covered drive (the paired carriageway beside, under the same deck) is that drive's
       // roof, not ground beside this one's edge)
-      const overDrive = hitsWide(x, z, 0.3).some((o) => y > o.y + 2.5 && Math.abs(o.o) <= (o.o > 0 ? o.c.WR[o.i] : o.c.WL[o.i]) + 0.3 && o.c.structs.some((q) => q.kind === 'under' && o.i >= q.i0 - 8 && o.i <= q.i1 + 8));
+      const [w03, w6, w15] = hitsWideEach(x, z, [0.3, 6, 1.5]);
+      const overDrive = w03.some((o) => y > o.y + 2.5 && Math.abs(o.o) <= (o.o > 0 ? o.c.WR[o.i] : o.c.WL[o.i]) + 0.3 && o.c.structs.some((q) => q.kind === 'under' && o.i >= q.i0 - 8 && o.i <= q.i1 + 8));
       // (beside a covered drive's open deck edge (the deck 3 m+ up, the ground outside under the deck's level): the
       // ground held at the drive's edge level for 6 m, the kit's edge wall rising from it to the deck's coping)
-      if (!overDrive) for (const h of hitsWide(x, z, 6)) {
+      if (!overDrive) for (const h of w6) {
         const w = h.o > 0 ? h.c.WR[h.i] : h.c.WL[h.i], d = Math.abs(h.o) - w;
         if (d <= 0.3 || y < h.y - 3 || y > h.y + 15) continue;
         const r = deckRelAt(h.c, h.i);
@@ -1597,7 +1762,7 @@ function clampCorridor(tile, ox, oz) {
         const between = hitsWide(x, z, 12).some((o) => o.c !== h.c && Math.abs(o.y - h.y) < 1.5 && Math.abs(o.o) > (o.o > 0 ? o.c.WR[o.i] : o.c.WL[o.i]));
         if (g === null || g < h.c.Y[h.i] + r - 2 || between) lim = Math.min(lim, h.y + h.c.E[h.i] * (sg * w - h.o) - 0.05);
       }
-      if (!overDrive) for (const h of hitsWide(x, z, 1.5)) {
+      if (!overDrive) for (const h of w15) {
         if (y < h.y - 3 || y > h.y + 15 || (y > h.y + 6 && h.c.structs.some((q) => q.kind === 'cover' && h.i >= q.i0 && h.i <= q.i1)) || (y > h.y + 2.5 && Math.abs(h.o) <= (h.o > 0 ? h.c.WR[h.i] : h.c.WL[h.i]) + 0.3 && h.c.structs.some((q) => q.kind === 'under' && h.i >= q.i0 - 8 && h.i <= q.i1 + 8))) continue;   // (over the drive only: beside it the deck's edge is the kit's wall, the ground there keeps the rule)   // (the covered drive: the park deck over it stays)   // (a cut 15 m deep at most; a cover's deck over it keeps its ground)
         const w = h.o > 0 ? h.c.WR[h.i] : h.c.WL[h.i], d = Math.abs(h.o) - w;
         const yE = h.y + h.c.E[h.i] * (Math.sign(h.o || 1) * w - h.o);   // (the edge's level at this point along the chain, not at the station)

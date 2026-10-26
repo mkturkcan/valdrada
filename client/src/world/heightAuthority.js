@@ -86,12 +86,15 @@ let MAN = null, SG = null, initP = null, REGION = null, RBOX = null, REGIONS = n
 const CH = new Map();        // 'tx_tz' -> chunk, or false (no data for that tile)
 const LOADING = new Map();
 
+// (five boroughs: `?terrainData=<dir under data/>` / TERRAIN_P1_DIR picks another product set, e.g. the merged city set;
+// regions, S and chunks are read from its manifest whatever their number)
+const DATA_NAME = (() => { try { const v = typeof location !== 'undefined' && location.search && new URLSearchParams(location.search).get('terrainData'); return v && /^[\w.-]+$/.test(v) ? v : 'terrain_p1'; } catch { return 'terrain_p1'; } })();
 const dataDir = () => (isNode ? (process.env.TERRAIN_P1_DIR || decodeURIComponent(new URL('../../public/data/terrain_p1/', import.meta.url).pathname)) : null);
 async function readBuf(name) {
   if (!isNode) {
-    const base = (typeof location !== 'undefined' ? new URL('data/terrain_p1/', location.href.replace(/[?#].*$/, '').replace(/[^/]*$/, '')).href : '/data/terrain_p1/');
+    const base = (typeof location !== 'undefined' ? new URL(`data/${DATA_NAME}/`, location.href.replace(/[?#].*$/, '').replace(/[^/]*$/, '')).href : `/data/${DATA_NAME}/`);
     const r = await fetch(base + name);
-    if (!r.ok) throw new Error(`terrain_p1 ${name}: ${r.status}`);
+    if (!r.ok) throw new Error(`${DATA_NAME} ${name}: ${r.status}`);
     return r.arrayBuffer();
   }
   const spec = 'node:fs/promises';
@@ -100,12 +103,23 @@ async function readBuf(name) {
   return b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength);
 }
 
+let FAR = null;
+// the far city's relief at (x, z) (m over the flat compile; 0 off the grid), or null without the data (the macros stay flat)
+export function haFarRelief(x, z) {
+  if (!FAR) return null;
+  const u = (x - FAR.x0) / FAR.step, w = (z - FAR.z0) / FAR.step, i = Math.floor(u), j = Math.floor(w);
+  if (i < 0 || j < 0 || i >= FAR.nx - 1 || j >= FAR.nz - 1) return 0;
+  const a = u - i, b = w - j, v = FAR.v, n = FAR.nx;
+  return (v[j * n + i] * (1 - a) + v[j * n + i + 1] * a) * (1 - b) + (v[(j + 1) * n + i] * (1 - a) + v[(j + 1) * n + i + 1] * a) * b;
+}
+
 export function haInit() {
   if (!FLAG) return Promise.resolve(false);
   if (!initP) {
     initP = (async () => {
       MAN = JSON.parse(new TextDecoder().decode(await readBuf('manifest.json')));
-      // P1B: several regions (an island each: Manhattan with Marble Hill, Roosevelt, Randall's/Wards, Governors)
+      // P1B: several regions (an island each: Manhattan with Marble Hill, Roosevelt, Randall's/Wards, Governors); five
+      // boroughs: the city's land parts and the soft edges past the Westchester and Nassau limits (boro_merge.py)
       REGIONS = (MAN.regions || [MAN.region]).map((ring) => {
         const b = [1e9, 1e9, -1e9, -1e9];
         for (const [x, z] of ring) { b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], z); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], z); }
@@ -114,6 +128,8 @@ export function haInit() {
       REGION = REGIONS[0].ring;
       RBOX = [1e9, 1e9, -1e9, -1e9];
       for (const { b } of REGIONS) { RBOX[0] = Math.min(RBOX[0], b[0]); RBOX[1] = Math.min(RBOX[1], b[1]); RBOX[2] = Math.max(RBOX[2], b[2]); RBOX[3] = Math.max(RBOX[3], b[3]); }
+      // five boroughs: the far city's relief (32 m nodes, int16 cm; boro_far.py), for the macro tiles past the near ring
+      try { const f = MAN.farRelief; if (f) { const fb = await readBuf(f.f); FAR = { ...f, v: Float32Array.from(new Int16Array(fb), (q) => q / 100) }; } } catch { FAR = null; }
       const s = MAN.S, sb = await readBuf(s.f);
       SG = { ...s, v: s.type === 'i16mm' ? Float32Array.from(new Int16Array(sb), (q) => q / 1000) : new Float32Array(sb) };
       for (const t of MAN.tiles) if (!t.nRegion) CH.set(`${t.tx}_${t.tz}`, false);
@@ -137,27 +153,42 @@ function parseChunk(buf, tx, tz) {
   const tri = new Uint32Array(buf, o, 3 * nT); o += 12 * nT;
   const rel = new Float32Array(buf, o, 3 * nT); o += 12 * nT;
   const tag = new Uint8Array(buf, o, nT);
-  // 4 m buckets over the tile square (CSR)
-  const ox = tx * TILE - MARGIN, oz = tz * TILE - MARGIN, cnt = new Uint32Array(NB * NB + 1);
-  const range = (t) => {
-    const a = tri[3 * t], b = tri[3 * t + 1], c = tri[3 * t + 2];
-    const i0 = Math.max(0, Math.floor((Math.min(x[a], x[b], x[c]) - ox) / BK)), i1 = Math.min(NB - 1, Math.floor((Math.max(x[a], x[b], x[c]) - ox) / BK));
-    const j0 = Math.max(0, Math.floor((Math.min(z[a], z[b], z[c]) - oz) / BK)), j1 = Math.min(NB - 1, Math.floor((Math.max(z[a], z[b], z[c]) - oz) / BK));
-    return [i0, i1, j0, j1];
+  // 4 m buckets over the tile square (CSR; PERF: built on the first read of off or list, a chunk loaded round a bridge's
+  // deck may never be asked)
+  const ox = tx * TILE - MARGIN, oz = tz * TILE - MARGIN;
+  const buckets = () => {
+    const cnt = new Uint32Array(NB * NB + 1);
+    const range = (t) => {
+      const a = tri[3 * t], b = tri[3 * t + 1], c = tri[3 * t + 2];
+      const i0 = Math.max(0, Math.floor((Math.min(x[a], x[b], x[c]) - ox) / BK)), i1 = Math.min(NB - 1, Math.floor((Math.max(x[a], x[b], x[c]) - ox) / BK));
+      const j0 = Math.max(0, Math.floor((Math.min(z[a], z[b], z[c]) - oz) / BK)), j1 = Math.min(NB - 1, Math.floor((Math.max(z[a], z[b], z[c]) - oz) / BK));
+      return [i0, i1, j0, j1];
+    };
+    const RG = new Int32Array(4 * nT);   // (each triangle's bucket range, taken once for both passes)
+    for (let t = 0; t < nT; t++) { const [i0, i1, j0, j1] = range(t); RG[4 * t] = i0; RG[4 * t + 1] = i1; RG[4 * t + 2] = j0; RG[4 * t + 3] = j1; for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) cnt[j * NB + i + 1]++; }
+    for (let k = 0; k < NB * NB; k++) cnt[k + 1] += cnt[k];
+    const fill = cnt.slice(0, NB * NB), list = new Uint32Array(cnt[NB * NB]);
+    for (let t = 0; t < nT; t++) { const i0 = RG[4 * t], i1 = RG[4 * t + 1], j0 = RG[4 * t + 2], j1 = RG[4 * t + 3]; for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) list[fill[j * NB + i]++] = t; }
+    return [cnt, list];
   };
-  for (let t = 0; t < nT; t++) { const [i0, i1, j0, j1] = range(t); for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) cnt[j * NB + i + 1]++; }
-  for (let k = 0; k < NB * NB; k++) cnt[k + 1] += cnt[k];
-  const fill = cnt.slice(0, NB * NB), list = new Uint32Array(cnt[NB * NB]);
-  for (let t = 0; t < nT; t++) { const [i0, i1, j0, j1] = range(t); for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) list[fill[j * NB + i]++] = t; }
-  return { tx, tz, ox, oz, nV, nT, x, z, tri, rel, tag, off: cnt, list, stamp: new Uint32Array(nT), sc: 0 };
+  const ch = { tx, tz, ox, oz, nV, nT, x, z, tri, rel, tag, stamp: new Uint32Array(nT), sc: 0 };
+  // (on first read both become plain properties)
+  const built = () => { const [off, list] = buckets(); Object.defineProperty(ch, 'off', { value: off, enumerable: true, writable: true, configurable: true }); Object.defineProperty(ch, 'list', { value: list, enumerable: true, writable: true, configurable: true }); };
+  Object.defineProperty(ch, 'off', { enumerable: true, configurable: true, get: () => { built(); return ch.off; } });
+  Object.defineProperty(ch, 'list', { enumerable: true, configurable: true, get: () => { built(); return ch.list; } });
+  return ch;
 }
 
 // is there region data for this tile? (loads it; false when the flag is off, the data is missing or the tile has none)
-export async function haTileReady(tx, tz) {
+// (chunkOnly: the region's chunk alone, for a reader of its relief (a bridge's deck anchors); the grade's stations and the
+// cover round the tile are a tile's own to load when it is laid, and only its own and its neighbours' are read)
+export async function haTileReady(tx, tz, chunkOnly = false) {
   if (!FLAG || !(await haInit()) || !MAN) return false;
   const k = `${tx}_${tz}`;
-  if (!LOADING.has('g' + k)) LOADING.set('g' + k, gradeLoad(tx, tz).catch(() => null));   // (TERRAIN GRADE: its stations, the cover)
-  await LOADING.get('g' + k);
+  if (!chunkOnly) {
+    if (!LOADING.has('g' + k)) LOADING.set('g' + k, gradeLoad(tx, tz).catch(() => null));   // (TERRAIN GRADE: its stations, the cover)
+    await LOADING.get('g' + k);
+  }
   if (CH.has(k)) return !!CH.get(k);
   const t = MAN.tiles.find((q) => q.tx === tx && q.tz === tz);
   if (!t) { CH.set(k, false); return false; }
@@ -299,11 +330,11 @@ function candidates(ch, x0, z0, x1, z1, out) {
   out.length = 0;
   const i0 = Math.max(0, Math.floor((x0 - ch.ox) / BK)), i1 = Math.min(NB - 1, Math.floor((x1 - ch.ox) / BK));
   const j0 = Math.max(0, Math.floor((z0 - ch.oz) / BK)), j1 = Math.min(NB - 1, Math.floor((z1 - ch.oz) / BK));
-  const st = ++ch.sc;
+  const st = ++ch.sc, off = ch.off, list = ch.list, stamp = ch.stamp;
   for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) {
-    for (let k = ch.off[j * NB + i], e = ch.off[j * NB + i + 1]; k < e; k++) {
-      const t = ch.list[k];
-      if (ch.stamp[t] !== st) { ch.stamp[t] = st; out.push(t); }
+    for (let k = off[j * NB + i], e = off[j * NB + i + 1]; k < e; k++) {
+      const t = list[k];
+      if (stamp[t] !== st) { stamp[t] = st; out.push(t); }
     }
   }
   return out;
@@ -580,12 +611,27 @@ function relPoint(ch, x, z) {
 }
 // an edge's profile over the TIN, by the edge alone (canonical endpoint order): { slit } or { lin } or { dp: [[s, r] ..] }
 // (s from the canonical first endpoint); cached per tile in ctx.edges
+// (PERF: ctx.edges holds the edges by a hash of their four coordinates, each bucket a chain of records compared value for
+// value; the same edges as a "px,pz,qx,qz" string key: equal numbers, 0 and -0 alike, NaN with NaN)
+const EKB = new Float64Array(1), EKU = new Uint32Array(EKB.buffer);
+const ekMix = (h, v) => {
+  if (v !== v) return Math.imul(h ^ 0x7ff80001, 0x9e3779b1);
+  EKB[0] = v + 0;
+  h = Math.imul(h ^ EKU[0], 0x9e3779b1);
+  return Math.imul(h ^ EKU[1], 0x85ebca6b);
+};
+const ekEq = (a, b) => a === b || (a !== a && b !== b);
+function edgeGet(M, h, px, pz, qx, qz) {
+  for (let r = M.get(h); r; r = r.next) if (ekEq(r.px, px) && ekEq(r.pz, pz) && ekEq(r.qx, qx) && ekEq(r.qz, qz)) return r.e;
+  return undefined;
+}
 function edgeInfo(ctx, ax, az, bx, bz) {
   const swap = ax > bx || (ax === bx && az > bz);
   const px = swap ? bx : ax, pz = swap ? bz : az, qx = swap ? ax : bx, qz = swap ? az : bz;
-  const key = `${px},${pz},${qx},${qz}`;
-  let e = ctx.edges.get(key);
+  const key = ekMix(ekMix(ekMix(ekMix(0x811c9dc5, px), pz), qx), qz);
+  let e = edgeGet(ctx.edges, key, px, pz, qx, qz);
   if (e) return { e, swap };
+  const put = (v) => { ctx.edges.set(key, { px, pz, qx, qz, e: v, next: ctx.edges.get(key) }); };
   const { ch, cand } = ctx, { tri, x: X, z: Z } = ch;
   const dx = qx - px, dz = qz - pz;
   candidates(ch, Math.min(px, qx), Math.min(pz, qz), Math.max(px, qx), Math.max(pz, qz), cand);
@@ -594,7 +640,8 @@ function edgeInfo(ctx, ax, az, bx, bz) {
     const a = tri[3 * t], b = tri[3 * t + 1], c = tri[3 * t + 2];
     const sg = Math.sign((X[b] - X[a]) * (Z[c] - Z[a]) - (Z[b] - Z[a]) * (X[c] - X[a])) || 1;
     let s0 = 0, s1 = 1;
-    for (const [u, w] of [[a, b], [b, c], [c, a]]) {
+    for (let k = 0; k < 3; k++) {
+      const u = k === 0 ? a : k === 1 ? b : c, w = k === 0 ? b : k === 1 ? c : a;   // (PERF: the edges (a, b), (b, c), (c, a) without arrays)
       // inside: sg * cross(w - u, p - u) >= 0, linear in s
       const f0 = sg * ((X[w] - X[u]) * (pz - Z[u]) - (Z[w] - Z[u]) * (px - X[u]));
       const f1 = sg * ((X[w] - X[u]) * dz - (Z[w] - Z[u]) * dx);
@@ -608,7 +655,7 @@ function edgeInfo(ctx, ax, az, bx, bz) {
     pr.push(s0, out255 ? 0 : relAt(ch, t, px + dx * s0, pz + dz * s0), s1, out255 ? 0 : relAt(ch, t, px + dx * s1, pz + dz * s1));
   }
   const n = pr.length / 2;
-  if (!n) { e = { lin: true, r0: 0, r1: 0 }; ctx.edges.set(key, e); return { e, swap }; }
+  if (!n) { e = { lin: true, r0: 0, r1: 0 }; put(e); return { e, swap }; }
   const ord = Array.from({ length: n }, (_, k) => k).sort((u, w) => pr[2 * u] - pr[2 * w]);
   const S = [], R = [];
   let slit = false;
@@ -617,11 +664,11 @@ function edgeInfo(ctx, ax, az, bx, bz) {
     if (S.length && s - S[S.length - 1] < 1e-7) { if (Math.abs(r - R[R.length - 1]) > 1e-3) slit = true; continue; }
     S.push(s); R.push(r);
   }
-  if (slit || S[0] > 1e-6 || S[S.length - 1] < 1 - 1e-6) { e = { slit: true }; ctx.edges.set(key, e); return { e, swap }; }
+  if (slit || S[0] > 1e-6 || S[S.length - 1] < 1 - 1e-6) { e = { slit: true }; put(e); return { e, swap }; }
   const r0 = R[0], r1 = R[R.length - 1];
   let worst = 0;
   for (let k = 1; k + 1 < S.length; k++) worst = Math.max(worst, Math.abs(R[k] - (r0 + (r1 - r0) * S[k])));
-  if (worst <= (ctx.tau || TAU) + 1e-6) { e = { lin: true, r0, r1 }; ctx.edges.set(key, e); return { e, swap }; }
+  if (worst <= (ctx.tau || TAU) + 1e-6) { e = { lin: true, r0, r1 }; put(e); return { e, swap }; }
   const keep = new Uint8Array(S.length);
   keep[0] = keep[S.length - 1] = 1;
   const stack = [[0, S.length - 1]];
@@ -637,7 +684,7 @@ function edgeInfo(ctx, ax, az, bx, bz) {
   const dp = [];
   for (let k = 1; k + 1 < S.length; k++) if (keep[k] && S[k] > 1e-4 && S[k] < 1 - 1e-4) dp.push([S[k], R[k]]);
   e = dp.length ? { dp, r0, r1, worst } : { lin: true, r0, r1 };
-  ctx.edges.set(key, e);
+  put(e);
   return { e, swap };
 }
 // the lift at a point of an edge (t from the edge's first point as given), by its canonical line or polyline
@@ -880,6 +927,26 @@ function liftCut(name, a, ctx, out, stats) {
 // (the tie leaves the shore within +-0.8 m of the datum), so a parapet stood up to 0.8 m short of the land behind it or
 // buried. Each wall piece is lifted as one by the land's relief 2 m behind its cap (the drawn land there), the face's foot
 // held 0.5 m or more under the water plane. Returns { keep (the curb soup without the bulkheads), out (them, lifted) }.
+// a vertical compiled face with the region's land (TIN tag 0-2, relief known) 6 m out on both sides (water is tag 3 from 3 m off land)
+function limitFace(a, i, ox, oz) {
+  const LL = MAN && MAN.landLimits;
+  if (!LL) return false;
+  const pts = [0, 1, 2].map((k) => [a[i + 3 * k], a[i + 3 * k + 2]]);
+  const px = pts[0][0] + ox, pz = pts[0][1] + oz;
+  // (only by a land limit the data names: manifest.landLimits, world polylines, within 150 m)
+  let near = false;
+  for (const L of LL) for (let j = 0; j + 1 < L.length && !near; j++) {
+    const [x0, z0] = L[j], [x1, z1] = L[j + 1], dx = x1 - x0, dz = z1 - z0, t = Math.max(0, Math.min(1, ((px - x0) * dx + (pz - z0) * dz) / (dx * dx + dz * dz || 1e-9)));
+    if (Math.hypot(x0 + dx * t - px, z0 + dz * t - pz) < 150) near = true;
+  }
+  if (!near) return false;
+  let ux = 0, uz = 0, best = 0;
+  for (let m = 0; m < 3; m++) for (let n = m + 1; n < 3; n++) { const dx = pts[n][0] - pts[m][0], dz = pts[n][1] - pts[m][1], L = Math.hypot(dx, dz); if (L > best) { best = L; ux = dx / L; uz = dz / L; } }
+  if (best < 0.2) return false;
+  const cx = (pts[0][0] + pts[1][0] + pts[2][0]) / 3 + ox, cz = (pts[0][1] + pts[1][1] + pts[2][1]) / 3 + oz;
+  const land = (x, z) => { const q = haInfo(x, z); return !!q && q.tag <= 2 && q.relief !== null && !Number.isNaN(q.relief); };
+  return land(cx - uz * 6, cz + ux * 6) && land(cx + uz * 6, cz - ux * 6);
+}
 function shoreLift(a, ch, ox, oz, stats) {
   const st = (stats.shore = { faces: 0, caps: 0, skirts: 0, liftMin: Infinity, liftMax: -Infinity, parapetMin: Infinity, parapetMax: -Infinity });
   const key = (x, z) => `${Math.round(x * 1000)},${Math.round(z * 1000)}`;
@@ -889,6 +956,9 @@ function shoreLift(a, ch, ox, oz, stats) {
   for (let q = 0; q < nT; q++) {
     const i = q * 9;
     if (!vert(i) || Math.min(a[i + 1], a[i + 4], a[i + 7]) > -2.5) continue;
+    // (five boroughs: the compile's bulkhead along a land city limit (it took the outside for water) is no shore where the
+    // region's ground goes on past it, the soft edge past Westchester and Nassau: the face goes, its cap stays as ground)
+    if (limitFace(a, i, ox, oz)) { role[q] = 9; st.limitFaces = (st.limitFaces || 0) + 1; continue; }
     role[q] = 1;
     for (let k = 0; k < 3; k++) outer.add(key(a[i + 3 * k] + ox, a[i + 3 * k + 2] + oz));
   }
@@ -937,6 +1007,7 @@ function shoreLift(a, ch, ox, oz, stats) {
   for (let q = 0; q < nT; q++) {
     const i = q * 9;
     if (!role[q]) { for (let k = 0; k < 9; k++) keep.push(a[i + k]); continue; }
+    if (role[q] === 9) continue;
     if (role[q] === 1) st.faces++; else if (role[q] === 2) st.caps++; else st.skirts++;
     for (let k = 0; k < 3; k++) {
       const x = a[i + 3 * k], y = a[i + 3 * k + 1], z = a[i + 3 * k + 2], kk = key(x + ox, z + oz);
@@ -1726,7 +1797,7 @@ function wallFaces(tile, ch, ox, oz, stats) {
 // triangle, is covered.
 function coverOpaque(tile, ch, ox, oz, fullOpaque, stats) {
   const key = (x, z) => `${Math.round(x * 1000)},${Math.round(z * 1000)}`;
-  const ec = new Map(), TB = new Map(), tris = [];
+  const ec = new Map(), TB = new Map(), tris = [], TF = [], TR = [];   // (TF: the triangles' corners flat; TR: their bucket ranges)
   for (const name of [...OPAQUE, 'curb']) {   // (the kerb tops close the strip between a walk and its gutter)
     const a = tile.S[name];
     if (!a) continue;
@@ -1747,16 +1818,23 @@ function coverOpaque(tile, ch, ox, oz, fullOpaque, stats) {
       tris.push(V);
       const i0 = Math.floor((Math.min(ax, bx, cx) - ox) / BK), i1 = Math.floor((Math.max(ax, bx, cx) - ox) / BK);
       const j0 = Math.floor((Math.min(az, bz, cz) - oz) / BK), j1 = Math.floor((Math.max(az, bz, cz) - oz) / BK);
+      TF.push(V[0][0], V[0][1], V[1][0], V[1][1], V[2][0], V[2][1]); TR.push(i0, i1, j0, j1);
       for (let j = j0; j <= j1; j++) for (let ii = i0; ii <= i1; ii++) { const bk = j * 100000 + ii; let l = TB.get(bk); if (!l) TB.set(bk, (l = [])); l.push(ti); }
     }
   }
+  // (PERF: the triangle that held the last point is tried first when the point's bucket lists it: the lattices below walk
+  // across one triangle at a time; the answer is the same, any listed triangle holding the point)
+  let last = -1;
+  const inTri = (ti, x, z) => {
+    const o = 6 * ti, ax = TF[o], az = TF[o + 1], bx = TF[o + 2], bz = TF[o + 3], cx = TF[o + 4], cz = TF[o + 5];
+    return (bx - ax) * (z - az) - (bz - az) * (x - ax) >= -1e-9 && (cx - bx) * (z - bz) - (cz - bz) * (x - bx) >= -1e-9 && (ax - cx) * (z - cz) - (az - cz) * (x - cx) >= -1e-9;
+  };
   const inAny = (x, z) => {
-    const l = TB.get(Math.floor((z - oz) / BK) * 100000 + Math.floor((x - ox) / BK));
+    const bj = Math.floor((z - oz) / BK), bi = Math.floor((x - ox) / BK);
+    if (last >= 0 && bi >= TR[4 * last] && bi <= TR[4 * last + 1] && bj >= TR[4 * last + 2] && bj <= TR[4 * last + 3] && inTri(last, x, z)) return true;
+    const l = TB.get(bj * 100000 + bi);
     if (!l) return false;
-    for (const ti of l) {
-      const [[ax, az], [bx, bz], [cx, cz]] = tris[ti];
-      if ((bx - ax) * (z - az) - (bz - az) * (x - ax) >= -1e-9 && (cx - bx) * (z - bz) - (cz - bz) * (x - bx) >= -1e-9 && (ax - cx) * (z - cz) - (az - cz) * (x - cx) >= -1e-9) return true;
-    }
+    for (let k = 0; k < l.length; k++) if (inTri(l[k], x, z)) { last = l[k]; return true; }
     return false;
   };
   const segB = new Map();
@@ -2161,10 +2239,32 @@ export function haInCentralPark(x, z) {
 }
 export const HA_PAVED = ['asphalt', 'sidewalk', 'path', 'plaza', 'brick', 'gutter', 'gravel', 'apron'];
 const CLAMP_OFF = (typeof location !== 'undefined' && new URLSearchParams(location.search).get('terrainClamp') === '0') || (typeof process !== 'undefined' && process.env && process.env.TERRAIN_CLAMP === '0');
+// PORTAL FIX: a structure that stands on its own fill or bed in the ground (the IRT approach at 122nd St, city/vk/viaducts.js)
+// registers its footprint as a cap fn(x, z) -> the world y the ground may not rise over there (null outside): the LiDAR
+// bare earth under such a structure holds the structure's own walls, fences and vents as 'ground', a crumpled sheet that
+// stood through its bed. The terrain and lawn vertices inside come down to the cap, after the rail cut and again last
+const GROUND_CAPS = [];
+export function haGroundCap(fn) { if (typeof fn === 'function') GROUND_CAPS.push(fn); }
+function capGround(tile, st) {
+  if (!GROUND_CAPS.length) return;
+  const [ox, oz] = tile.header.origin;
+  let n = 0;
+  for (const nm of ['terrP1', 'grass', 'grassU']) {
+    const a = tile.S[nm];
+    if (!a || a.length < 9) continue;
+    for (let i = 0; i + 2 < a.length; i += 3) {
+      let c = Infinity;
+      for (const f of GROUND_CAPS) { const y = f(a[i] + ox, a[i + 2] + oz); if (y !== null && y !== undefined && y < c) c = y; }
+      if (a[i + 1] > c) { a[i + 1] = c; n++; }
+    }
+  }
+  st.caps = (st.caps || 0) + n;
+}
 export function haClampGround(tile) {
   if (CLAMP_OFF || !FLAG || !tile || !tile.S) return null;
   const st = { base: 0, grass: 0, maxDrop: 0, passes: 0 };
   railCutStructure(tile, st);   // (first: the clamp then keeps its re-laid ground off the paving too)
+  capGround(tile, st);   // (PORTAL FIX)
   const TG0 = Date.now(); gradeDrapePaths(tile, st);   // (TERRAIN GRADE: park walks held far under a hill laid on it)
   const TG1 = Date.now(); st.cut = gradeCut(tile); if (st.cut) st.cut.ms = { drape: TG1 - TG0, cut: Date.now() - TG1 };   // (TERRAIN GRADE: the ground cut along every paving, kerb, coping and wall-cap edge)
   if (st.cut) gradeStrips(tile, st.cut);   // (and laid between two facing edges in a narrow strip)
@@ -2186,6 +2286,7 @@ export function haClampGround(tile) {
   // (until no land stands over a cap, eight passes at most: a raised cap can find a higher bank within its new reach)
   for (let k = 0; k < 8; k++) { shoreRaise(tile, st); if (!st.shoreBuried) break; }
   if (st.grade) baseUnderLawn(tile, st.grade);   // (TERRAIN GRADE: last: the base under the lawns as every pass left them)
+  capGround(tile, st);   // (PORTAL FIX: and last, over whatever the passes raised)
   delete st.cpDrop;
   if (tile.p1) tile.p1.clamp = st;
   return st;
@@ -2466,8 +2567,10 @@ function railCutStructure(tile, st) {
   if (!nRuns) return;
   // stations by 4 m cell
   const SH = new Map();
-  for (let k = 0; k < ST.length; k += 9) { const hk = `${Math.floor(ST[k] / 4)},${Math.floor(ST[k + 1] / 4)}`; let l = SH.get(hk); if (!l) SH.set(hk, (l = [])); l.push(k); }
-  const stAt = (x, z) => { let b = -1, bd = 9; const ci = Math.floor(x / 4), cj = Math.floor(z / 4); for (let di = -3; di <= 3; di++) for (let dj = -3; dj <= 3; dj++) for (const k of SH.get(`${ci + di},${cj + dj}`) || []) { const d = Math.hypot(ST[k] - x, ST[k + 1] - z); if (d < bd + 8) { const al = Math.abs((x - ST[k]) * -ST[k + 3] + (z - ST[k + 1]) * ST[k + 2]); if (al < 0.75 && (b < 0 || d < bd)) { bd = d; b = k; } } } return b; };
+  const shk = (i, j) => (i > -1048576 && i < 1048576 && j > -1048576 && j < 1048576 ? (i + 1048576) * 2097152 + (j + 1048576) : `${i},${j}`);   // (PERF: the cell as a number)
+  for (let k = 0; k < ST.length; k += 9) { const hk = shk(Math.floor(ST[k] / 4), Math.floor(ST[k + 1] / 4)); let l = SH.get(hk); if (!l) SH.set(hk, (l = [])); l.push(k); }
+  const NOL = [];
+  const stAt = (x, z) => { let b = -1, bd = 9; const ci = Math.floor(x / 4), cj = Math.floor(z / 4); for (let di = -3; di <= 3; di++) for (let dj = -3; dj <= 3; dj++) for (const k of SH.get(shk(ci + di, cj + dj)) || NOL) { const d = Math.hypot(ST[k] - x, ST[k + 1] - z); if (d < bd + 8) { const al = Math.abs((x - ST[k]) * -ST[k + 3] + (z - ST[k + 1]) * ST[k + 2]); if (al < 0.75 && (b < 0 || d < bd)) { bd = d; b = k; } } } return b; };
   const inCor = (x, z, pad) => { const k = stAt(x, z); if (k < 0) return null; const ac = (x - ST[k]) * ST[k + 2] + (z - ST[k + 1]) * ST[k + 3]; return Math.abs(ac) <= ST[k + 4] + pad ? { k, ac } : null; };
   // a station is a cut on a side when its coping stands 0.6 m over the bed
   const cutS = (k, sg) => { const fl = ST[k + 5], t = sg >= 0 ? ST[k + 6] : ST[k + 7]; return Number.isFinite(fl) && Number.isFinite(t) && t - fl > 0.6; };
@@ -2650,16 +2753,9 @@ function clampOnce(tile, st, extra = null) {
   const pav = [];
   if (extra) pav.push(extra); else for (const n of HA_PAVED) if (S[n] && S[n].length >= 9) pav.push(S[n]);
   if (!pav.length) return;
-  // a polygon [[x, z, yPaved, yGround] ..] clipped to the half-plane left of (ax, az) -> (bx, bz) (sg: the winding)
-  const clipHalf = (P, ax, az, bx, bz, sg) => {
-    const out = [], side = (p) => sg * ((bx - ax) * (p[1] - az) - (bz - az) * (p[0] - ax));
-    for (let k = 0; k < P.length; k++) {
-      const p = P[k], q = P[(k + 1) % P.length], sp = side(p), sq = side(q);
-      if (sp >= 0) out.push(p);
-      if ((sp >= 0) !== (sq >= 0)) { const f = sp / (sp - sq); out.push([p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f, p[2] + (q[2] - p[2]) * f]); }
-    }
-    return out;
-  };
+  // (a paved triangle [x, z, yPaved] x 3 clipped to the half-planes left of a ground triangle's edges (sg: its winding),
+  // flat: 6 corners at most)
+  const CPA = new Float64Array(3 * 16), CPB = new Float64Array(3 * 16);
   for (const [name, over] of [['terrP1', 0], ['grass', LAWN_OVER], ['grassU', LAWN_OVER]]) {
     const a = S[name];
     if (!a || a.length < 9) continue;
@@ -2672,6 +2768,8 @@ function clampOnce(tile, st, extra = null) {
       for (let j = j0; j <= j1; j++) for (let q = i0; q <= i1; q++) { const k2 = j * 8192 + q; let l = TB.get(k2); if (!l) TB.set(k2, (l = [])); l.push(t); }
     }
     const seen = new Int32Array(nT).fill(-1);
+    const GB = new Float64Array(4 * nT);   // (PERF: each ground triangle's plan box)
+    for (let t = 0; t < nT; t++) { const i = 9 * t; GB[4 * t] = Math.min(a[i], a[i + 3], a[i + 6]); GB[4 * t + 1] = Math.max(a[i], a[i + 3], a[i + 6]); GB[4 * t + 2] = Math.min(a[i + 2], a[i + 5], a[i + 8]); GB[4 * t + 3] = Math.max(a[i + 2], a[i + 5], a[i + 8]); }
     // (Central Park's ground is laid by its own parts over its arches, transverses and banks: left to them)
     const [tox, toz] = tile.header.origin, inCP = new Uint8Array(nT);
     if (tox < CPB[1] + 512 && tox + 512 > CPB[0] && toz < CPB[3] + 512 && toz + 512 > CPB[2]) for (let t = 0; t < nT; t++) { const i = 9 * t; inCP[t] = haInCentralPark((a[i] + a[i + 3] + a[i + 6]) / 3 + tox, (a[i + 2] + a[i + 5] + a[i + 8]) / 3 + toz) ? 1 : 0; }
@@ -2684,8 +2782,9 @@ function clampOnce(tile, st, extra = null) {
       stamp++;
       // (TERRAIN INT2: a park drive's own piece (city/cpDrives.js): the ground comes down under it whatever the depth)
       const drv = !extra && tile.cpDriveZone ? tile.cpDriveZone((b[j] + b[j + 3] + b[j + 6]) / 3 + tile.header.origin[0], (b[j + 2] + b[j + 5] + b[j + 8]) / 3 + tile.header.origin[1]) : false;
-      const i0 = Math.floor(Math.min(b[j], b[j + 3], b[j + 6]) / C), i1 = Math.floor(Math.max(b[j], b[j + 3], b[j + 6]) / C);
-      const j0 = Math.floor(Math.min(b[j + 2], b[j + 5], b[j + 8]) / C), j1 = Math.floor(Math.max(b[j + 2], b[j + 5], b[j + 8]) / C);
+      const bx0 = Math.min(b[j], b[j + 3], b[j + 6]), bx1 = Math.max(b[j], b[j + 3], b[j + 6]), bz0 = Math.min(b[j + 2], b[j + 5], b[j + 8]), bz1 = Math.max(b[j + 2], b[j + 5], b[j + 8]);
+      const i0 = Math.floor(bx0 / C), i1 = Math.floor(bx1 / C);
+      const j0 = Math.floor(bz0 / C), j1 = Math.floor(bz1 / C);
       for (let jj = j0; jj <= j1; jj++) for (let ii = i0; ii <= i1; ii++) {
         const l = TB.get(jj * 8192 + ii);
         if (!l) continue;
@@ -2693,13 +2792,28 @@ function clampOnce(tile, st, extra = null) {
           if (seen[t] === stamp) continue;
           seen[t] = stamp;
           const i = 9 * t;
+          // (PERF: plans 1 cm apart or more share no area: the clip below would leave nothing)
+          if (GB[4 * t + 1] < bx0 - 0.01 || GB[4 * t] > bx1 + 0.01 || GB[4 * t + 3] < bz0 - 0.01 || GB[4 * t + 2] > bz1 + 0.01) continue;
           const sg = Math.sign((a[i + 3] - a[i]) * (a[i + 8] - a[i + 2]) - (a[i + 6] - a[i]) * (a[i + 5] - a[i + 2]));
-          let P = [[b[j], b[j + 2], b[j + 1]], [b[j + 3], b[j + 5], b[j + 4]], [b[j + 6], b[j + 8], b[j + 7]]];
-          for (let k = 0; k < 3 && P.length >= 3; k++) P = clipHalf(P, a[i + 3 * k], a[i + 3 * k + 2], a[i + 3 * ((k + 1) % 3)], a[i + 3 * ((k + 1) % 3) + 2], sg);
-          if (P.length < 3) continue;
+          // (PERF: the clip on two flat buffers)
+          let P = CPA, Q = CPB, np = 3;
+          P[0] = b[j]; P[1] = b[j + 2]; P[2] = b[j + 1]; P[3] = b[j + 3]; P[4] = b[j + 5]; P[5] = b[j + 4]; P[6] = b[j + 6]; P[7] = b[j + 8]; P[8] = b[j + 7];
+          for (let k = 0; k < 3 && np >= 3; k++) {
+            const hx = a[i + 3 * k], hz = a[i + 3 * k + 2], ex = a[i + 3 * ((k + 1) % 3)] - hx, ez = a[i + 3 * ((k + 1) % 3) + 2] - hz;
+            let nq = 0;
+            for (let e = 0; e < np; e++) {
+              const p3 = 3 * e, q3 = 3 * ((e + 1) % np);
+              const sp = sg * (ex * (P[p3 + 1] - hz) - ez * (P[p3] - hx)), sq = sg * (ex * (P[q3 + 1] - hz) - ez * (P[q3] - hx));
+              if (sp >= 0) { Q[3 * nq] = P[p3]; Q[3 * nq + 1] = P[p3 + 1]; Q[3 * nq + 2] = P[p3 + 2]; nq++; }
+              if ((sp >= 0) !== (sq >= 0)) { const f = sp / (sp - sq); Q[3 * nq] = P[p3] + (P[q3] - P[p3]) * f; Q[3 * nq + 1] = P[p3 + 1] + (P[q3 + 1] - P[p3 + 1]) * f; Q[3 * nq + 2] = P[p3 + 2] + (P[q3 + 2] - P[p3 + 2]) * f; nq++; }
+            }
+            const T = P; P = Q; Q = T; np = nq;
+          }
+          if (np < 3) continue;
           const ax = a[i], az = a[i + 2], bx = a[i + 3], bz = a[i + 5], cx = a[i + 6], cz = a[i + 8];
           const d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
-          for (const [x, z, py] of P) {
+          for (let e = 0; e < np; e++) {
+            const x = P[3 * e], z = P[3 * e + 1], py = P[3 * e + 2];
             const w0 = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / d, w1 = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / d;
             const g = w0 * a[i + 1] + w1 * a[i + 4] + (1 - w0 - w1) * a[i + 7];
             // (TERRAIN INT2: in Central Park only a clip, the ground within CP_CLIP (0.25 m) over the walk; deeper paving there is
@@ -2709,7 +2823,8 @@ function clampOnce(tile, st, extra = null) {
         }
       }
     }
-    const drop = new Map(), key = (x, z) => `${Math.round(x * 1000)},${Math.round(z * 1000)}`;
+    // (PERF: a corner's millimetres as one number, the same corners as the "x,z" string, which one past 2 km takes)
+    const drop = new Map(), key = (x, z) => { const rx = Math.round(x * 1000), rz = Math.round(z * 1000); return rx > -2097152 && rx < 2097152 && rz > -2097152 && rz < 2097152 ? (rx + 2097152) * 4194304 + (rz + 2097152) : `${rx},${rz}`; };
     // (in Central Park a corner comes down CP_CLIP at most over all the passes: the park's ground is not dug into a hollow)
     const cpD = (st.cpDrop = st.cpDrop || new Map());
     for (let t = 0; t < nT; t++) {

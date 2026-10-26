@@ -9,11 +9,11 @@
 // out) with skipBent(x, z) / skipTrack(x, z) for city/elevatedKit.js (the generic IRT deck and bents on the viaduct).
 
 import { COLLIDERS } from '../colliders.js';
-import { HA_ON, haAnchors, haStructWarp, haWarpKids, haFoot } from '../../world/haAnchor.js';   // P1 TERRAIN (`?terrain=p1`)
-import { haInit } from '../../world/heightAuthority.js';
-import { Geo, UP } from './vkKit.js';
-import { vkMatsReady, setRivBand, spikeMat } from './vkMats.js';
-import { MV, P, toUL, archGeom, archBuild, mvvBents, bentBuild, spanBuild, deckBuild, mvvMats, COLL } from './mvv.js';
+import { HA_ON, haAnchors, haStructWarp, haWarpKids, haFoot, haLift, haDeckShift } from '../../world/haAnchor.js';   // P1 TERRAIN (`?terrain=p1`)
+import { haInit, haGroundCap } from '../../world/heightAuthority.js';
+import { Geo, UP, path } from './vkKit.js';
+import { vkMatsReady, setRivBand, spikeMat, otherMat } from './vkMats.js';
+import { MV, P, toUL, archGeom, archBuild, mvvBents, bentBuild, spanBuild, deckBuild, mvvMats, COLL, LV } from './mvv.js';
 import { stationBuild, stationColliders } from './mvvStation.js';
 import { RS, RP, rsUL, rsStations, rsdMats, rsdSpan, rsdBent, rsdLamp } from './rsd.js';
 import { PK, PP, tU, parkUV, parkMats, parkInterval, parkSpan125, parkBent, parkBentTags, parkCols, parkCorner, parkPlatforms, parkHouse, DVv as DVV } from './park.js';
@@ -84,12 +84,87 @@ function mvvBuildTile(group, ctx) {
   }
   // the ends: granite-faced masonry abutments where the line meets the rising ground (the flat datum here)
   for (const [u, dir] of [[MV.u0, -1], [MV.u1, 1]]) {
+    if (dir < 0 && APPROACH) continue;   // (PORTAL FIX: the south end is the approach's, below)
     const a = P(u, 0, 0);
     if (!owns(ctx.ox, ctx.oz, a[0], a[2])) continue;
     g.rect(M.granite, P(u + dir * 6, 0, GY - 0.3), P(u + dir * 6, 0, 19.2), [MV.A[0], 0, MV.A[1]], 12.2, 12.0);
   }
   if (!g.empty) tris += g.flush(group, 'mvv' + ctx.key);
   if (n) console.log(`[vk] tile ${ctx.key}: Manhattan Valley viaduct ${n} pieces, ${tris} triangles`);
+}
+
+// ---------------------------------------------------------------- PORTAL FIX: the approach south of the viaduct
+// (P1 TERRAIN only; the flat city keeps its granite abutment.) The steel ends at the OSM bridge way's end (MV.u0, W 122nd
+// St); from there the line runs on in Broadway's median between two masonry retaining walls on its own fill to the open
+// cut the compile draws from u -388.8 (the drawn rails' first station in tile 1_-7), the ground rising to meet the walls'
+// coping on the way: one cross-section swept along the line (the bed, the ballast, ties and rails, the walls with their
+// battered faces and coping, the bridge seat under the last span), every station on the vertical curve between the
+// LiDAR deck at u0 and the compiled rails' lifted top at the cut. The footprint caps the ground (world/heightAuthority.js
+// haGroundCap: the bare earth there holds the old structure's walls and fences, the crumpled sheet in the median) and
+// drops the median's compiled paving and furniture in it.
+const APPROACH = VK && HA_ON;
+const AP = { uN: MV.u0 + 0.6, uS: -390.6, uCut: -388.8, hw: 6.25, wall: 0.75, par: 1.05, deep: 9.0, step: 2.0 };
+AP.out = AP.hw + AP.wall;   // the walls' outer face line
+const apIn = (x, z, pad = 0) => { const [u, l] = toUL(x, z); return u > AP.uS - pad && u < AP.uN + pad && Math.abs(l) < AP.out + pad; };
+let _apR = null;
+// the rail top's world y at station u: a smoothstep from the viaduct's LiDAR deck at u0 to the cut's lifted rails
+function apRail(u) {
+  if (!_apR) {
+    const a = P(MV.u0, 0, 0), b = P(AP.uCut, 0, 0);
+    let r0 = MV.RAIL + haDeckShift('irt_mvv', MV.u0, a[0], a[2]);
+    let r1 = 3.73 + haLift(b[0], b[2]);
+    if (!Number.isFinite(r0)) r0 = MV.RAIL; if (!Number.isFinite(r1)) r1 = r0;
+    _apR = [r0, r1];
+  }
+  const t = Math.min(1, Math.max(0, (MV.u0 - u) / (MV.u0 - AP.uCut))), s = t * t * (3 - 2 * t);
+  return _apR[0] + (_apR[1] - _apR[0]) * s;
+}
+if (APPROACH) {
+  try { haGroundCap((x, z) => (apIn(x, z) ? apRail(toUL(x, z)[0]) - 0.95 : null)); } catch (e) { console.warn('[vk] approach cap', e); }
+}
+function apBuild(group, ctx) {
+  const M = mvvMats(), wallM = otherMat('graniteD'), copeM = M.granite, bal = otherMat('ballast');
+  const g = new Geo();
+  const us = [];
+  for (let u = AP.uN; u > AP.uS; u -= AP.step) us.push(u);
+  us.push(AP.uS);
+  const line = (l, dy) => us.map((u) => P(u, l, apRail(u) + dy));
+  const UPs = us.map(() => UP);
+  // the fill's bed under the ballast and the ballast (its top at the ties' foot)
+  const tieB = MV.RAIL - LV.TIE_B, tieT = MV.RAIL - LV.TIE_T;
+  path(g, bal, line(0, -tieB - 0.22), UPs, 2 * AP.hw, 0.44, { caps: false });
+  path(g, M.conc, line(0, -tieB - 1.2), UPs, 2 * AP.hw + 0.02, 1.5, { caps: false });
+  // the retaining walls: battered outer face (two sweeps, a footing course and the wall), coping, parapet inside
+  for (const sg of [-1, 1]) {
+    const lc = sg * (AP.hw + AP.wall / 2);
+    path(g, wallM, line(lc, AP.par - AP.deep / 2), UPs, AP.wall, AP.deep, { caps: true });
+    path(g, wallM, line(sg * (AP.hw + AP.wall + 0.18), -2.6 - (AP.deep - 3.0) / 2), UPs, 0.36, AP.deep - 3.0, { caps: false });
+    path(g, copeM, line(lc + sg * 0.05, AP.par + 0.13), UPs, AP.wall + 0.25, 0.26, { caps: true });
+  }
+  // the bridge seat: the fill's north face under the last span's end, from the footing to the bed
+  { const u = AP.uN - 0.35, r = apRail(u);
+    g.sweep(wallM, [P(u, -AP.out - 0.4, r - tieB - 2.0), P(u, AP.out + 0.4, r - tieB - 2.0)], [[MV.A[0], 0, MV.A[1]], [MV.A[0], 0, MV.A[1]]], [UP, UP], 0.7, AP.deep - 2.0, { caps: true }); }
+  // ties every 0.6 m and the running rails, guard timbers and third rail, all on the curve
+  for (const t of MV.tracks) {
+    for (let k = 0; k < us.length - 1; k++) {
+      const ua = us[k], ub = us[k + 1], n = Math.max(1, Math.round((ua - ub) / 0.6));
+      for (let q = 0; q < n; q++) {
+        const u = ua - (q + 0.5) * ((ua - ub) / n), r = apRail(u);
+        g.rect(M.timber, P(u, t - 1.35, r - tieB + 0.089), P(u, t + 1.35, r - tieB + 0.089), UP, 0.2, 0.178, { caps: true });
+      }
+    }
+    for (const sl of [-0.7175, 0.7175]) {
+      path(g, M.rail, line(t + sl, -tieT + 0.07), UPs, 0.017, 0.11, { caps: false });
+      path(g, M.rail, line(t + sl, -tieT + 0.008), UPs, 0.14, 0.016, { caps: false });
+      path(g, M.railTop, line(t + sl, -0.022), UPs, 0.072, 0.044, { caps: false });
+    }
+    const t3 = t + (t > 0 ? 1.55 : -1.55);
+    path(g, M.rail, line(t3, -tieT + 0.12), UPs, 0.08, 0.16, { caps: false });
+    path(g, M.timber, line(t3, -tieT + 0.28), UPs, 0.3, 0.04, { caps: false });
+  }
+  const tris = g.empty ? 0 : g.flush(group, 'mvvApproach' + ctx.key);
+  console.log(`[vk] tile ${ctx.key}: the IRT approach south of the viaduct (u ${AP.uN.toFixed(1)} to ${AP.uS}), rail ${_apR ? _apR.map((v) => v.toFixed(2)).join(' -> ') : '?'}, ${tris} triangles`);
+  once('mvvApproach', () => { for (const sg of [-1, 1]) for (let u = AP.uN - 4; u > AP.uS; u -= 8) { const p = P(u, sg * (AP.hw + AP.wall / 2), 0); addBox(p[0], apRail(u) - 1.0, p[2], AP.wall / 2, 2.2, 4.0, ROT); } });
 }
 
 // ---------------------------------------------------------------- the Riverside Drive Viaduct, span by span
@@ -192,8 +267,28 @@ const inPARK = (x, z, pad = 0) => { const [u, v] = parkUV(x, z); return v > PK.V
 // with traffic on it, 13 m under the rebuilt deck (23.3 m over the street): its raised triangles are taken out and its
 // road records flagged noTraffic (sim/traffic.js skips them; sim/peds.js skips level > 0 roads already), so no road or car
 // hangs in the arches. The rebuilt deck carries its own roadway surface (vk/rsd.js).
+// PORTAL FIX: the median's compiled paving inside the approach's walls (the structure is the surface there)
+function apDropPaving(tile, ox, oz) {
+  const c = P((AP.uN + AP.uS) / 2, 0, 0);
+  if (c[0] < ox - 120 || c[0] > ox + 632 || c[2] < oz - 120 || c[2] > oz + 632) return;
+  let nt = 0;
+  for (const name of ['sidewalk', 'curb', 'brick', 'plaza', 'path', 'gravel', 'grass', 'grassU', 'paintW', 'paintY', 'warn', 'warnIron', 'gutter', 'asphalt']) {
+    const a = tile.S[name];
+    if (!a || a.length < 9) continue;
+    const out = [];
+    let cut = 0;
+    for (let i = 0; i + 8 < a.length; i += 9) {
+      const x = (a[i] + a[i + 3] + a[i + 6]) / 3 + ox, z = (a[i + 2] + a[i + 5] + a[i + 8]) / 3 + oz;
+      if (apIn(x, z, -0.05)) { cut++; continue; }
+      for (let k = 0; k < 9; k++) out.push(a[i + k]);
+    }
+    if (cut) { tile.S[name] = Float32Array.from(out); nt += cut; }
+  }
+  if (nt) console.log(`[vk] tile ${ox / 512}_${oz / 512}: ${nt} compiled ground triangles out under the IRT approach`);
+}
 const onRsdDeck = (x, z) => { const [u, l] = rsUL(x, z); return u > -40 && u < 520 && Math.abs(l) < 20; };
 export function apply(tile, ox, oz) {
+  if (APPROACH) apDropPaving(tile, ox, oz);   // (PORTAL FIX)
   if (!VK || !(ox < 1150 && ox + 512 > 780 && oz < -3690 && oz + 512 > -4260)) return;
   let nr = 0, nt = 0;
   const RV = tile.S.roadVerts, meta = tile.S.roads;
@@ -252,6 +347,7 @@ const warped = (k, group, ctx, f) => {
 export function build(group, ctx) {
   if (!VK) return;
   if (inMVV(ctx.ox + 256, ctx.oz + 256, 400)) { try { warped('mvv', group, ctx, () => mvvBuildTile(group, ctx)); } catch (e) { console.warn('[vk] mvv', e); } }
+  if (APPROACH) { const m = P((AP.uN + AP.uS) / 2, 0, 0); if (owns(ctx.ox, ctx.oz, m[0], m[2])) { try { apBuild(group, ctx); } catch (e) { console.warn('[vk] approach', e); } } }
   if (inPARK(ctx.ox + 256, ctx.oz + 256, 400)) { try { warped('park', group, ctx, () => parkBuildTile(group, ctx)); } catch (e) { console.warn('[vk] park', e); } }
   if (inRSD(ctx.ox + 256, ctx.oz + 256, 400)) { try { warped('rsd', group, ctx, () => rsdBuildTile(group, ctx)); } catch (e) { console.warn('[vk] rsd', e); } }
 }
@@ -270,6 +366,7 @@ export function dropFurniture(wx, wz) {
     const v5 = PK.v125[0] - 0.9, u5 = (tU(1, v5) + tU(2, v5)) / 2;
     if (Math.abs(v - v5) < 1.1) for (const uc of parkCols(v5)) if (Math.abs(u - uc) < 1.1) return true;
   }
+  if (APPROACH && apIn(wx, wz, 0.4)) return true;   // (PORTAL FIX: the median's lamps and trees where the approach stands)
   if (!inMVV(wx, wz)) return false;
   const [u, l] = toUL(wx, wz), H = MV.span / 2;
   if (Math.abs(Math.abs(u) - H) < 2.2 && Math.abs(l) < 9) return true;

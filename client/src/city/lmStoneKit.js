@@ -304,13 +304,16 @@ export function hipRoof(B, mat, capMat, gx0, gx1, gn0, gn1, yE, pitch, o = {}) {
   const hb = alongX ? (gn1 - gn0) / 2 : (gx1 - gx0) / 2;
   const yR = yE + hb * tp;
   const G = (gx, gn, y) => { const [x, z] = B.W(gx, gn); return [x, B.y0 + y, z]; };
-  const S = B.S(mat);
+  const S = B.S(mat), tr0 = S.tr ? S.tr.slice() : null;
+  let pid = (Math.abs(Math.round(gx0 * 13 + gn0 * 7 + yE * 3)) % 97) / 97;   // the planes' seeds
+  const mh = (a, b) => { let h = Math.imul((a | 0) ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul((b | 0) + 0x632be5ab, 0xc2b2ae35); h ^= h >>> 15; h = Math.imul(h, 0x27d4eb2f); h ^= h >>> 13; return (h >>> 0) / 4294967296; };
   const ext = o.flatTop || 0;   // a truncated hip: a flat deck at yE + (hb - ext) * tp (ext = the deck's half width)
   const yTop = yE + (hb - ext) * tp;
   // one plane: its eave from P0 to P1 (grid), the slope inward along `inw` (grid unit), the hips shrinking the course's
   // ends by `shr0`, `shr1` per metre of run (1 = a 45 degree hip, 0 = a gable end)
   const plane = (e0, e1, inw, run, shr0, shr1) => {
     const L = Math.hypot(e1[0] - e0[0], e1[1] - e0[1]), ax = [(e1[0] - e0[0]) / L, (e1[1] - e0[1]) / L];
+    S.tr = tr0;   // (a seam or cap writer on the same base may have left its own tint on the sink)
     const sl = run / Math.cos(pitch), nC = Math.max(1, Math.round(sl / ch)), dr = run / nC;
     // the plane's outward normal in world: horizontal part opposite inw, vertical part up
     const hw = B.W(e0[0] - inw[0], e0[1] - inw[1]), h0 = B.W(e0[0], e0[1]);
@@ -325,10 +328,47 @@ export function hipRoof(B, mat, capMat, gx0, gx1, gn0, gn1, yE, pitch, o = {}) {
         const p = G(gx, gn, yE + r * tp);
         return [p[0] + N[0] * lift, p[1] + N[1] * lift, p[2] + N[2] * lift];
       };
-      B.polyW(S, [P(a00, r0, t), P(a01, r0, t), P(Math.min(a11, a01), r1, 0), P(Math.max(a10, a00), r1, 0)], N);
-      // the butt: from the plane up to the lifted edge, facing out and a little down
-      const b0 = P(a00, r0, 0), b1 = P(a01, r0, 0), c0 = P(a00, r0, t), c1 = P(a01, r0, t);
-      B.polyW(S, [b0, b1, c1, c0], [hx / hl, -0.2, hz / hl]);
+      if (!o.mottle) {
+        B.polyW(S, [P(a00, r0, t), P(a01, r0, t), P(Math.min(a11, a01), r1, 0), P(Math.max(a10, a00), r1, 0)], N);
+        // the butt: from the plane up to the lifted edge, facing out and a little down
+        const b0 = P(a00, r0, 0), b1 = P(a01, r0, 0), c0 = P(a00, r0, t), c1 = P(a01, r0, t);
+        B.polyW(S, [b0, b1, c1, c0], [hx / hl, -0.2, hz / hl]);
+        continue;
+      }
+      // (o.mottle) the course in pieces of o.mw metres, each its own tint: tile-to-tile scatter, weathered patches and,
+      // with o.streak, dark runs down the slope from the ridge (strongest toward the eave)
+      const mw = o.mw ?? 1.2, t0 = Math.max(a10, a00), t1 = Math.min(a11, a01), cl = (v) => Math.min(t1, Math.max(t0, v));
+      for (let j = Math.floor(a00 / mw); j * mw < a01; j++) {
+        const s0 = j * mw, s1 = s0 + mw, u0 = Math.max(s0, a00), u1 = Math.min(s1, a01);
+        if (u1 - u0 < 0.01) continue;
+        const ji = j + Math.round(pid * 1000), col = mh(ji, 7), patch = mh(Math.floor(ji / 3), Math.floor(k / 6) + 17 * pid), tile = mh(ji, k + 31 * pid);
+        let f = 1 + o.mottle * (0.45 * (tile - 0.5) + 0.9 * (patch - 0.5));
+        if (o.streak && col > 0.62) f -= o.streak * (col - 0.62) / 0.38 * (0.35 + 0.65 * (1 - k / nC));
+        S.tr = tr0 ? [tr0[0] * f, tr0[1] * f, tr0[2] * f] : [f, f, f];
+        // (o.streakMat: the darker pieces in a second material, for sets whose tint is not per vertex, e.g. the copper)
+        const Sx = o.streakMat && ((col > 0.72 && k < nC * (0.25 + 0.7 * mh(ji, 3))) || patch < 0.1) ? B.S(o.streakMat) : S;   // runs from the eave up, a few weathered patches
+        B.polyW(Sx, [P(u0, r0, t), P(u1, r0, t), P(cl(s1), r1, 0), P(cl(s0), r1, 0)], N);
+        B.polyW(Sx, [P(u0, r0, 0), P(u1, r0, 0), P(u1, r0, t), P(u0, r0, t)], [hx / hl, -0.2, hz / hl]);
+      }
+    }
+    S.tr = tr0;
+    pid++;
+    // a gutter along the eave (o.gutter: its material): a half-round read as a square member, just outside and below
+    if (o.gutter) {
+      const g0 = G(e0[0] - inw[0] * 0.14, e0[1] - inw[1] * 0.14, yE - 0.1), g1 = G(e1[0] - inw[0] * 0.14, e1[1] - inw[1] * 0.14, yE - 0.1);
+      ribW(B, B.S(o.gutter), g0, g1, 0.2);
+    }
+    // standing seams (o.seam: their pitch along the eave, metres): ribs from the eave up to the ridge or the hip line
+    if (o.seam) {
+      const Ss = B.S(o.seamMat || mat), ts = o.seamT ?? 0.07;
+      const Q = (a, r, lift) => {
+        const p = G(e0[0] + ax[0] * a + inw[0] * r, e0[1] + ax[1] * a + inw[1] * r, yE + r * tp);
+        return [p[0] + N[0] * lift, p[1] + N[1] * lift, p[2] + N[2] * lift];
+      };
+      for (let a = o.seam / 2; a < L; a += o.seam) {
+        const rm = Math.min(run, shr0 > 0 ? a / shr0 : 1e9, shr1 > 0 ? (L - a) / shr1 : 1e9);
+        if (rm > 0.3) ribW(B, Ss, Q(a, 0, t + ts * 0.5), Q(a, rm, ts * 0.5), ts);
+      }
     }
   };
   const inX = [1, 0], inN = [0, 1];
@@ -373,6 +413,11 @@ export function hipRoof(B, mat, capMat, gx0, gx1, gn0, gn1, yE, pitch, o = {}) {
     const Sc = B.S(capMat), cw = o.capW ?? 0.16;
     const R0 = G(ridge[0][0], ridge[0][1], yR), R1 = G(ridge[1][0], ridge[1][1], yR);
     ribW(B, Sc, R0, R1, cw);
+    if (o.crest) {   // ridge cresting: posts and a rail in o.crest's material
+      const Sk = B.S(o.crest), d = [R1[0] - R0[0], R1[1] - R0[1], R1[2] - R0[2]], Lr = Math.hypot(...d), hc = o.crestH ?? 0.6;
+      for (let q = 0.35; q < Lr; q += 0.55) { const p = [R0[0] + d[0] * q / Lr, R0[1] + cw / 2, R0[2] + d[2] * q / Lr]; ribW(B, Sk, p, [p[0], p[1] + hc * (q % 1.65 < 0.55 ? 1.25 : 1), p[2]], 0.05); }
+      ribW(B, Sk, [R0[0], R0[1] + cw / 2 + hc, R0[2]], [R1[0], R1[1] + cw / 2 + hc, R1[2]], 0.06);
+    }
     if (!o.gable) {
       const cs = alongX ? [[gx0, gn0, 0], [gx0, gn1, 0], [gx1, gn0, 1], [gx1, gn1, 1]] : [[gx0, gn0, 0], [gx1, gn0, 0], [gx0, gn1, 1], [gx1, gn1, 1]];
       for (const [cgx, cgn, end] of cs) ribW(B, Sc, G(cgx, cgn, yE + 0.04), end ? R1 : R0, cw);

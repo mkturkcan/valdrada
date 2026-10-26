@@ -14,6 +14,7 @@
 //     its parapets at the drive's outer edges and its deck from the same profile (cpLandmarks.js archesBuild).
 // `?cpDrives=0` / CP_DRIVES=0: off (the per-vertex lift as before).
 import { CP_DRIVES } from './cpDrivesData.js';
+import { roadsOf } from '../world/tiledata.js';
 import { cpRelief, cpBridgeRelief, cpDecks, CP_DATUM } from './cpRelief.js';
 import { haAnchorsReady, haRoadDeckAt } from '../world/haAnchor.js';
 import { haInfo, HA_ASPHALT, haInCentralPark } from '../world/heightAuthority.js';
@@ -117,13 +118,16 @@ export function cpDriveDecks() {
   DDK = new Set();
   for (const d of cpDecks()) {
     let n = 0, m = 0;
-    for (let k = 0; k + 1 < d.P.length; k += 3) { m++; const q = cpDriveNear(d.P[k], d.P[k + 1]); if (q && q.d <= q.half) n++; }
+    for (let k = 0; k + 1 < d.P.length; k += 3) { m++; const q = cpDriveNear(d.P[k], d.P[k + 1]); if (q && q.d <= q.e0 + BAND) n++; }   // (a deck beside a drive, in its corridor, too)
     if (m && n * 2 >= m) DDK.add(d.i);
   }
   return DDK;
 }
 // over a drive's arch: a deck that carries the drive holds the drive's surface 1 m or more over the ground here
 const overArch = (x, z) => { const b = cpBridgeRelief(x, z, otherDecks()), g = cpRelief(x, z); return b !== null && b - g > 1.0; };
+// (the fill fades to nothing toward a drive's arch along the drive, over 10 m, so the valley's ground meets the filled
+// bank continuously: one field for every piece)
+const archFade = (q) => { for (const d of [0, 2.5, 5, 7.5, 10]) for (const sg of [-1, 1]) if (overArch(q.x + q.ux * d * sg, q.z + q.uz * d * sg)) { const u = d / 10; return u * u * (3 - 2 * u); } return 1; };
 // the compile's pieces of a drive (dropped inside the park and generated again below) and the other sections (met by cut
 // and fill at the corridor's edge)
 const HARD = ['asphalt', 'sidewalk', 'curb', 'paintW', 'paintY', 'paintG', 'gutter', 'busred', 'warn', 'warnIron', 'brick', 'plaza', 'path', 'gravel'];
@@ -163,6 +167,14 @@ function buildDrives(tile, ox, oz) {
     for (let k = 1; k + 1 < P.length; k++) L.push(...P[0], ...P[k], ...P[k + 1]);
   };
   let n = 0;
+  // (the park paths crossing a drive: a zebra across the carriageway where one meets it, the walkers' crossing)
+  const XP = [];
+  const RV = tile.S.roadVerts;
+  if (RV) for (const r of roadsOf(tile)) {
+    if (r.rclass !== 5) continue;
+    for (let q = 0; q + 1 < r.len; q++) { const k = (r.start + q) * 3; XP.push([RV[k] + ox, RV[k + 2] + oz, RV[k + 3] + ox, RV[k + 5] + oz]); }
+  }
+  const crosses = (ax, az, bx, bz) => { for (const [px, pz, qx, qz] of XP) { const d = (bx - ax) * (qz - pz) - (bz - az) * (qx - px); if (Math.abs(d) < 1e-9) continue; const t = ((px - ax) * (qz - pz) - (pz - az) * (qx - px)) / d, u = ((px - ax) * (bz - az) - (pz - az) * (bx - ax)) / d; if (t >= 0 && t < 1 && u >= 0 && u <= 1) return t; } return -1; };
   for (const c of CH) {
     const { X, Z, S, half, di } = c, m = X.length, sec = section(half);
     const nrm = (i) => { const a = Math.max(0, i - 1), b = Math.min(m - 1, i + 1), dx = X[b] - X[a], dz = Z[b] - Z[a], L = Math.hypot(dx, dz) || 1; return [-dz / L, dx / L]; };
@@ -196,7 +208,14 @@ function buildDrives(tile, ox, oz) {
       if (sec.bike && !junction(half - sec.bike / 2)) quad('paintG', sec.car1 + 0.3, half - 0.05, 0.006);
       if (!junction(-half + 0.3)) quad('paintW', -half + 0.25, -half + 0.25 + LINE, 0.007);
       if (sec.bike && !junction(sec.car1)) quad('paintW', sec.car1 + 0.1, sec.car1 + 0.1 + LINE, 0.007);
-      if (sm % (DASH + GAP) < DASH) for (const v of sec.lanes) if (!junction(v) && !junction(v + 3) && !junction(v - 3)) quad('paintW', v - LINE / 2, v + LINE / 2, 0.007);
+      if (sm % (DASH + GAP) < DASH && ![-2, -1, 0, 1, 2].some((jj) => i + jj >= 0 && i + jj + 1 < m && crosses(X[i + jj], Z[i + jj], X[i + jj + 1], Z[i + jj + 1]) >= 0)) for (const v of sec.lanes) if (!junction(v) && !junction(v + 3) && !junction(v - 3)) quad('paintW', v - LINE / 2, v + LINE / 2, 0.007);
+      // a zebra where a park path crosses: 0.5 m bars every metre across the carriageway, 3 m long, centred on the path
+      for (let jj = -2; jj <= 2; jj++) {
+        const ia = i + jj; if (ia < 0 || ia + 1 >= m) continue;
+        if (crosses(X[ia], Z[ia], X[ia + 1], Z[ia + 1]) < 0) continue;
+        if (Math.abs(jj) <= 1) for (let v = -half + 0.4; v + 0.5 <= half - 0.3; v += 1.0) quad('paintW', v, v + 0.5, 0.008);
+        break;
+      }
       // the kerbs, the walks and their outer edges, both sides (stopped at another drive's carriageway)
       for (const sg of [-1, 1]) {
         const k0 = sg * half, k1 = sg * (half + KERB_W), w1 = sg * (half + KERB_W + WALK_W);
@@ -206,8 +225,7 @@ function buildDrives(tile, ox, oz) {
         quad('sidewalk', Math.min(k1, w1), Math.max(k1, w1), KERB);
         face('curb', w1, -0.25, KERB, sg);
         // the lawn beyond the walk, BAND m in strips of 1.5 m, on the ground as the drive lays it (cut and fill): the old
-        // lawn there is gone, the lawn beyond meets it on the same heights; none beside an arch (its walls close it)
-        if (overArch(X[i], Z[i]) || overArch(X[i + 1], Z[i + 1])) continue;
+        // lawn there is gone, the lawn beyond meets it on the same heights; beside an arch it lies on the valley's ground
         for (let k = 0; k < 4; k++) {
           const a0 = Math.abs(w1) + (BAND * k) / 4, a1 = Math.abs(w1) + (BAND * (k + 1)) / 4;
           const G = (j, v) => { const N = j ? N1 : N0, x = (j ? X[i + 1] : X[i]) + N[0] * v, z = (j ? Z[i + 1] : Z[i]) + N[1] * v; return [x - ox, CP_DATUM + cpRelief(x, z) + cpDriveGroundDy(x, z) - 0.005, z - oz]; };
@@ -238,12 +256,12 @@ export function cpDrivesApply(tile, ox, oz, ground) {
     const H = cpDriveH(q.x, q.z);   // (the drive's level at the foot on its centreline)
     if (H === null) return null;
     const g = cpRelief(x, z), dh = H - g;
-    const arch = overArch(q.x, q.z);   // (beside a drive's arch: the valley its path runs in stays open)
-    if (q.d <= q.e0) return { H, w: 1, dh, arch };
+    const arch = false, fa = dh > 0 ? archFade(q) : 1;   // (the fill fades out toward a drive's arch: its valley stays open)
+    if (q.d <= q.e0) return { H, w: fa, dh, arch };
     const B = Math.max(1.5, Math.min(15, 2 * Math.abs(dh)));
     if (q.d >= q.e0 + B) return null;
     const u = 1 - (q.d - q.e0) / B;
-    return { H, w: u * u * (3 - 2 * u), dh, arch };
+    return { H, w: u * u * (3 - 2 * u) * fa, dh, arch };
   };
   for (const name of [...HARD, ...ground]) {
     const a = tile.S[name];
@@ -262,21 +280,27 @@ export function cpDrivesApply(tile, ox, oz, ground) {
       if ((lawn || HARD.includes(name)) && haInCentralPark(cx, cz)) {
         const vq = [0, 3, 6].map((k) => cpDriveNear(a[i + k] + ox, a[i + k + 2] + oz));
         const qq = q && !q.end ? q : vq.find((r) => r && !r.end) || null;
-        let R = qq ? qq.e0 + (overArch(qq.x, qq.z) ? 0 : BAND) : 0;   // (beside an arch the drive lays no lawn band: the valley's own stays)
+        let R = qq ? qq.e0 + BAND : 0;
         if (qq && name === 'path') {
           // (a park path crossing the corridor (its long edge within 45 deg of the drive's normal) runs on to the walk)
           let L = 0, ex = 0, ez = 0;
           for (let k = 0; k < 3; k++) { const j = (k + 1) % 3, dx = a[i + 3 * j] - a[i + 3 * k], dz = a[i + 3 * j + 2] - a[i + 3 * k + 2], l = Math.hypot(dx, dz); if (l > L) { L = l; ex = dx / l; ez = dz / l; } }
           if (Math.abs(ex * -qq.uz + ez * qq.ux) > 0.7) R = qq.e0;
         }
-        if (qq && (qq.d <= R || vq.some((r) => r && !r.end && r.d <= r.e0 + BAND))) {
+        // (under a drive's arch the valley's own pieces, more than 1.5 m under the drive, are the path's and its banks')
+        // (at a drive's arch: the valley's own pieces, their middle 1 m and more under the drive, are the path's and its
+        // banks' and stay; a hard piece standing 1 m over the valley's ground there is a fragment the old deck lift raised: out)
+        const arch = qq && overArch(qq.x, qq.z), Hq = arch ? cpDriveH(qq.x, qq.z) : null, cy = (a[i + 1] + a[i + 4] + a[i + 7]) / 3;
+        const under = arch && Hq !== null && cy < ROAD_Y + Hq - 1.0;
+        if (arch && !lawn && qq.d <= qq.e0 + BAND && cy > CP_DATUM + cpRelief(cx, cz) + 1.0 && qq.d > qq.e0) { dropped++; continue; }
+        if (qq && !under && (qq.d <= R || vq.some((r) => r && !r.end && r.d <= r.e0 + BAND))) {
           const nx = -qq.uz, nz = qq.ux;
           const lat = (p) => (p[0] + ox - qq.x) * nx + (p[2] + oz - qq.z) * nz;
           for (const sgn of [1, -1]) {
             let Pg = [0, 3, 6].map((k) => [a[i + k], a[i + k + 1], a[i + k + 2]]);
             const side = (p) => sgn * lat(p) - R, o2 = [];
             for (let k = 0; k < Pg.length; k++) { const p0 = Pg[k], p1 = Pg[(k + 1) % Pg.length], s0 = side(p0), s1 = side(p1); if (s0 >= 0) o2.push(p0); if ((s0 >= 0) !== (s1 >= 0)) { const t = s0 / (s0 - s1); o2.push([p0[0] + (p1[0] - p0[0]) * t, p0[1] + (p1[1] - p0[1]) * t, p0[2] + (p1[2] - p0[2]) * t]); } }
-            for (let k = 1; k + 1 < o2.length; k++) for (const p of [o2[0], o2[k], o2[k + 1]]) { const x = p[0] + ox, z = p[2] + oz, b = blend(x, z); let dy = b ? b.dh * b.w : 0; if (dy > 0 && b && (b.arch || overArch(x, z))) dy = 0; keep.push(p[0], p[1] + dy, p[2]); }
+            for (let k = 1; k + 1 < o2.length; k++) for (const p of [o2[0], o2[k], o2[k + 1]]) { const x = p[0] + ox, z = p[2] + oz, b = blend(x, z); let dy = b ? b.dh * b.w : 0; keep.push(p[0], p[1] + dy, p[2]); }
           }
           dropped++;
           continue;
@@ -288,7 +312,6 @@ export function cpDrivesApply(tile, ox, oz, ground) {
         const x = a[i + 3 * k] + ox, z = a[i + 3 * k + 2] + oz, b = blend(x, z);
         if (!b) continue;
         let dy = b.dh * b.w;
-        if (dy > 0 && (b.arch || overArch(x, z))) continue;
         if (isGround) dy -= 0.05 * b.w;   // (the ground just under the walk's edge)
         a[i + 3 * k + 1] += dy;
         st.met++;
@@ -328,7 +351,7 @@ export function cpDriveArch(A) {
   const B = A.slice();
   const we = q.half + KERB_W + WALK_W;   // (the parapets' inner faces on the walks' outer edges)
   B[9] = off - we - 0.45; B[10] = off + we + 0.45;
-  const deckAt = (x, z) => { const r = cpDriveNear(x, z), H = r ? cpDriveH(r.x, r.z) : null; return H === null ? null : 3.38 + H - 0.02; };
+  const deckAt = (x, z) => { const r = cpDriveNear(x, z), H = r ? cpDriveH(r.x, r.z) : null; return H === null ? null : 3.38 + H + KERB - 0.02; };   // (the walk's level: the parapet 0.9 m over it)
   return { A: B, deckAt, off, half: q.half, e0: q.e0 };
 }
 export const cpDriveChains = () => CH;
@@ -342,9 +365,7 @@ export function cpDriveGroundDy(x, z) {
   const g = cpRelief(x, z), dh = H - g;
   let w = 1;
   if (q.d > q.e0) { const B = Math.max(1.5, Math.min(15, 2 * Math.abs(dh))); if (q.d >= q.e0 + B) return 0; const u = 1 - (q.d - q.e0) / B; w = u * u * (3 - 2 * u); }
-  const dy = dh * w;
-  if (dy > 0 && (overArch(q.x, q.z) || overArch(x, z))) return 0;
-  return dy;
+  return dh > 0 ? dh * w * archFade(q) : dh * w;
 }
 // the drives' walk lines in tile key ('tx_tz'): per chain the run of its smoothed centreline inside the tile (2 m margin),
 // world [x, y, z] with y on the walk, the offset of the walk's middle and the run's box (sim/peds.js)

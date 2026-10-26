@@ -62,6 +62,13 @@ const MATS = {
   brownstone: { tex: 'brownstone', fam: 'wall', unit: 'iso', tint: '#5b4034' },
   granite_grey: { tex: 'granite', fam: 'wall', unit: 'iso' },
   granite_grey_flamed: { tex: 'granite', fam: 'wall', unit: 'iso', roughSet: [0.62, 0.8], nrm: 0.6 },
+  // the Museum of Natural History's own sets (city/lmAmnh.js): their library keys are the museum's alone, so Unreal binds them to
+  // its own HQ sets (ue_families.json hq.pbr: neutral albedos, the colour the writers' tint per vertex) through every rebind
+  amnh_tile: { tex: 'terracotta', fam: 'wall', unit: 'iso', tint: '#ffffff' },
+  amnh_slate: { tex: 'granite', fam: 'wall', unit: 'iso', tint: '#ffffff' },
+  amnh_copper: { tex: 'stucco', fam: 'wall', unit: 'iso', tint: '#ffffff' },
+  amnh_granite: { tex: 'granite_pink', fam: 'wall', unit: 'iso', tint: '#ffffff' },
+  amnh_sedum: { tex: 'mulch', fam: 'wall', unit: 'iso', tint: '#ffffff' },
   granite_pink: { tex: 'granite_pink', fam: 'wall', unit: 'iso', tint: '#a68a80' },
   granite_black: { tex: 'granite', fam: 'wall', unit: 'iso', tint: '#232324' },
   // (no red granite set is packed: the grey granite's grain under the red tint is the intended look, QA Q50)

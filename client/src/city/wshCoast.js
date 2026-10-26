@@ -12,6 +12,8 @@
 import { HA_BASE, haInfo } from '../world/heightAuthority.js';
 import { wshShoreBand } from './wshGround.js';
 import { boxAt, topIn } from './fdrBox.js';
+import { marinaDropPier } from './marinaKit.js';
+import { SEAWALL, swPier } from './seawallKit.js';   // (SEAWALL KIT: the piers on piles)
 
 const isNode = typeof window === 'undefined';
 const PIER_Y = 3.40;
@@ -73,10 +75,12 @@ export function wshCoast(tile, ox, oz) {
   // ---- piers
   const deck = { plaza: [], curb: [] };
   for (const p of T.piers) {
+    if (marinaDropPier(ox, oz, p.id)) { st.marinaDrop = (st.marinaDrop || 0) + 1; continue; }   // (MARINA KIT: a dock outline drawn as a slab; the kit's floating docks there)
     // (one level for every pier, so a pier split over tiles meets itself: the compile's flat pier level, 0.45 m under its
     // bulkheads' caps)
     const y = PIER_Y;
     p.y = y;
+    const d0 = deck.plaza.length;
     for (const t of p.tris) {
       if (!own((t[0] + t[2] + t[4]) / 3, (t[1] + t[3] + t[5]) / 3, ox, oz)) continue;
       // (a pier under an FDR structure: the structure's where the triangle's centre is in it, or a corner is under its deck
@@ -87,6 +91,14 @@ export function wshCoast(tile, ox, oz) {
       const tri = up(A, Bv, C) ? [A, Bv, C] : [A, C, Bv];
       for (const v of tri) deck.plaza.push(v[0], v[1], v[2]);
       st.pierTris++;
+    }
+    // (SEAWALL KIT: the deck on piles: its edge, soffit, pile grid, fender piles and rail; no fascia to the river bed)
+    if (SEAWALL) {
+      const R = p.ring, mine = deck.plaza.slice(d0);
+      const skip = (a, b) => boxAt(a[0], a[1]) || boxAt(b[0], b[1]) || boxAt((a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+      try { swPier(tile, R, mine, y, ox, oz, (x, z) => own(x, z, ox, oz), skip); } catch (e) { console.warn('[seawall] pier', e); }
+      st.piers++;
+      continue;
     }
     // (the fascia: both faces, from the deck to 1 m under the water plane)
     const R = p.ring;
@@ -153,7 +165,7 @@ export function wshCoast(tile, ox, oz) {
     const off = n === 'grass' || n === 'grassU' || n === 'path' ? 0.08 : 0.05;
     for (let i = 0; i + 2 < a.length; i += 3) { const p = inPier(a[i], a[i + 2]); if (p !== null && Math.abs(a[i + 1] - p) < 1.5) a[i + 1] = p + off; }
   }
-  append(S, 'grass', strip.grass); append(S, 'sidewalk', strip.sidewalk); append(S, 'plaza', strip.plaza.concat(deck.plaza)); append(S, 'curb', deck.curb);
+  append(S, 'grass', strip.grass); append(S, 'sidewalk', strip.sidewalk); append(S, 'plaza', SEAWALL ? strip.plaza : strip.plaza.concat(deck.plaza)); append(S, 'curb', deck.curb);
   tile.__wshCoast = st;
   return st;
 }

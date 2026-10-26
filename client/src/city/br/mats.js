@@ -122,6 +122,13 @@ const offset = (m) => { m.polygonOffset = true; m.polygonOffsetFactor = -2; m.po
 export const lineWhite = () => once('lw', () => offset(pbrMaterial('paint_thermo', { ...W, seed: 41 })));
 export const lineYellow = () => once('ly', () => offset(pbrMaterial('paint_thermo_yellow', { ...W, seed: 41 })));
 export const planks = (hex = 0x8a7458) => once('wood' + hex, () => pbrMaterial('wood_painted', { ...W, tint: hexStr(hex), chips: 0.4, rot: 90 }));
+// HB25: the masonry bridges' granite on the neutral granite set (Unreal binds it to a grey granite scan whose colour is this
+// tint; the library's granite_grey binds to a brown rubble wall). Unreal keeps one record per material name, so every bridge
+// that uses it shares one tint (BR_GRANITE)
+export const BR_GRANITE = 0x8f8a82;
+export const graniteN = () => once('grN', () => pbrMaterial('amnh_granite', { ...W, tint: hexStr(BR_GRANITE), dirt: 0.25 }));
+// HB25: a walkway's brick paving (the High Bridge's)
+export const paving = (hex = 0x9a6a58) => once('pave' + hex, () => pbrMaterial('paving_brick', { ...W, tint: hexStr(hex) }));
 export const galv = () => once('galv', () => pbrMaterial('steel_galvanized', { ...W }));
 
 // a lamp or a light bulb: a dull fitting by day, its colour glowing after dark (ENV.night), never blinking

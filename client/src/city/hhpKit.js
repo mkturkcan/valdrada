@@ -21,6 +21,7 @@ import { pbrMaterial } from './mat/pbrLib.js';
 import { roadsOf } from '../world/tiledata.js';
 import { HA_P1, haGradeAt } from '../world/heightAuthority.js';
 import { BOXES, boxAt, boxesAt } from './fdrBox.js';
+import { SEAWALL, swSegment } from './seawallKit.js';   // SEAWALL KIT: the river walls
 
 const TILE = 512;
 const COL = {
@@ -322,7 +323,7 @@ export async function build(group, ctx) {
       }
     }
   }
-  if (HA_P1) for (const s of BOXES) drawBox(PB, B, M, s, ox, oz, stats);
+  if (HA_P1) for (const s of BOXES) drawBox(PB, B, M, s, ox, oz, stats, ctx.tile);
   const r = B.flush(group, 'hhp_' + ctx.key), r2 = PB.flush(group, ctx.key);
   r.meshes += r2.meshes; r.tris += r2.tris;
   if (r.meshes) console.log(`[hhp kit] tile ${ctx.key}: ${Object.entries(stats).filter(([, v]) => v).map(([k, v]) => `${k} ${v}`).join(', ')}; ${r.meshes} meshes, ${r.tris | 0} triangles`);
@@ -371,7 +372,7 @@ function archAt(c, st, ground) {
 // inner retaining wall (from the drive's or the street's level, whichever is lower, to the deck's top or the street's,
 // whichever is higher), the tunnel side walls of every drive under it (concrete, up to the soffit), the slab's soffit
 // and the portals (the deck's end face, and the walls beside the bores down to the drives)
-function drawBox(PB, B, M, s, ox, oz, stats) {
+function drawBox(PB, B, M, s, ox, oz, stats, tile) {
   const c = s.c;
   const C = (i, o, y) => [c.X[i] + c.NX[i] * o, y, c.Z[i] + c.NZ[i] * o];
   const open = (i, o, sg) => !boxAt(c.X[i] + c.NX[i] * (o + sg * 1.0), c.Z[i] + c.NZ[i] * (o + sg * 1.0));
@@ -391,7 +392,13 @@ function drawBox(PB, B, M, s, ox, oz, stats) {
       if (s.kind === 'shore' && sg !== s.sr) continue;   // (a shore band's inner edge is the drive's kerb)
       if (s.kind === 'shore') { const m = C(i, (e0 + e1) / 2 - sg * 0.3, 0); if (boxesAt(m[0], m[2]).some((o) => o !== s)) continue; }   // (inside another structure: its walls)
       const nrm = [c.NX[i] * sg, c.NZ[i] * sg], inn = [-nrm[0], -nrm[1]];
-      if (sg === s.sr) {
+      if (sg === s.sr && SEAWALL && tile) {
+        // SEAWALL KIT: the river wall as the kit's granite seawall (coping 0.45 m over the deck, the esplanade rail, its paving,
+        // lamps and benches on the park decks)
+        const n1 = [c.NX[i + 1] * sg, c.NZ[i + 1] * sg], A = C(i, e0, 0), Bq = C(i + 1, e1, 0);
+        swSegment(tile, { x: A[0], z: A[2], nx: nrm[0], nz: nrm[1], top: t0 + 0.45, foot: -4, walk: t0, s: c.S[i] }, { x: Bq[0], z: Bq[2], nx: n1[0], nz: n1[1], top: t1 + 0.45, foot: -4, walk: t1, s: c.S[i + 1] },
+          { kind: 'granite', rail: 'iron', cope: 0.8, pave: s.kind === 'park' ? 4.2 : 0, esp: s.kind === 'park', seed: 3 });
+      } else if (sg === s.sr) {
         const A = C(i, e0, 0), Bq = C(i + 1, e1, 0), Ai = C(i, e0 - sg * 0.6, 0), Bi = C(i + 1, e1 - sg * 0.6, 0);
         wallFace(PB, 'ashlar', [[A[0], t0 + 0.2, A[2]], [Bq[0], t1 + 0.2, Bq[2]]], [[A[0], -4, A[2]], [Bq[0], -4, Bq[2]]], nrm, COL.stone);
         wallFace(PB, 'ashlar', [[Ai[0], t0 + 0.2, Ai[2]], [Bi[0], t1 + 0.2, Bi[2]]], [[Ai[0], t0 - 0.05, Ai[2]], [Bi[0], t1 - 0.05, Bi[2]]], inn, COL.stone);

@@ -15,7 +15,7 @@ EXPORT = os.path.abspath(os.path.join(HERE, '..', '..', 'client', 'tools', 'ar34
 PROJECT = os.path.join(EXPORT, 'ue_project', 'BoundlessUE.uproject')
 UE_ROOT = os.environ.get('UE_ROOT', '/data0/projectnyc_aux/ue/UE_5.8')
 CELLCACHE = os.environ.get('CELLCACHE', '/data0/projectnyc_aux/cellcache')   # FAC42: the world's own cache (a private one too)
-VERSION = int(os.environ.get('BD_TILEFAC_V', '108'))   # FAC42: a diagnostic or new master is a new version, never an in-place rebuild (FP18 107: the glass layer)
+VERSION = int(os.environ.get('BD_TILEFAC_V', '119'))   # FAC42: a diagnostic or new master is a new version, never an in-place rebuild (FP18 107: the glass layer; 119: window identity from the wall plane)
 HLSL = os.environ.get('BD_TILEFAC_HLSL', 'bd_tilefac.hlsl')
 # RG44: the kit's glass sets too (BD_TILEFAC_GLASS=1): in the page they are the facade shader's windows (rooms, blinds, lit
 # rooms); their own export record, a smooth dark pane, mirrored the sky as bright as the wall round it at a grazing view
@@ -162,6 +162,7 @@ def in_engine():
         if eal.find_asset_data(ap).asset_class_path.asset_name != 'MaterialInstanceConstant': continue
         nm = ap.split('/')[-1].split('.')[0]
         if nm.startswith('lod16'): continue
+        if nm.endswith('_nan'): continue   # (2026-10-25: the packed facades' copies, bound below from their instance)
         r = recs.get(find(nm) or '') or {}
         if not (r.get('userData') or {}).get('isFacade'): continue
         if GLASS_SETS.match(r.get('name') or '') and not GLASS_ON: T['skipped_glass'] += 1; continue
@@ -186,6 +187,15 @@ def in_engine():
             else: T.setdefault('texture_missing', {}); T['texture_missing'][u_] = T['texture_missing'].get(u_, 0) + 1
         mel.update_material_instance(mi)
         T['bound'] += 1
+        # (the packed copy, '<instance>_nan', drawn on the Nanite facades (docs/notes/ue-persistent-city.md): the same
+        # values over the packed master '<master>p')
+        if eal.does_asset_exist(ap.split('.')[0] + '_nan') and eal.does_asset_exist(MASTER + 'p'):
+            v_ = eal.load_asset(ap.split('.')[0] + '_nan')
+            mel.set_material_instance_parent(v_, eal.load_asset(MASTER + 'p')); mel.clear_all_material_instance_parameters(v_)
+            for n_ in mel.get_scalar_parameter_names(mi): mel.set_material_instance_scalar_parameter_value(v_, n_, mel.get_material_instance_scalar_parameter_value(mi, n_))
+            for n_ in mel.get_vector_parameter_names(mi): mel.set_material_instance_vector_parameter_value(v_, n_, mel.get_material_instance_vector_parameter_value(mi, n_))
+            for n_ in mel.get_texture_parameter_names(mi): mel.set_material_instance_texture_parameter_value(v_, n_, mel.get_material_instance_texture_parameter_value(mi, n_))
+            mel.update_material_instance(v_); T['packed_copies'] = T.get('packed_copies', 0) + 1
         T.setdefault('names', {}); kn = (r.get('name') or 'tile') ; T['names'][kn] = T['names'].get(kn, 0) + 1
     for d_ in C['world_dest'].split(','): eal.save_directory(d_, only_if_is_dirty=True, recursive=True)
     T['secs'] = round(time.time() - t0, 1)

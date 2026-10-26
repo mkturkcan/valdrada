@@ -89,6 +89,7 @@ void AValdradaClient::BeginPlay()
 		// (the path tracer's progress bar would be drawn into the captures)
 		{ TEXT("r.PathTracing.ProgressDisplay"), TEXT("0") } })
 		if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(CV.Key)) V->Set(CV.Value, ECVF_SetByCode);
+	ApplyTier();
 	SetupEnvironment();
 	SemanticMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Client/Materials/M_client_semantic.M_client_semantic"));
 	if (!SemanticMat) { UE_LOG(LogValdrada, Warning, TEXT("no /Game/Client/Materials/M_client_semantic (Tools/make_materials.py): no semantic output")); }
@@ -114,6 +115,42 @@ void AValdradaClient::BeginPlay()
 	ExitWatch = MakeUnique<FValdradaExitWatch>(Link.Get(), 3.f);
 	PathTraceExt = FSceneViewExtensions::NewExtension<FValdradaPathTraceExt>();
 	Note(FString::Printf(TEXT("renderer client: core %s:%d, tier %s, tables %s, city %s"), *Host, Port, *Tier, *TablesDir, City.bOk ? TEXT("loaded") : TEXT("MISSING")));
+}
+
+void AValdradaClient::ApplyTier()
+{
+	// Data/tiers.json: {"low": {"r.X": 1, ...}, "medium": ..., "high": ..., "cinematic": ...}, the render settings of the
+	// persistent city's graphics tiers (tools/ue/persist_tiers.json without its own valdrada.* ranges and output size)
+	FString Text;
+	TSharedPtr<FJsonObject> J;
+	if (!FFileHelper::LoadFileToString(Text, *FPaths::Combine(FPaths::ProjectDir(), TEXT("Data/tiers.json"))) ||
+		!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), J) || !J.IsValid())
+	{
+		Note(TEXT("tier: no Data/tiers.json, engine settings as configured"));
+		return;
+	}
+	const TSharedPtr<FJsonObject>* T = nullptr;
+	if (!J->TryGetObjectField(Tier.ToLower(), T) || !T || !T->IsValid())
+	{
+		Note(FString::Printf(TEXT("tier: '%s' is not in Data/tiers.json, engine settings as configured"), *Tier));
+		return;
+	}
+	int32 N = 0, Missing = 0;
+	for (const auto& KV : (*T)->Values)
+	{
+		const FString Key(KV.Key);
+		if (Key.StartsWith(TEXT("_")) || Key == TEXT("res") || Key.StartsWith(TEXT("valdrada."))) continue;
+		IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(*Key);
+		if (!V) { ++Missing; continue; }
+		double D = 0;
+		FString S;
+		if (KV.Value->TryGetNumber(D)) S = FString::SanitizeFloat(D, 0);
+		else if (!KV.Value->TryGetString(S)) continue;
+		if (S.EndsWith(TEXT(".0"))) S.LeftChopInline(2);
+		V->Set(*S, ECVF_SetByCode);
+		++N;
+	}
+	Note(FString::Printf(TEXT("tier %s: %d console variables set (%d unknown to this build)"), *Tier, N, Missing));
 }
 
 void AValdradaClient::Note(const FString& Line)

@@ -12,7 +12,8 @@ import { mvvArchSkip } from './w125wData.js';   // AR32W
 // AR33: the viaduct part (vk/viaducts.js) may take over a stretch of an elevated line: globalThis.__AR33VK.skipBent(x, z)
 // and .skipTrack(x, z) (world metres) leave those bents and track segments to it; the parts load before this builds
 import { areasReady } from './areas.js';
-import { HA_ON, haAnchorBridges, haAnchorTracks } from '../world/haAnchor.js';   // P1 TERRAIN: the J/M/Z on the Williamsburg Bridge
+import { HA_ON, haAnchorBridges, haAnchorTracks } from '../world/haAnchor.js';
+import { haRegistry } from '../world/heightAuthority.js';   // P1 TERRAIN: the J/M/Z on the Williamsburg Bridge
 
 const EL14 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('el14') === '0');
 const STEEL = 0x34383b;    // the els are painted a near-black green that weathers to rust-brown streaks
@@ -42,6 +43,11 @@ export async function buildElevated(scene) {
       const n = await haAnchorTracks(D, B);
       if (n) console.log(`[elevated] ${n} tracks on the re-seated bridges' decks`);
     } catch (e) { console.warn('[terrain p1] elevated tracks', e); }
+    // five boroughs: the Bronx els on the terrain (the terrain data set's elevated_bx.json, world heights; boro_els.py)
+    try {
+      const X = await haRegistry('elevated_bx');
+      if (X && X.tracks) { D.tracks = D.tracks.concat(X.tracks); D.bents = (D.bents || []).concat(X.bents || []); console.log(`[elevated] Bronx: ${X.tracks.length} tracks, ${X.bents.length} bents`); }
+    } catch { /* no Bronx els in this data set */ }
   }
   const steel = [], bed = [], rail = [];
   const U = D.deckUnder ?? 1.35;

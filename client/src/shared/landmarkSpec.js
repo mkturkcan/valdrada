@@ -108,6 +108,8 @@ export const LANDMARKS = [
   // /TW
   // LM16: the AMNH's north side (city/lmAmnh.js buildAmnhNorth); the point is inside the compiled footprint (tile -1_0 #211)
   { id: 78, key: 'amnhNorth',       name: 'Museum of Natural History, north side (Gilder Center, 81st Street terrace)', lat: 40.781899, lon: -73.974332, mode: 'replace' },
+  // HB25: the Highbridge Water Tower (city/lmHighbridgeTower.js) on its compiled ring (tile 6_-13 #8, OSM way 275059317)
+  { id: 79, key: 'highbridgeTower', name: 'Highbridge Water Tower',      lat: 40.842543, lon: -73.932619, mode: 'replace' },
 ];
 // TW: the points of four landmarks that fell on the wrong footprint in the five-borough compile (each now inside its own;
 // 30 Rockefeller Plaza's 28 m inside the complex's ring of the live tiles and of runs 7-9, the point the records lane gave)
@@ -269,6 +271,13 @@ export const BUILDING_OVERRIDES = [
   if (!q || q.get('lm16') !== '0') BUILDING_OVERRIDES.push(
     { key: 'lm16Amnh', name: 'American Museum of Natural History, 77th Street to the Rose Center (tile -1_0 #82)', lat: 40.781112, lon: -73.974907, landmarkId: 46 },
     { key: 'lm16AmnhNorth', name: 'AMNH north side: Gilder Center, 81st Street terrace (tile -1_0 #211)', lat: 40.781899, lon: -73.974332, landmarkId: 78 },
+  );
+}
+// HB25: the Highbridge Water Tower's ring (tile 6_-13 #8, a 47.9 m octagon drawn as a cream prism) to its builder; `?hb25=0` leaves it
+{
+  const q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+  if (!q || q.get('hb25') !== '0') BUILDING_OVERRIDES.push(
+    { key: 'hb25Tower', name: 'Highbridge Water Tower (tile 6_-13 #8)', lat: 40.842543, lon: -73.932619, landmarkId: 79 },
   );
 }
 // LB39 (landmarks lane, 2026-10-11): the Statue of Liberty's footprint on the tiles already compiled (live set run 6: the star

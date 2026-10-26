@@ -197,6 +197,14 @@ const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: ROOT, encoding: '
 const inputsOf = (c) => ({ schema: 'valdrada.cell/0', cell: key(c), srcTree: tree, nycTree, assets: assets.digest, baker: bakerHash.slice(0, 16), tiles: Object.fromEntries(tilesOf(c).map((t) => [t, tileSha(t).slice(0, 16)])), opts: OPTS });
 const hashOf = (c) => sha(JSON.stringify(inputsOf(c))).slice(0, 24);
 const plan = cells.map((c) => ({ c, k: key(c), h: hashOf(c) }));
+// CITY (2026-10-25): --plan <file> writes each cell's content hash and whether its package is cached, then exits before
+// any page starts (tools/city/city.py computes the dirty set from it)
+if (has('plan')) {
+  const out = { head, srcTree: tree, cells: Object.fromEntries(plan.map((p) => [p.k, { hash: p.h, cached: fs.existsSync(path.join(CACHE, p.h, 'cell.glb')) }])) };
+  const f = opt('plan');
+  if (f && f !== '1') fs.writeFileSync(f, JSON.stringify(out)); else process.stdout.write(JSON.stringify(out) + '\n');
+  process.exit(0);
+}
 const todo = plan.filter((p) => has('force') || !fs.existsSync(path.join(CACHE, p.h, 'cell.glb')));
 if (!cells.length) {   // nothing to bake: the region's index stays as it is (a load set whose cells are all baked lists none missing)
   log(`${name}: no cells${opt('loadset') ? ' (the load set lists none missing; --all bakes all of its cells)' : ''}; the index is left as it is`);

@@ -28,6 +28,7 @@ import { TW_BUILDERS } from './tk/tkLandmarks.js';   // TW: the tower kit's land
 // LM16 (2026-10-16): the AMNH and the Guggenheim modelled on their rings with the kit's material sets; `?lm16=0` keeps the old boxes
 import { buildAmnh, buildAmnhNorth } from './lmAmnh.js';
 import { buildGuggenheim } from './lmGuggenheim.js';
+import { buildHighbridgeTower } from './lmHighbridgeTower.js';   // HB25: the Highbridge Water Tower
 const LM16 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('lm16') === '0');
 const TWLM = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('twlm') === '0');   // TW
 
@@ -617,6 +618,8 @@ function thermalWindow(trimB, glsB, off, yaw, y0, rad) {
 
 /* --------------------------------- builders ---------------------------------- */
 export const BUILDERS = {
+  // HB25: the Highbridge Water Tower on its ring (city/lmHighbridgeTower.js)
+  highbridgeTower(ctx) { return buildHighbridgeTower(ctx); },
 
   // ==================== the Statue of Liberty (id 67) ====================
   // drawn by city/liberty.js (the statue, the pedestal, Fort Wood), resident with its own level chain like the bridges; the

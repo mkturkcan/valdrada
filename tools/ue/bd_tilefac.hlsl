@@ -9,9 +9,20 @@ struct BDH {
   // for one sample a pixel; Unreal's frames take 8 jittered samples, so they fade at a fraction of the width (AAK)
   // (S125, v95: 0.6, the details fading a little sooner: at 0.35 the rooms and panes of the towers flickered from frame to
   // frame on a moving lens, 51 frames of Broadway's opening over Times Square)
+  // FP18 (v108, untested): a ray-traced hit (Lumen's hit-lit reflections, cine2h's HIT_LIGHTING_FOR_REFLECTIONS) has no
+  // derivatives (MaterialTemplate.ush, Common.ush: ddx, ddy and fwidth are 0 in RAYTRACINGSHADER), so every filter of
+  // this program saw a zero footprint and a reflected facade drew unfiltered (windows, blinds, slats, bricks at mip 0);
+  // there the footprint is the hit's distance from the lens times a reflection ray's cone (fp, metres, set below)
+  float fp;
+#if RAYHITGROUPSHADER
+  float fwk(float x) { return fp; }
+  float2 fwk(float2 x) { return (float2)(fp); }
+  float3 fwk(float3 x) { return (float3)(fp); }
+#else
   float fwk(float x) { return fwidth(x) * 0.6; }
   float2 fwk(float2 x) { return fwidth(x) * 0.6; }
   float3 fwk(float3 x) { return fwidth(x) * 0.6; }
+#endif
   float gmod(float x, float y) { return x - y * floor(x / y); }
   float hash12(float2 p) { float3 p3 = frac(float3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return frac((p3.x + p3.y) * p3.z); }
   float vnoise(float2 p) {
@@ -44,11 +55,20 @@ struct BDH {
 };
 BDH H;
 float2 vFUv = UV0;
-float4 vAux = float4(UV1, UV2);
-float4 vAux2 = float4(UV3, UV4);
-float3 vAux3 = float3(UV5, UV6.x);
+// FP18 v112 (WINDOW FIX): the facade's per-wall attributes (UV 1-6: floor height, bay width, style, flags, the building's
+// seed, the wall's length and seed, the door) are constant over a triangle, but Unreal stores a static mesh's UVs as half
+// floats and the rasterizer interpolates them with a few ulps of barycentric error. A seed such as cvar 0.6549 is 670.5 in
+// 1024ths as a half, so floor(x * 1024 + 0.5) gave 670 at one pixel and 671 at the next, and which pixels moved with the
+// lens's sub-pixel jitter: a wall's rooms, blinds and lit windows took one of two identities pixel by pixel (the speckle)
+// and switched between them across whole panes in one frame (lfBroadway125 140, 171, 205, 208; the bit tests on flags had
+// the same edge at 17.9999). Each attribute is snapped back to its stored half value first: the same on every pixel of
+// the wall and in every frame, so every identity hashed from it is fixed
+float4 vAux = f16tof32(f32tof16(float4(UV1, UV2)));
+float4 vAux2 = f16tof32(f32tof16(float4(UV3, UV4)));
+float3 vAux3 = f16tof32(f32tof16(float3(UV5, UV6.x)));
 float3 vWP = H.tw2ue(WPA * 0.01);
 float3 cameraPosition = H.tw2ue(CAM * 0.01);
+H.fp = length(vWP - cameraPosition) * 0.0015 + 0.002;   // (FP18 v108: the hit's footprint; used only in ray-traced hits)
 float3 vNormal = H.V3(normalize(H.tw2ue(NWS)));
 float3 vViewPosition = -H.V3(vWP - cameraPosition);
 float night = NightV, wet = WetV, snowA = SnowV, uTimeF = TimeF;
@@ -72,8 +92,32 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
 
         FAC_emis = ((float3)(0.0)); FAC_rough = 0.92; FAC_nrmAdj = ((float3)(0.0)); FAC_dbg = 0.0; FAC_dbgV = ((float3)(0.0)); FAC_spand = 0.0; FAC_grainV = ((float3)(1.0));
         float floorH = vAux.x, winW = vAux.y, storeH = vAux.z, style = vAux.w;
-        float bldgH = vAux2.x, litAmt = vAux2.y, flags = vAux2.w;
+        float bldgH = vAux2.x, litAmt = vAux2.y, flags = floor(vAux2.w + 0.5);   // (v119: the flags' bits from the nearest integer)
         float cvar = floor(vAux2.z * 1024.0 + 0.5) * (1.0 / 1024.0);
+        // FP18 v119 (WINDOW FIX): a wall's identity from stable inputs only. The building and wall seeds in UV 3-5 (cvar,
+        // the wall seed) reach the pixel shader differing by ~1e-4 from pane to pane and frame to frame (diagnostic masters
+        // v113-v117 on lfBroadway125), so every hash built on them (rooms, blinds, lit rooms, sashes, tints, glass family)
+        // gave a pane one of two identities, switching across whole panes in one frame on a moving lens (140, 171, 205,
+        // 208, 219) and speckling where the two met. A wall's seeds are now its own plane: the horizontal normal's
+        // direction (128 steps), the offset along it (4 m bins) and the world position of the wall's u = 0 end along it
+        // (8 m bins), the same on every pixel of the wall in every frame; with the cell index from u and v (stable) they
+        // fix each pane. Roofs and up-facing caps keep the attribute seed (only smooth noise reads it there)
+        float wallSeedS_ = floor(vAux3.y * 128.0 + 0.5) * (1.0 / 128.0);
+        {
+          float3 nT_ = normalize(H.tw2ue(NWS));
+          if (abs(nT_.y) < 0.7) {
+            float2 nh_ = normalize(nT_.xz);
+            float2 th_ = float2(-nh_.y, nh_.x);
+            float aB_ = floor(atan2(nh_.y, nh_.x) * (128.0 / 6.2831853) + 0.5);
+            float dB_ = floor(dot(vWP.xz, nh_) * 0.25 + 0.5);
+            float duS_ = dot(ddx(vWP.xz), th_) * ddx(vFUv.x) + dot(ddy(vWP.xz), th_) * ddy(vFUv.x);
+            float sU_ = duS_ < 0.0 ? -1.0 : 1.0;
+            float oB_ = floor((dot(vWP.xz, th_) - sU_ * vFUv.x) * 0.125 + 0.5);
+            float2 wk_ = float2(H.gmod(aB_, 128.0) * 1.37 + H.gmod(dB_, 997.0) * 0.113 + 3.1, H.gmod(oB_, 991.0) * 0.731 + 7.7);
+            wallSeedS_ = floor(H.hash12(wk_) * 128.0) * (1.0 / 128.0);
+            cvar = floor(H.hash12(wk_.yx * 1.618 + 11.3) * 1024.0) * (1.0 / 1024.0);
+          }
+        }
         bool cornice = H.gmod(flags, 2.0) >= 1.0;
         bool blind = H.gmod(floor(flags / 2.0), 2.0) >= 1.0;
         if (blind && vAux2.x > 36.0 && vFUv.y > 26.0) blind = false;
@@ -279,7 +323,7 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
           bool glassStyle = (style > 2.5 && style < 3.5) || (style > 10.5 && style < 11.5);
           bool loftStyle = (style > 5.5 && style < 7.5);
           float wallLen = max(vAux3.x, 0.01);
-          float wallSeed = floor(vAux3.y * 128.0 + 0.5) * (1.0 / 128.0);
+          float wallSeed = wallSeedS_;   // (v119)
           float bayN = floor((wallLen - 0.44) / winW);
           float sideM = (wallLen - max(bayN, 0.0) * winW) * 0.5;
           float cuC = (u - sideM) / winW, cvC = v / floorH;
@@ -294,8 +338,9 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
           if (condoS) { x0 = 0.10; x1 = 0.90; y0 = 0.16; y1 = 0.94; }
           float aaU = max(H.fwk(cuC), 1e-4), aaV = max(H.fwk(cvC), 1e-4);
           float xb0 = x0, xb1 = x1, yb0 = y0, yb1 = y1;
-          float cvI = floor(vAux2.z * 1024.0 + 0.5);
-          float wlDC = vAux3.z >= 8.0 ? floor(vAux3.z / 8.0) - 1.0 : -1.0;
+          float cvI = floor(cvar * 1024.0 + 0.5);   // (v119: the wall's stable seed)
+          float doorQ_ = floor(vAux3.z + 0.5);
+          float wlDC = doorQ_ >= 8.0 ? floor(doorQ_ / 8.0) - 1.0 : -1.0;
           float wlPin = (cellU == wlDC) ? 0.0 : 1.0;
           float bk = clamp(cellU, 0.0, 4090.0) + 1.0;
           float off = H.wlsg(cvI + 17.0, bk) * 0.028 * wlPin;
@@ -316,7 +361,7 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
                            clamp((min(fy + hwV, y1) - max(fy - hwV, y0)) / max(2.0 * hwV, 1e-5), 0.0, 1.0), jFade);
           float winMask = covU * covV;
           if (v > bldgH - 0.8 || v < 0.15 || !inBay) winMask = 0.0;
-          float doorPack = vAux3.z;
+          float doorPack = doorQ_;
           float doorCell = floor(doorPack / 8.0) - 1.0;
           float doorColI = H.gmod(floor(doorPack / 2.0), 4.0);
           bool doorWall = doorPack >= 8.0 && bayN >= 1.0 && !store && !glassStyle && wallLen > 3.6;
@@ -506,14 +551,17 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
                 }
                 float filmS = 0.12 + dust0 * 0.2;
                 float3 shopGlass = float3(0.8, 0.83, 0.81);
-                albedo = lerp(room * shopGlass * sfA, float3(0.08, 0.09, 0.095), max(filmS, (1.0 - grazeS) * 0.75));
+                albedo = lerp(min(room, (float3)(0.45)) * shopGlass * sfA, float3(0.08, 0.09, 0.095), max(filmS, (1.0 - grazeS) * 0.75));
                 {
-                  float3 seS = room * shopGlass * glowS * 2.0 * (1.0 - filmS) * grazeS;
+                  // (v123 STORE12: by day a shop's own light is a share of the daylit street's, not a white panel: its
+                  // emission held to 0.3 of the night's and the room under 0.45 before it; the white slabs from the air at v122)
+                  float3 seS = min(room, (float3)(0.45)) * shopGlass * glowS * 2.0 * (1.0 - filmS) * grazeS * lerp(0.3, 1.0, night);
                   float tsqS = 1.0 - smoothstep(180.0, 320.0, length(vWP.xz - float2(-1215.0, 2820.0)));
                   FAC_emis += seS * lerp(1.0, min(1.0, 0.85 / max(1e-3, max(seS.r, max(seS.g, seS.b)))), tsqS);
                 }
-                FAC_rough = 0.1 + filmS * 0.3;
-                FAC_rough = lerp(FAC_rough, 0.7, smoothstep(0.15, 0.5, H.fwk(u)));
+                // (v122 STORE12: the shop glass a dielectric sheen above Lumen's 0.6 trace limit, as the far shells' glass (v9):
+                // at the page's 0.10-0.19 it mirrored the open sky as flat white slabs from the air)
+                FAC_rough = 0.62 + filmS * 0.1;
               }
             }
             {
@@ -549,7 +597,7 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
             float lit_ = step(1.0 - litFrac, id3);
             {
               float wPh = H.hash12(float2(cellU * 7.3 + wallSeed * 3.0, cellV * 11.1 + cvar * 5.0));
-              if (wPh < 0.12) lit_ = step(0.0, sin(uTimeF * (0.011 + wPh * 0.02) + wPh * 251.0));
+              if (wPh < 0.12) lit_ = smoothstep(-0.25, 0.25, sin(uTimeF * (0.011 + wPh * 0.02) + wPh * 251.0));   // (v112: a room's light fades over ~40 s; the step switched it in one frame)
             }
             float3 lightCol = id2 < 0.88
               ? lerp(float3(1.0, 0.72, 0.27), float3(1.0, 0.89, 0.61), H.hash12(float2(cellU, cellV + 9.0)))
@@ -557,7 +605,7 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
             {
               float tvR = H.hash12(float2(cellV * 3.9 + cvar * 41.0, cellU * 6.1));
               if (tvR < 0.08) {
-                float fl = 0.6 + 0.4 * sin(uTimeF * 9.0 + tvR * 300.0) * sin(uTimeF * 23.7 + tvR * 91.0);
+                float fl = 0.6 + 0.4 * sin(uTimeF * 0.9 + tvR * 300.0) * sin(uTimeF * 2.37 + tvR * 91.0);   // (v112: a TV's flicker over seconds, not frames)
                 lightCol = lerp(lightCol, float3(0.55, 0.68, 1.0) * (0.7 + fl * 0.6), night);
               }
             }
@@ -706,7 +754,7 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
             }
             {
               float3 Vw = normalize(cameraPosition - vWP);
-              float3 NwG = normalize(cross(ddx(vWP), -ddy(vWP)));
+              float3 NwG = cross(ddx(vWP), -ddy(vWP)); NwG = dot(NwG, NwG) > 1e-20 ? normalize(NwG) : normalize(H.W3(vNormal));   // (v108: no derivatives in a ray-traced hit)
               if (dot(NwG, Vw) < 0.0) NwG = -NwG;
               float pj1 = H.hash12(float2(cellU * 3.1 + wallSeed * 11.0, cellV * 5.3)) - 0.5;
               float pj2 = H.hash12(float2(cellV * 9.7 + cvar * 31.0, cellU * 1.7)) - 0.5;
@@ -1300,7 +1348,7 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
               float pat = clamp(dot(albedo, ((float3)(0.3333))) / dBase, 0.18, 2.0);
               albedo = lerp(albedo, famAlb * pat, 0.94 * cwF);
               float3 Vw2 = normalize(cameraPosition - vWP);
-              float3 Nw2 = normalize(cross(ddx(vWP), -ddy(vWP)));
+              float3 Nw2 = cross(ddx(vWP), -ddy(vWP)); Nw2 = dot(Nw2, Nw2) > 1e-20 ? normalize(Nw2) : normalize(H.W3(vNormal));   // (v108)
               if (dot(Nw2, Vw2) < 0.0) Nw2 = -Nw2;
               Nw2 = normalize(Nw2 + float3(H.hash12(float2(cvar * 311.0, 2.13)) - 0.5, 0.0,
                                          H.hash12(float2(7.31, cvar * 431.0)) - 0.5) * 0.030);
@@ -1579,7 +1627,7 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
           albedo *= lerp(1.0, lerp(0.80, 0.62 + 0.52 * louv, lVis), lBank);
           if (mpv > -0.5) {
             float dCol2 = 0.0;
-            float dSeed = H.hash12(float2(floor(vAux3.y * 64.0) * 3.1, cvar * 83.0));
+            float dSeed = H.hash12(float2(floor(wallSeedS_ * 64.0) * 3.1, cvar * 83.0));
             if (dSeed < 0.38 && mWallL > 3.2) {
               float dx = 0.9 + H.hash12(float2(dSeed * 311.0, cvar * 7.7)) * max(0.0, mWallL - 1.8);
               float aaDu = max(H.fwk(u), 1e-4), aaDv = max(H.fwk(mpv), 1e-4);
@@ -1713,6 +1761,13 @@ float3 normal = normalize(vNormal);
         }
         diffuseColor.rgb *= FAC_grainV;
 
+// (three's geometric specular AA, applySpecAA: sigma2 0.25, kappa 0.14)
+{
+  float3 ndx = ddx(normal), ndy = ddy(normal);
+  float variance = 0.25 * (dot(ndx, ndx) + dot(ndy, ndy));
+  float kernel = min(2.0 * variance, 0.14);
+  roughnessFactor = min(sqrt(roughnessFactor * roughnessFactor + kernel), 1.0);
+}
 // ---- FP18 (v105): the glass layer. A pane is glass over a room: what is seen through it is the room's own light, not the
 // sun on the pane (the room painted as the base colour lit as a flat panel in the sun, black in the shade); its surface is
 // mirror smooth (between 0.1 and Lumen's 0.6 the traced reflections are stochastic, and the curtain walls' panes flipped
@@ -1732,9 +1787,7 @@ float3 normal = normalize(vNormal);
     float tr = 1.0 - H.fresnelR(cosV, 0.06);
     FAC_emis += aI * kIn * tr * gm;
     diffuseColor.rgb = lerp(diffuseColor.rgb, aI * 0.22 * tr + 0.003, gm);
-    // (v108: the pane's footprint decides how sharp its mirror can be: a pane a few pixels across reflects through a
-    // lobe wide enough that its neighbours' tilts and a moving lens do not flip it; mirror only where it spans many)
-    float rG = lerp(0.018, 0.30, smoothstep(0.03, 0.35, UE_aa));
+    float rG = lerp(0.018, 0.06, smoothstep(0.05, 0.5, UE_aa));
     roughnessFactor = lerp(roughnessFactor, rG, gm);
     // (v107: a punched window's two sashes, above and below its meeting rail, each at its own tilt)
     float pV2 = UE_pV * 2.0 + (1.0 - UE_gs) * step(0.6, UE_fy);
@@ -1746,19 +1799,12 @@ float3 normal = normalize(vNormal);
     // (v107: a punched window's old glass sits less true than a curtain wall's (+-0.02 rad against +-0.012), and one in
     // twenty is a hopper left open, its pane leaning back 0.06-0.14 rad to the sky)
     float h3 = H.hash12(float2(UE_pU * 5.171 + UE_pS * 0.23, UE_pV * 7.713 + 1.9));
-    float2 tl = float2(h1, h2) * lerp(0.04, 0.024, UE_gs) * smoothstep(0.30, 0.06, UE_aa) + float2(UE_fx - 0.5, UE_fy - 0.5) * 0.02 * smoothstep(0.12, 0.03, UE_aa);
-    tl.y += (1.0 - UE_gs) * step(h3, 0.05) * lerp(0.06, 0.14, frac(h3 * 37.0)) * smoothstep(0.30, 0.06, UE_aa);
+    float2 tl = float2(h1, h2) * lerp(0.04, 0.024, UE_gs) + float2(UE_fx - 0.5, UE_fy - 0.5) * 0.02 * smoothstep(0.12, 0.03, UE_aa);
+    tl.y += (1.0 - UE_gs) * step(h3, 0.05) * lerp(0.06, 0.14, frac(h3 * 37.0));
     normal = normalize(lerp(normal, normalize(normal + Tt * tl.x + Bt * tl.y), gm));
   }
   // (the curtain walls' spandrel glass: the same glass on an opaque backing)
   roughnessFactor = lerp(roughnessFactor, 0.07, saturate(UE_sp) * 0.85);
-}
-// (three's geometric specular AA, applySpecAA: sigma2 0.25, kappa 0.14; v108: after the glass layer, so it sees the panes' tilts)
-{
-  float3 ndx = ddx(normal), ndy = ddy(normal);
-  float variance = 0.25 * (dot(ndx, ndx) + dot(ndy, ndy));
-  float kernel = min(2.0 * variance, 0.14);
-  roughnessFactor = min(sqrt(roughnessFactor * roughnessFactor + kernel), 1.0);
 }
 // ---- glass: the family's F0 (tinted) and its own dark diffuse; above Unreal's 0.08 dielectric ceiling partly metallic
 float3 base = diffuseColor.rgb;

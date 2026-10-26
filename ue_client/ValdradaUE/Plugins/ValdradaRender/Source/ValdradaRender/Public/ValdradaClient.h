@@ -97,6 +97,8 @@ private:
 	float NightValue = -1.f;
 	float PresetExpo = 1.f;   // the time of day's fixed exposure (the film look's Expo)
 	void SetupEnvironment();
+	/** the tier's console variables from Data/tiers.json (the persistent city's graphics tiers, tools/ue/persist_tiers.json) */
+	void ApplyTier();
 	void ApplyEnv(const TSharedPtr<FJsonObject>& Env);
 	void ApplyEnvLook(const TSharedPtr<FJsonObject>& Env, bool bForce);
 	FString LastLook, LastLookTod;

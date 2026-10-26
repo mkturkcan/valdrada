@@ -1105,6 +1105,18 @@ MASTERS['water3'] = (WATER3, [('WP', 'wp'), ('Tm', 'time'), ('Wind', 'v', (6.0, 
                               ('RgN', 's', 0.0), ('RgC0', 'v', (0, 0, 0, 0)), ('RgC1', 'v', (0, 0, 0, 0)), ('Rg', 'v', (2.4, 0.08, 17.0, 1.0)), ('Fm', 'v', (0, 0.55, 1.3, 0))],
                      [('Rough', 1), ('Spec', 1), ('NormalOut', 3), ('Scat', 3), ('Absorb', 3), ('PhaseG', 1), ('Behind', 1), ('Opacity', 1)],
                      {'normal_ws': True, 'slw': True})
+# WATER3F (2026-10-25): M_bx_water3f, M_bx_water3 for the far level's rivers with a fetch map: FetchT (linear, R) over
+# the world rect FetchR (x0, z0, 1/w, 1/h, metres; z 0 off) is a channel's t (tools/ue/water_fetch.py: 1 on open water,
+# under 1 on channels 90-210 m wide); the sea's fetch goes from Wind.z to FetchN.x and the long trains' lift from Wind.w
+# to 1 as t falls. Where t is 1 the code takes Wind.z and Wind.w themselves, so open water is M_bx_water3's to the bit.
+WATER3F = WATER3.replace(
+    "float U = max(Wind.x, 0.5), F = max(Wind.z, 50.0), wd = Wind.y * 0.01745329;",
+    "float tF = FetchR.z > 0.0 ? saturate(Texture2DSampleLevel(FetchT, FetchTSampler, (X - FetchR.xy) * FetchR.zw, 0).r) : 1.0;\n"
+    "float U = max(Wind.x, 0.5), F = max(tF >= 1.0 ? Wind.z : lerp(FetchN.x, Wind.z, tF), 50.0), wd = Wind.y * 0.01745329;\n"
+    "float lift = tF >= 1.0 ? Wind.w : lerp(1.0, Wind.w, tF);").replace(
+    "lerp(Wind.w, 1.0, smoothstep(2.0 * kp, 16.0 * kp, k))", "lerp(lift, 1.0, smoothstep(2.0 * kp, 16.0 * kp, k))")
+MASTERS['water3f'] = (WATER3F, MASTERS['water3'][1] + [('FetchT', 'tl', 'orm'), ('FetchR', 'v', (0, 0, 0, 0)), ('FetchN', 'v', (800.0, 0, 0, 0))],
+                      MASTERS['water3'][2], MASTERS['water3'][3])
 # VEIL2 (2026-10-15, the owner: the fountains' water in the city's cells "isn't proper UE5 water but some low-quality
 # textured water"): M_bx_veil2, M_bx_veil for the cells. Every fountain's falling water shares one library key
 # (fw26:veil#..., the key's hash leaves the web's uniforms out), so the instance carries a table of up to eight veils

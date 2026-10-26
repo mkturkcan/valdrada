@@ -1,0 +1,10 @@
+{
+ "_doc": "retired 2026-10-24: the museum has its own library keys (pbrLib amnh_* sets, HQ maps by ue_families.json hq.pbr), bound by every matlib rebind; nothing to split or set here",
+ "dump": [],
+ "texlib": "/Game/Tex",
+ "import": [],
+ "apply": false,
+ "set": {},
+ "out": "/data0/projectnyc_aux/ue_cache/matlib/amnh_apply.json",
+ "split": {}
+}

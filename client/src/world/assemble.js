@@ -24,6 +24,8 @@ import { haLift, haPreload, haHoldDecks, haRestoreDecks, haWarpDeep, haAnchors, 
 import { HHP, hhpReady, hhpPre, hhpPost, hhpSkipBuilding, hhpAfterClamp } from '../city/hhp.js';   // HIGHWAYS P2 (`?hhp=1`): the Henry Hudson Parkway as designed alignments
 import { wshGroundFix } from '../city/wshGround.js';
 import { wshCoastReady } from '../city/wshCoast.js';   // (the West Side Highway's and the northern parkway's shore ground)
+import { MARINA, marinaReady, marinaSlivers, marinaGround, marinaSkipBuilding, buildMarina } from '../city/marinaKit.js';   // MARINA KIT: docks, gangways, pilings and boats city-wide; the slabs they replace out
+import { SEAWALL, seawallExtract, buildSeawall } from '../city/seawallKit.js';   // SEAWALL KIT: coursed granite and concrete seawalls, copings, rails, ladders, outfalls, fenders, piers on piles
 import { pbrMaterial } from '../city/mat/pbrLib.js';   // P2C: the built walls' stone
 const SMOOTH_P2C = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('terrainSmooth') === '0');   // TERRAIN INT2: on by default (`?terrainSmooth=0` off)
 const SMOOTH_IDS = new Set([5, 6, 7, 15, 17]);
@@ -31,8 +33,12 @@ function smoothNatural(pos, mat, nrm, ox, oz) {
   // (TERRAIN INT2: gathered in 1.5 m cells by position, not by shared vertices: the compiled lawn's needles meet the
   // base and each other at T-junctions, so a vertex rarely has the faces round it as its own; a cell's faces within the
   // crease of a vertex's own face, in that cell and the eight round it and within 1.2 m of height, give its normal)
-  const nV = mat.length, CS = 1.5, H = new Map(), key = (i, j, k) => (i * 65536 + j) * 512 + k;
-  const cell = (x, y, z) => [Math.floor((x - ox + 64) / CS), Math.floor((z - oz + 64) / CS), Math.floor((y + 300) / 1.2)];
+  // (PERF: the cells' faces packed in cell order, each with its length; a vertex sharing its triangle's previous vertex's
+  // cell and normal takes that vertex's sum; the sums run over the same faces in the same order)
+  const nV = mat.length, CS = 1.5, key = (i, j, k) => (i * 65536 + j) * 512 + k;
+  const CI = new Map(), vc = new Int32Array(nV).fill(-1), cnt = [];
+  const cellOf = (v) => key(Math.floor((pos[v * 3] - ox + 64) / CS), Math.floor((pos[v * 3 + 2] - oz + 64) / CS), Math.floor((pos[v * 3 + 1] + 300) / 1.2));
+  const face = new Float64Array(Math.ceil(nV / 3) * 4);
   const ok = new Uint8Array(nV);
   for (let t = 0; t + 2 < nV; t += 3) {
     if (!SMOOTH_IDS.has(mat[t]) || mat[t + 1] !== mat[t] || mat[t + 2] !== mat[t]) continue;
@@ -42,32 +48,141 @@ function smoothNatural(pos, mat, nrm, ox, oz) {
     if (fx * fx + fy * fy + fz * fz < 1e-12) continue;
     if (fy < 0) { fx = -fx; fy = -fy; fz = -fz; }
     ok[t] = ok[t + 1] = ok[t + 2] = 1;
+    const f4 = (t / 3) * 4;
+    face[f4] = fx; face[f4 + 1] = fy; face[f4 + 2] = fz; face[f4 + 3] = Math.hypot(fx, fy, fz);
     for (let k = 0; k < 3; k++) {
-      const v = t + k, [ci, cj, ck] = cell(pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]), q = key(ci, cj, ck);
-      let l = H.get(q); if (!l) H.set(q, (l = [])); l.push(fx, fy, fz);
+      const q = cellOf(t + k);
+      let c = CI.get(q);
+      if (c === undefined) { c = cnt.length; CI.set(q, c); cnt.push(0); }
+      vc[t + k] = c; cnt[c]++;
     }
+  }
+  // (a face is listed once per corner in the cell: its corners come one after another, so its entries in a cell are one run,
+  // kept as one entry with its count; the sums still add it once per corner)
+  const nC = cnt.length, off = new Int32Array(nC + 1);
+  for (let c = 0; c < nC; c++) off[c + 1] = off[c] + cnt[c];
+  const E = new Float64Array(off[nC] * 5), fill = off.slice(0, nC), lastT = new Int32Array(nC).fill(-1);
+  for (let v = 0; v < nV; v++) {
+    const c = vc[v];
+    if (c < 0) continue;
+    const t = (v / 3) | 0;
+    if (lastT[c] === t) { E[5 * (fill[c] - 1) + 4]++; continue; }
+    lastT[c] = t;
+    const f4 = t * 4, e = 5 * fill[c]++;
+    E[e] = face[f4]; E[e + 1] = face[f4 + 1]; E[e + 2] = face[f4 + 2]; E[e + 3] = face[f4 + 3]; E[e + 4] = 1;
   }
   const C = Math.cos((78 * Math.PI) / 180);
   const out = new Float32Array(nV * 3);
-  for (let v = 0; v < nV; v++) {
+  // the vertices to sum, by cell (one that shares its triangle's earlier vertex's cell and normal copies that one's sum)
+  const first = new Int32Array(nC).fill(-1), next = new Int32Array(nV).fill(-1), same = new Int32Array(nV).fill(-1);
+  for (let v = nV - 1; v >= 0; v--) {
     if (!ok[v]) continue;
-    let ax = nrm[v * 3], ay = nrm[v * 3 + 1], az = nrm[v * 3 + 2];
-    if (ay < 0) { ax = -ax; ay = -ay; az = -az; }
-    const [ci, cj, ck] = cell(pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]);
-    let sx = 0, sy = 0, sz = 0;
-    for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) for (let dk = -1; dk <= 1; dk++) {
-      const l = H.get(key(ci + di, cj + dj, ck + dk));
-      if (!l) continue;
-      for (let i = 0; i < l.length; i += 3) {
-        const L = Math.hypot(l[i], l[i + 1], l[i + 2]);
-        if ((l[i] * ax + l[i + 1] * ay + l[i + 2] * az) / L < C) continue;
-        sx += l[i]; sy += l[i + 1]; sz += l[i + 2];
+    const o3 = v * 3, r = v % 3;
+    for (let p = v - r; p < v; p++) if (vc[p] === vc[v] && nrm[p * 3] === nrm[o3] && nrm[p * 3 + 1] === nrm[o3 + 1] && nrm[p * 3 + 2] === nrm[o3 + 2]) { same[v] = p; break; }
+    if (same[v] < 0) { next[v] = first[vc[v]]; first[vc[v]] = v; }
+  }
+  const NBR = [];   // (the neighbourhood's entry ranges, in the sum's order)
+  let VA = new Float64Array(192), VI = new Int32Array(64), VB = new Int32Array(64), GQ = new Int32Array(64), GB = new Int32Array(64);
+  const UMAX = 128, UE = new Int32Array(UMAX), G = new Map(), GK = [];
+  const finish = (v, sx, sy, sz) => {
+    const v3 = v * 3, L = Math.hypot(sx, sy, sz);
+    if (L > 0) { const sg = nrm[v3 + 1] < 0 ? -1 : 1; out[v3] = (sg * sx) / L; out[v3 + 1] = (sg * sy) / L; out[v3 + 2] = (sg * sz) / L; }
+    else { out[v3] = nrm[v3]; out[v3 + 1] = nrm[v3 + 1]; out[v3 + 2] = nrm[v3 + 2]; }
+  };
+  for (let c0 = 0; c0 < nC; c0++) {
+    if (first[c0] < 0) continue;
+    let m = 0;
+    for (let v = first[c0]; v >= 0; v = next[v]) m++;
+    if (m > VI.length) { VA = new Float64Array(3 * m); VI = new Int32Array(m); VB = new Int32Array(m); GQ = new Int32Array(m); GB = new Int32Array(m); }
+    let j = 0;
+    const v0 = first[c0];
+    for (let v = v0; v >= 0; v = next[v], j++) {
+      let ax = nrm[v * 3], ay = nrm[v * 3 + 1], az = nrm[v * 3 + 2];
+      if (ay < 0) { ax = -ax; ay = -ay; az = -az; }
+      VA[3 * j] = ax; VA[3 * j + 1] = ay; VA[3 * j + 2] = az; VI[j] = v; VB[j] = 0;
+    }
+    NBR.length = 0;
+    {
+      const o3 = v0 * 3, ci = Math.floor((pos[o3] - ox + 64) / CS), cj = Math.floor((pos[o3 + 2] - oz + 64) / CS), ck = Math.floor((pos[o3 + 1] + 300) / 1.2);
+      for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) for (let dk = -1; dk <= 1; dk++) {
+        const c = CI.get(key(ci + di, cj + dj, ck + dk));
+        if (c !== undefined) NBR.push(5 * off[c], 5 * fill[c]);
       }
     }
-    const L = Math.hypot(sx, sy, sz);
-    if (L > 0) { const sg = nrm[v * 3 + 1] < 0 ? -1 : 1; out[v * 3] = (sg * sx) / L; out[v * 3 + 1] = (sg * sy) / L; out[v * 3 + 2] = (sg * sz) / L; }
-    else { out[v * 3] = nrm[v * 3]; out[v * 3 + 1] = nrm[v * 3 + 1]; out[v * 3 + 2] = nrm[v * 3 + 2]; }
+    // (a face's crease test is decided for a group of the cell's vertices at once when its cosine to the group's first
+    // normal clears the crease by more than the farthest normal of the group from that one; the faces it leaves open
+    // are tried vertex by vertex; vertices alike on those share one sum, over the same faces in the same order)
+    let done = 0;
+    while (done < m) {
+      // the next group: the first vertex left and those within 0.25 of its normal
+      let q0 = -1;
+      for (let q = 0; q < m; q++) if (VB[q] !== -2 - c0) { q0 = q; break; }
+      const sx0 = VA[3 * q0], sy0 = VA[3 * q0 + 1], sz0 = VA[3 * q0 + 2];
+      let n = 0, D = 0;
+      for (let q = q0; q < m; q++) {
+        if (VB[q] === -2 - c0) continue;
+        const d = Math.hypot(VA[3 * q] - sx0, VA[3 * q + 1] - sy0, VA[3 * q + 2] - sz0);
+        if (!(d < 0.05)) continue;
+        VB[q] = -2 - c0; GQ[n++] = q; if (d > D) D = d;
+      }
+      if (n === 0) { GQ[n++] = q0; VB[q0] = -2 - c0; D = Infinity; }   // (a normal not a number: on its own)
+      done += n;
+      let nu = 0;
+      const hi = C + D + 1e-9, lo = C - D - 1e-9;
+      if (n > 1 && D < 0.05) {
+        for (let b = 0; b < NBR.length && nu <= UMAX; b += 2) for (let i = NBR[b]; i < NBR[b + 1]; i += 5) {
+          const g = (E[i] * sx0 + E[i + 1] * sy0 + E[i + 2] * sz0) / E[i + 3];
+          if (g >= hi || g < lo) continue;
+          if (nu === UMAX) { nu = UMAX + 1; break; }
+          UE[nu++] = i;
+        }
+      } else nu = UMAX + 1;
+      if (nu <= UMAX) {
+        G.clear();
+        const nw = (nu + 31) >> 5;
+        for (let k = 0; k < n; k++) {
+          const q = GQ[k], ax = VA[3 * q], ay = VA[3 * q + 1], az = VA[3 * q + 2];
+          let gk = '';
+          for (let w = 0; w < nw; w++) {
+            let bits = 0;
+            for (let u = 32 * w; u < nu && u < 32 * w + 32; u++) { const i = UE[u]; if (!((E[i] * ax + E[i + 1] * ay + E[i + 2] * az) / E[i + 3] < C)) bits |= 1 << (u & 31); }
+            gk += bits + ',';
+          }
+          GK[k] = gk;
+          if (!G.has(gk)) G.set(gk, null);
+        }
+        for (const gk of G.keys()) {
+          const W = gk.split(',');
+          let sx = 0, sy = 0, sz = 0, u = 0;
+          for (let b = 0; b < NBR.length; b += 2) for (let i = NBR[b]; i < NBR[b + 1]; i += 5) {
+            let take;
+            if (u < nu && UE[u] === i) { take = (+W[u >> 5] >> (u & 31)) & 1; u++; }
+            else take = (E[i] * sx0 + E[i + 1] * sy0 + E[i + 2] * sz0) / E[i + 3] >= hi;
+            if (!take) continue;
+            const r = E[i + 4];
+            sx += E[i]; sy += E[i + 1]; sz += E[i + 2];
+            if (r > 1) { sx += E[i]; sy += E[i + 1]; sz += E[i + 2]; if (r > 2) { sx += E[i]; sy += E[i + 1]; sz += E[i + 2]; } }
+          }
+          G.set(gk, [sx, sy, sz]);
+        }
+        for (let k = 0; k < n; k++) { const S = G.get(GK[k]); finish(VI[GQ[k]], S[0], S[1], S[2]); }
+        continue;
+      }
+      // (else vertex by vertex)
+      for (let k = 0; k < n; k++) {
+        const q = GQ[k], ax = VA[3 * q], ay = VA[3 * q + 1], az = VA[3 * q + 2];
+        let sx = 0, sy = 0, sz = 0;
+        for (let b = 0; b < NBR.length; b += 2) for (let i = NBR[b]; i < NBR[b + 1]; i += 5) {
+          if ((E[i] * ax + E[i + 1] * ay + E[i + 2] * az) / E[i + 3] < C) continue;
+          const r = E[i + 4];
+          sx += E[i]; sy += E[i + 1]; sz += E[i + 2];
+          if (r > 1) { sx += E[i]; sy += E[i + 1]; sz += E[i + 2]; if (r > 2) { sx += E[i]; sy += E[i + 1]; sz += E[i + 2]; } }
+        }
+        finish(VI[q], sx, sy, sz);
+      }
+    }
   }
+  for (let v = 0; v < nV; v++) if (same[v] >= 0) { const p = same[v]; out[v * 3] = out[p * 3]; out[v * 3 + 1] = out[p * 3 + 1]; out[v * 3 + 2] = out[p * 3 + 2]; }
   for (let v = 0; v < nV; v++) if (ok[v]) { nrm[v * 3] = out[v * 3]; nrm[v * 3 + 1] = out[v * 3 + 1]; nrm[v * 3 + 2] = out[v * 3 + 2]; }
 }
 import { vegTile, vegDropTree, vegBuild } from './vegP1.js';
@@ -1812,6 +1927,8 @@ export async function assembleTile(key, arrayBuf, ctx) {
   // lifted by its relief (0 on the region's boundary), the road lines and the grid lifted, the region's base laid
   // HIGHWAYS P2 (city/hhp.js, `?hhp=1`): the compiled parkway out before the cut, its own ground laid after it
   const HHPT = HHP && await hhpReady();
+  const MKT = MARINA && await marinaReady();   // (before wshCoast: its planimetric pier decks the kit replaces are dropped there)
+  if (MARINA) { try { marinaSlivers(tile); } catch (e) { console.warn('[marina] slivers', e); } }   // (the compile's sunk-bank lawn slivers, before the cut)
   const P1T = HA_P1 && await haTileReady(Math.floor(ox / 512), Math.floor(oz / 512));
   if (HHPT) { try { hhpPre(tile, ox, oz, P1T); } catch (e) { console.warn('[hhp] pre', e); } }
   // (P1 anchors: the elevated decks and the FDR under the park decks are Phase 2's structures: held out of the cut)
@@ -1821,7 +1938,9 @@ export async function assembleTile(key, arrayBuf, ctx) {
   if (HHPT) { try { hhpPost(tile, ox, oz, P1T); } catch (e) { console.warn('[hhp] post', e); } }
   if (HHPT && P1T) { try { await wshCoastReady(); wshGroundFix(tile, ox, oz); } catch (e) { console.warn('[wsh] ground', e); } }
   if (P1T) haClampGround(tile);   // TERRAIN FIX: the natural ground never over the paving (heightAuthority.js)
+  if (P1T && SEAWALL) { try { seawallExtract(tile, ox, oz); } catch (e) { console.warn('[seawall] extract', e); } }   // SEAWALL KIT: the swept shore walls out of the curb soup, to the kit
   if (HHPT) hhpAfterClamp(tile);   // (the FDR structures' deck tops: over the drives by design)
+  if (MKT) { try { marinaGround(tile, ox, oz); } catch (e) { console.warn('[marina] ground', e); } }   // MARINA KIT: the dock strips' compiled ground out
   const VGT = P1T && await vegTile(ox, oz);   // VEG P1: this tile's trees, understorey and cover mask (world/vegP1.js)
 
   // tile terrain sampler (carved grid) for foundation depths
@@ -2233,7 +2352,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
     cx /= ring.length; cz /= ring.length;
     // a footprint that lies entirely in the traffic lanes is not a building
     if (!NO_DATUM && !b.landmarkId && b.area <= 200 && onCarriageway(ring, cx, cz)) { culledOnRoad++; cyDrop(); continue; }   // CY12: a footprint that is not a building has no courts
-    if (tpSkipBuilding(cx, cz, b.height, b.area) || bpSkipBuilding(cx, cz, b.height, b.area) || (CPT && cpSkipBuilding(cx, cz, b.height, b.area)) || (ART && areaSkipBuilding(cx, cz, b.height, b.area)) || (HHPT && hhpSkipBuilding(cx, cz))) { cyDrop(); continue; }   // TP28: the TKTS booth (the red steps stand there) and the kiosk box on the Duffy Square plaza
+    if (tpSkipBuilding(cx, cz, b.height, b.area) || bpSkipBuilding(cx, cz, b.height, b.area) || (CPT && cpSkipBuilding(cx, cz, b.height, b.area)) || (ART && areaSkipBuilding(cx, cz, b.height, b.area)) || (HHPT && hhpSkipBuilding(cx, cz)) || (MKT && marinaSkipBuilding(key, b.i))) { cyDrop(); continue; }   // TP28: the TKTS booth (the red steps stand there) and the kiosk box on the Duffy Square plaza
     // foundation: walls extend down to below the lowest terrain under the footprint,
     // shader renders the below-grade band (v<0) as a stone/brick foundation course
     let minT = 1e9;
@@ -3448,6 +3567,8 @@ export async function assembleTile(key, arrayBuf, ctx) {
     }, (x, z) => { const y = sidewalkYAt(x, z); return y !== null ? y : padYNear(x, z); });
   } catch (e) { if (!window.__rampErr) { window.__rampErr = 1; console.warn('curb ramps', e); } }
 
+  if (MKT) { try { const r = buildMarina(group, ox, oz); if (r) tile.__marina = r; } catch (e) { console.warn('[marina] build', e); } }   // MARINA KIT
+  if (SEAWALL) { try { const r = buildSeawall(group, tile); if (r) tile.__seawall = r; } catch (e) { console.warn('[seawall] build', e); } }   // SEAWALL KIT
   if (DISPOSE_OWNED) registerOwned(key, group);   // SPACE r2: what this tile draws with (two tiles' materials are shared: kept)
   if (LOWMEM) { freeArraysAfterUpload(group, geoMark); lateSweep(group, geoMark); }   // SPACE r2 (?lowmem=1): the tile's own static geometry lets its arrays go once uploaded
   return {

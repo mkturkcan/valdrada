@@ -54,6 +54,8 @@ in the Unreal project `client/tools/ar34/export/ue_project`:
 ```bash
 UE_V2=1 UE_CITY_DIR=<cache>/city_v2 UE_BAKE_NAME=cityv2 python3 tools/ue/city_build.py run --pages 6
 python3 ue_client/ValdradaUE/Tools/make_manifests.py --city <cache>/city_v2      # Data/city.json, Data/classes.json
+python3 ue_client/ValdradaUE/Tools/make_tiers.py        # Data/tiers.json, the four graphics tiers
+python3 ue_client/ValdradaUE/Tools/cook_list.py         # the cook takes only the levels city.json names
 ```
 
 The first build of the five boroughs took 11 h 20 min on the reference machine (56,819 cells baked on three GPUs,
@@ -61,6 +63,10 @@ The first build of the five boroughs took 11 h 20 min on the reference machine (
 the development machine it is a symbolic link to the city build's `Content/`. `make_manifests.py` lists only levels and
 tables that exist; the current city names 981 block levels, 3,682 far levels and 56,582 kit tables (15.46 GB of
 `.vcel` files).
+The project's `Content/` keeps every earlier build of a block and far package beside the current one (for 0.6.0, 401
+stale block levels and 4,242 stale far packages); `cook_list.py` writes the levels of `Data/city.json` into the "Map"
+primary asset type of `Config/DefaultGame.ini` as specific assets, so the cook takes those alone (0.6.0: 981 block and
+3,651 far levels).
 
 A Windows machine needs the same uncooked packages under `ue_client\ValdradaUE\Content`, as a real folder.
 `export_content.py` lists exactly the packages the last Linux cook cooked (no stale levels of the city build) and packs

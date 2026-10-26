@@ -18,6 +18,8 @@ import argparse, json, math, os, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(HERE, '..', 'city'))
+import pconf; pconf.apply()   # (CITY 2026-10-25: config/pipeline.json's flags as defaults; an env value that differs is logged)
 ROOT = os.path.abspath(os.path.join(HERE, '..', '..'))
 CELLCACHE = '/data0/projectnyc_aux/cellcache'
 CITY = os.environ.get('UE_CITY_DIR', '/data0/projectnyc_aux/ue_cache/city')   # (city v2: its own manifests, ue_cache/city_v2)
@@ -102,9 +104,14 @@ def bake_stage(pages, tries=12):
 
 
 def city_index():
-    """every baked city cell and its package: kept in ue_cache/city/baked.json, the bakes' indexes merged into it (GB43,
-    2026-10-14: a bake's index lists the cells of its own run only, so a bake started again over the cells left dropped
-    the 16,144 cells baked before from the city's index); a cell baked again takes its new package"""
+    """every baked city cell and its package (CITY 2026-10-25: from the cell registry, tools/city/registry.py, the one source
+    of truth: the bakes' receipts are published into it by `city update` / `city registry publish`, and what an old-style
+    driver still writes into baked.json or the cityv2_N receipts is absorbed on read; CITY_REGISTRY=0 reads the old files
+    as before: GB43, baked.json with the bakes' indexes merged into it, later files winning (the rebake index trap))"""
+    import registry as REG
+    if REG.enabled():
+        ix = REG.current_index()
+        return {k: h for k, h in ix.items() if os.path.exists(os.path.join(CELLCACHE, h, 'cell.glb'))}
     bp = os.path.join(CITY, 'baked.json')
     try: ix = json.load(open(bp))
     except Exception: ix = {}
@@ -197,8 +204,15 @@ def build_cells(subset, index):
         blocks = {block_of(k) for k in dkey}
         bk = R.cc_blocks({k: d for k, d in allk.items() if block_of(k) in blocks}, logf, S)
     S['secs'] = round(time.time() - t0, 1)
+    import registry as REG
+    with REG.file_lock(os.path.join(CITY, 'cells.json.lock')):   # (CITY: two builds merging at once lost each other's cells)
+        _merge_manifest(dkey, extra, I, S, bk if R.V2_BLOCKS else None, R)
+    log('build done', len(dkey), 'cells,', json.dumps(S))
+
+
+def _merge_manifest(dkey, extra, I, S, bk, R):
     M = manifest()   # (read again: merged, never overwritten)
-    if R.V2_BLOCKS:
+    if bk is not None:
         for b, d in bk.items(): M.setdefault('blocks', {})[f'{b[0]}_{b[1]}'] = {'key': d, 'level': f'{R.CCB_ROOT}/{d}/L'}
     S['rebuilt'] = sum(1 for k in extra if M['cells'][k]['key'] != dkey.get(k))
     for k, d in dkey.items():
@@ -208,8 +222,7 @@ def build_cells(subset, index):
                          'hash': I['cells'][k], 'ptool': R.cc_ptool(),
                          'check': {x: r.get(x) for x in ('cop_m2', 'twice_m2', 'worst_pair_m2')}}
     M.setdefault('rounds', []).append({'made': time.ctime(), 'cells': len(dkey), 'stages': S}); M['made'] = time.ctime()
-    tmp = os.path.join(CITY, 'cells.json.tmp'); json.dump(M, open(tmp, 'w')); os.replace(tmp, os.path.join(CITY, 'cells.json'))
-    log('build done', len(dkey), 'cells,', json.dumps(S))
+    tmp = os.path.join(CITY, f'cells.json.{os.getpid()}.tmp'); json.dump(M, open(tmp, 'w')); os.replace(tmp, os.path.join(CITY, 'cells.json'))
 
 
 def build_stage():

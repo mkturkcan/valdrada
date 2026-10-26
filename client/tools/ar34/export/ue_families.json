@@ -2582,8 +2582,14 @@
    "granite_black": "granite_wall",
    "concrete_precast": "preconcrete_wall_001",
    "concrete_smooth": "concrete_wall_008",
+   "metal_painted": "PaintedMetal002",
    "concrete_board": "concrete_wall_008",
-   "stucco": "white_stucco"
+   "stucco": "white_stucco",
+   "amnh_tile": "amnh_tile",
+   "amnh_slate": "amnh_slate",
+   "amnh_copper": "amnh_copper",
+   "amnh_granite": "amnh_granite",
+   "amnh_sedum": "amnh_sedum"
   },
   "unit": {
    "red_brick": [

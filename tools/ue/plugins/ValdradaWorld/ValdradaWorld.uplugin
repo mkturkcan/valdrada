@@ -1,0 +1,12 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1",
+	"FriendlyName": "Valdrada World",
+	"Description": "The persistent city level: streamed kit cells, near/far swap, grid setup",
+	"Category": "Valdrada",
+	"CanContainContent": false,
+	"EnabledByDefault": true,
+	"Plugins": [ { "Name": "MovieRenderPipeline", "Enabled": true } ],
+	"Modules": [ { "Name": "ValdradaWorld", "Type": "Runtime", "LoadingPhase": "Default" }, { "Name": "ValdradaWorldEditor", "Type": "Editor", "LoadingPhase": "Default" } ]
+}

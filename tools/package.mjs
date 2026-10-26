@@ -337,7 +337,7 @@ Mehmet Kerem Turkcan. If you use it, the compiled city or imagery rendered
 with it, please cite Valdrada itself:
 
     M. K. Turkcan. "Valdrada: a real-data, real-time digital twin of New
-    York City." Software, version 0.5.2, 2026.
+    York City." Software, version 0.6.0, 2026.
     https://github.com/mkturkcan/valdrada
 `;
 }

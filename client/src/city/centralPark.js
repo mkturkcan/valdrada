@@ -114,6 +114,7 @@ function sinkBaseP1(tile) {
   for (let i = 0; i + 2 < B.length; i += 3) {
     const x = B[i] + ox, z = B[i + 2] + oz;
     if (covered(B[i], B[i + 2]) === 'paved' || !haInCentralPark(x, z)) continue;   // (bare, or under the lawn only)
+    if (!haInCentralPark(x + 5, z) || !haInCentralPark(x - 5, z) || !haInCentralPark(x, z + 5) || !haInCentralPark(x, z - 5)) continue;   // (not at the park's edge: the street's walk and the wall meet the base there)
     const t = CP_DATUM + cpRelief(x, z) + cpDriveGroundDy(x, z) - 0.04;
     if (B[i + 1] < t && t - B[i + 1] < 1.0) { B[i + 1] = t; r++; }
   }

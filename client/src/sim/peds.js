@@ -34,7 +34,8 @@ function kitColliders() {
 import { tpPromenades, tpSeats } from '../city/tsqPlaza.js';
 import { bpPromenades, bpSeats } from '../city/bryantPark.js';
 import { cpPromenades, cpSeats, cpWater, cpKeepOut } from '../city/centralPark.js';
-import { CPD_ON, cpDriveNear, cpDriveWalks } from '../city/cpDrives.js';   // TERRAIN INT2: the rebuilt park drives
+import { CPD_ON, cpDriveNear, cpDriveWalks } from '../city/cpDrives.js';
+import { pgDriveHit } from '../world/placeGuard.js';   // TERRAIN INT2: the rebuilt park drives
 import { HA_P1, haInCentralPark } from '../world/heightAuthority.js';
 import { vg37Blocked } from '../world/vg37.js';   // VG37 (GROUND): the mapped hedges and planted beds are no walk
 import { areaPromenades, areaSeats } from '../city/areas.js';
@@ -2116,7 +2117,7 @@ export class Peds {
   // { x, y, z (the seat point on the floor plan, y the floor), yaw (the way a seated person faces), h (the seat's top
   // above y), table (a chair at a table), kind, take (taken, by hash), h4 (a hash for the pose), key, ped }
   _seatList() {
-    const A = tpSeats(), B = bpSeats(), C = cpSeats(), E = areaSeats(), n = A.length + B.length + C.length + E.length;
+    const A = tpSeats(), B = bpSeats(), C = cpSeats().filter((q) => !pgDriveHit(q.x, q.z, 15)), E = areaSeats(), n = A.length + B.length + C.length + E.length;   // (TERRAIN INT2: no seat in a rebuilt drive's corridor)
     if (n === this._seatN) return this._seatL;
     this._seatN = n;
     const old = new Map();

@@ -351,7 +351,8 @@ def mrq_manifest(unreal, cfg, side, level, seq_path, name, ranges):
         # UE14 (UE track, 2026-10-09): BXUE_AA=none renders each sample without temporal reconstruction (the frame's AA from
         # --spatial samples, the shutter's blur from the temporal ones), a test against TSR's smear of thin alpha-cut leaves
         # (GB43: or the settings' aa 'none', with their spatial samples: a supersampled frame, no TSR smear between samples)
-        sp(aa, 'anti_aliasing_method', unreal.AntiAliasingMethod.AAM_NONE if os.environ.get('BXUE_AA') == 'none' or cfg.get('aa') == 'none' else unreal.AntiAliasingMethod.AAM_TSR)
+        sp(aa, 'anti_aliasing_method', unreal.AntiAliasingMethod.AAM_NONE if os.environ.get('BXUE_AA') == 'none' or cfg.get('aa') == 'none' else
+           unreal.AntiAliasingMethod.AAM_TEMPORAL_AA if cfg.get('aa') == 'taa' else unreal.AntiAliasingMethod.AAM_TSR)   # (FP18: 'taa', the older temporal AA)
         # UE14 end
         # ==== R1C (lane C, 2026-10-11): the path tracer's samples a pixel, no temporal reconstruction
         if cfg.get('pathtrace'):

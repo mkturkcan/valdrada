@@ -6100,6 +6100,8 @@ vec3 worn = mix(asph, paintC * 0.80, 0.62);
         // (along-face, world-Y) frame, so they never stretch with the slope.
         if (m == 5 || m == 7 || m == 8) {
           GND_rock = smoothstep(0.819, 0.500, abs(GND_wn.y)); // 35 deg -> 60 deg
+          // (TERRAIN INT2: a lawn bank in the region is woodland floor to ~65 deg, its schist in patches past ~55 deg)
+          if (vgOn > 0.5 && m == 5) GND_rock = GND_rock * smoothstep(0.45, 0.30, abs(GND_wn.y)) + smoothstep(0.60, 0.45, abs(GND_wn.y)) * smoothstep(0.55, 0.78, fbm(vWPos.xz * 0.08 + 19.0)) * 0.6;
           // ...but the COLUMBIA SUPERBLOCK is not a schist outcrop. Its terraces
           // are padAt banks — granite retaining walls with lawn over them — and
           // the slope rule was turning the plaza flank ramps either side of the

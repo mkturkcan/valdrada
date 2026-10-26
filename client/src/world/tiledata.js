@@ -79,6 +79,11 @@ export function* buildingsOf(tile) {
       frontIdx: dv.getUint8(o + 43) - 1, // -1 = unknown (old tiles / no street frontage)
     };
     for (const r of near) if (inRing(tile.S.bldgXZ, b.start, b.len, org[0], org[1], r.x, r.z)) applyReadOverride(b, r.o);
+    // STORE12: a storefront never takes the whole wall. The compile gives 4.5 m to shops on buildings of any height, so a
+    // 3.2 m one-storey building on Broadway at 121st St drew as one band of shop glass from kerb to roof (white slabs from
+    // the air). Under 4 m of building a one-storey shopfront (bulkhead, glass, sign band) up to a 0.35 m parapet; above,
+    // the shop band stops 1.2 m under the roof at most
+    if (b.storeH > 0 && b.height > 0) b.storeH = Math.max(0, Math.min(b.storeH, b.height < 4 ? b.height - 0.35 : b.height - 1.2));
     yield b;
   }
 }
