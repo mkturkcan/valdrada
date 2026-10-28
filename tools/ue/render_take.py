@@ -600,7 +600,19 @@ def cf_far(fard, logf, S):
                                    lambda ks: _imp_levels(ks, CF_ROOT, os.path.join(CC, 'far_src'), os.path.join(CC, 'far_imp'), os.path.join(CC, 'far_tmp'), logf, 'cf'),
                                    'far import')
     S['cf_import_s'] = round(time.time() - t, 1); t = time.time()
-    bound = lambda fk: json.load(open(os.path.join(CC, 'far_imp', fk + '.json'))).get('mat') == msig
+    # (NJCOVER2: a covered package is bound when its ground instances are on the current cover master too, bd_cover_mat.COVV:
+    # a new cover master re-binds the covered packages, not the rest of the far city)
+    covv = None
+    if os.path.exists(os.path.join(HERE, 'bd_cover_mat.py')):
+        import bd_cover_mat; covv = bd_cover_mat.COVV
+    def _covered(fn):
+        import struct
+        with open(os.path.join(fard, fn + '.glb'), 'rb') as fh:
+            h = fh.read(20); return b'lod16BdGroundCv' in fh.read(struct.unpack('<I', h[12:16])[0])
+    cov_fk = {fk for fn, fk in fkeys.items() if covv is not None and _covered(fn)}
+    def bound(fk):
+        j = json.load(open(os.path.join(CC, 'far_imp', fk + '.json')))
+        return j.get('mat') == msig and (fk not in cov_fk or j.get('cov') == covv)
     def bind_far(unbound):
         out = os.path.join(CC, 'far_tmp', f'mat_{os.getpid()}'); shutil.rmtree(out, ignore_errors=True)
         with editor_slot():
@@ -612,7 +624,9 @@ def cf_far(fard, logf, S):
                 code, _ = run(['python3', os.path.join(HERE, 'bd_cover_mat.py'), '--dest', ','.join(f'{CF_ROOT}/{fk}' for fk in unbound), '--out', out + '_cov'], logf + '.cfcov')
             if code: return
         for fk in unbound:
-            jp = os.path.join(CC, 'far_imp', fk + '.json'); j = json.load(open(jp)); j['mat'] = msig; json.dump(j, open(jp, 'w'))
+            jp = os.path.join(CC, 'far_imp', fk + '.json'); j = json.load(open(jp)); j['mat'] = msig
+            if fk in cov_fk: j['cov'] = covv
+            json.dump(j, open(jp, 'w'))
     S['cf_bound_new'] = claimed(set(fkeys.values()), 'far_mat', bound, bind_far, 'far materials (see the bind log)')
     S['cf_mat_s'] = round(time.time() - t, 1)
     return fkeys
@@ -1023,7 +1037,7 @@ def main():
         if not os.path.exists(sp_): json.dump(S_, open(sp_, 'w'), indent=1)
         # (FP18, 2026-10-22: the console variables and the notes are left out of the take's key: patch_manifest sets the
         # settings' cvars on the render's job, so a cvar-only variant reuses its preset's take, ~10 min an A/B, not ~45)
-        a.settings = sp_; xkey = {'settings': sha({k: v for k, v in S_.items() if k != 'cvars' and not k.startswith('_')})[:16]}
+        a.settings = sp_; xkey = {'settings': sha({k: v for k, v in S_.items() if k not in ('cvars', 'cvars_shot') and not k.startswith('_')})[:16]}
     if take_no_peds(a.shot): xkey['nopeds'] = 1
     tkey = sha({**xkey, 'world': wkey, 'usd': I['usd'], 'usd_files': usd_list, 'harvest': I['harvest'], 'light': fsha(os.path.join(I['harvest'], 'light_static.json')),
                 'tools': {n: fsha(os.path.join(HERE, n)) for n in TAKE_TOOLS}, 'export': {n: fsha(os.path.join(EXPORT, n)) for n in EXPORT_TOOLS}})[:16]
@@ -1035,13 +1049,24 @@ def main():
     if not TK and os.path.exists(tj): TK = json.load(open(tj))
     cv_now = json.load(open(a.settings)).get('cvars') or {}
     # (a take built by a variant with a cvar this run's settings lack would carry it in its manifest: built again)
+    # (stream06, 2026-10-26: a take's sequence reaches back only its warm-up before the first frame of the range it was
+    # built for (TAKE_RANGE). render_c2 of mnFdrSchurz reused a take built for frames 60-60, so frame 0 had 4 warm-up
+    # frames of camera-cut data instead of 64: Movie Render Queue warmed up 4 frames, captured while the world's
+    # sublevels and meshes were still loading, and the towers drew in over the shot (window grids, roof slabs, no walls).
+    # A take is reused only when the range it was built for starts at or before this render's first frame.)
+    def take_start(T_):
+        if 'range_start' in T_: return T_['range_start']
+        try: return int((json.load(open(os.path.join(tdir, 'act', 'act_cfg.json'))).get('frames') or [0])[0])
+        except Exception: return 0
+    if TK and TK.get('status') == 'ok' and take_start(TK) > fa:
+        log('take', tkey, f'was built for frames from {take_start(TK)}: its pre-roll does not reach frame {fa}; built again'); TK = None
     if TK and TK.get('status') == 'ok' and os.path.exists(TK['manifest']) and set(TK.get('cvars_built') or {}) <= set(cv_now):
         rec['take'] = 'reused'; log('take', tkey, 'reused')
     else:
         log('take', tkey, 'building (actors and light from', I['usd'] + ')')
         TK, err = build_take(I, W, tkey, tdir, a.settings, logf)
         if err: log('take failed at', err, '(log', logf + ')'); json.dump({'status': 'failed', 'at': err}, open(tj, 'w')); sys.exit(4)
-        TK['cvars_built'] = cv_now
+        TK['cvars_built'] = cv_now; TK['range_start'] = int(TAKE_RANGE.split('-')[0]) if TAKE_RANGE else 0
         json.dump(TK, open(tj, 'w'), indent=1); rec['take'] = 'built'; rec['take_s'] = TK['stages']['secs']
     fcntl.flock(tlock, fcntl.LOCK_UN)
     # the far city's night windows follow the take (the world is shared by times of day); a cache world's far masters read
@@ -1053,7 +1078,11 @@ def main():
     # the render
     raw = os.path.join(rdir, 'raw'); os.makedirs(raw)
     rel = f'MovieRenderPipeline/rt_{a.shot}_{runid}.utxt' if tag == 'all' else f'MovieRenderPipeline/rt_{a.shot}_{tag}_{runid}.utxt'
-    if not patch_manifest(TK['manifest'], os.path.join(SAVED, rel), raw, fa, fb - 1, json.load(open(a.settings)).get('cvars') or {}): log('render: the manifest has no output setting'); sys.exit(5)
+    # (stream06, 2026-10-26: a preset's cvars_shot, per-shot cvars over its cvars, e.g. pLibGold's Nanite detail; cvars
+    # only, so the take is shared with the preset's other renders)
+    S_cv = json.load(open(a.settings)); cv_ = dict(S_cv.get('cvars') or {}); cv_.update((S_cv.get('cvars_shot') or {}).get(a.shot) or {})
+    if (S_cv.get('cvars_shot') or {}).get(a.shot): log('cvars for', a.shot + ':', json.dumps(S_cv['cvars_shot'][a.shot]))
+    if not patch_manifest(TK['manifest'], os.path.join(SAVED, rel), raw, fa, fb - 1, cv_): log('render: the manifest has no output setting'); sys.exit(5)
     env = ue_env(); env['DRI_PRIME'] = f'pci-0000_{a.gpu_pci}_00_0'
     W_, H_ = json.load(open(a.settings)).get('res', '2560x1440').split('x')
     gl = open(os.path.join('/data0/projectnyc_aux/tmp/ue_gpu_locks', f'pci-0000_{a.gpu_pci}_00_0.lock'), 'a+')
@@ -1061,7 +1090,6 @@ def main():
     gl.seek(0); gl.truncate(); gl.write(f'pid {os.getpid()} {time.ctime()} render_take {a.shot}'); gl.flush()
     # (GB43, 2026-10-14: the cvars sizing pools Unreal makes at start, given on the command line too: the Movie Render
     # Queue sets its cvars once the level is loaded, after Nanite's root pages were sized)
-    cv_ = json.load(open(a.settings)).get('cvars') or {}
     startup_cvars = [f'-dpcvars={k}={cv_[k]}' for k in ('r.Nanite.Streaming.StreamingPoolSize',) if k in cv_]
     for attempt in (1, 2):
         for f in os.listdir(raw): os.remove(os.path.join(raw, f))
@@ -1076,6 +1104,13 @@ def main():
         log(f'render attempt {attempt} failed (exit {code}, {len(fs)} frames)')
     fcntl.flock(gl, fcntl.LOCK_UN); gl.close()
     rec['render_s'] = secs; rec['render_attempts'] = attempt
+    try:   # (stream06: the warm-up Movie Render Queue actually ran; fewer than the preset's means a short pre-roll, see take_start)
+        import re as re_
+        m_ = re_.search(r'having (\d+) warm up frames', open(os.path.join(rdir, f'render_{attempt}.log'), errors='replace').read())
+        if m_:
+            rec['warmup_frames'] = int(m_.group(1)); want_ = int(json.load(open(a.settings)).get('warmup') or 0)
+            if want_ and rec['warmup_frames'] < want_: log(f'WARNING: {rec["warmup_frames"]} warm-up frames, the preset asks {want_}: streaming may draw in during the shot')
+    except Exception: pass
     ts = [os.path.getmtime(os.path.join(raw, f)) for f in fs]
     if len(fs) < fb - fa: log('render failed:', len(fs), 'of', fb - fa, 'frames'); json.dump(rec, open(os.path.join(rdir, 'take_ue.json'), 'w'), indent=1); sys.exit(5)
     dts = sorted(y - x for x, y in zip(ts, ts[1:]))

@@ -10,7 +10,7 @@
 # The index, ue_cache/matlib/index.json: {key: {'path': asset path, 'mat': the binding tools' signature}}; a key whose
 # signature is not today's is bound again (its batch folder), so a change to a master or a binding rule rebinds the
 # library, never the cells.
-import argparse, fcntl, json, os, re, struct, subprocess, sys, time
+import argparse, contextlib, fcntl, json, os, re, struct, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -86,8 +86,15 @@ def ensure(cells_dir, logf=None):
             for k in new: ix[k] = {'path': f'{folder}/{k}', 'mat': None}
             save_index(ix); folders.append(folder)
         if folders:   # (the binding over the library's folders: the cells' records name every key)
+            import asset_guard
             out = os.path.join(DIR, f'bind_{os.getpid()}')
-            with R.editor_slot():
+            # (asset_guard: the shared folders open only for city update's build stage; a new batch folder is this run's own)
+            stale_shared = [f for f in folders if f in stale_folders]
+            if stale_shared and not asset_guard.token():
+                raise RuntimeError(f'matlib: {len(stale_shared)} shared library folders are bound with other tools than today\'s '
+                                   f'({stale_shared[:3]}); only city update\'s build stage may rebind them (tools/ue/asset_guard.py)')
+            guard = asset_guard.unlocked(stale_shared, 'matlib.ensure') if stale_shared else contextlib.nullcontext()
+            with guard, R.editor_slot():
                 code, _ = R.run(['python3', os.path.join(HERE, 'r1c_bind.py'), '--world-dest', ','.join(folders), '--cells', cells_dir, '--out', out],
                                 logf or os.path.join(DIR, 'bind.log'))
             if code or not os.path.exists(os.path.join(out, 'cellmat2.json')): raise RuntimeError(f'matlib: binding failed (see {logf})')

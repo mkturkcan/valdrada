@@ -54,8 +54,8 @@
  },
  "high": {
   "r.Nanite.Streaming.ReservedResources": 1,
-  "r.Nanite.Streaming.StreamingPoolSize": 640,
-  "r.Streaming.PoolSize": 2000,
+  "r.Nanite.Streaming.StreamingPoolSize": 512,
+  "r.Streaming.PoolSize": 1500,
   "r.ViewDistanceScale": 3.0
  },
  "cinematic": {

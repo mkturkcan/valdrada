@@ -66,7 +66,7 @@ small ornamentals and ginkgo) in up to three sizes (young, mature, large) with u
 branches to the twigs, leaves cut from CC0 scans and 62K to 1.37M triangles a tree. With the window rooms the download is 220 files, about 2.2 GB:
 
 ```bash
-hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.6.0 \
+hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.6.1 \
     --include "Blender/bxtrees2/*" --include "Blender/bxwin/*" --local-dir .cache/hf
 export BXTREES_ASSETS=$PWD/.cache/hf/Blender/bxtrees2
 export BXTREES2_TEX=$BXTREES_ASSETS/tex

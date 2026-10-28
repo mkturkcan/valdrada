@@ -6350,6 +6350,347 @@
       "flags": "play=1&fall=0",
       "size": "1080x1920"
     },
+    "v6HhpRise": {
+      "act": "mnterrain",
+      "time": "golden",
+      "duration": 15.0,
+      "ease": 0.1,
+      "warm": 240,
+      "fov": 45,
+      "flags": "terrain=p1&hhp=1&fall=0&gfx=saturation:1.16,contrast:0.2,motionBlur:0.5",
+      "title": "Valdrada 0.6 trailer: high over the Hudson, descending north along the Henry Hudson Parkway, Riverside Park and the 79th Street boat basin (assembly shot)",
+      "keys": [
+        {
+          "p": [
+            -73.9985,
+            40.7745,
+            480
+          ],
+          "look": [
+            -73.989,
+            40.7815,
+            0
+          ]
+        },
+        {
+          "p": [
+            -73.996,
+            40.779,
+            370
+          ],
+          "look": [
+            -73.9862,
+            40.7865,
+            0
+          ]
+        },
+        {
+          "p": [
+            -73.9935,
+            40.7835,
+            260
+          ],
+          "look": [
+            -73.9835,
+            40.7915,
+            5
+          ]
+        }
+      ]
+    },
+    "v6Palisades": {
+      "act": "mnterrain",
+      "time": "golden",
+      "duration": 10.0,
+      "ease": 0.1,
+      "warm": 240,
+      "fov": 45,
+      "flags": "terrain=p1&hhp=1&fall=0&gfx=saturation:1.16,contrast:0.2,motionBlur:0.5",
+      "title": "Valdrada 0.6 trailer: over the Hudson north of the George Washington Bridge, the Palisades woodland across the river (assembly shot)",
+      "keys": [
+        {
+          "p": [
+            -73.947,
+            40.852,
+            120
+          ],
+          "look": [
+            -73.964,
+            40.87,
+            50
+          ]
+        },
+        {
+          "p": [
+            -73.9475,
+            40.8555,
+            115
+          ],
+          "look": [
+            -73.9645,
+            40.8735,
+            50
+          ]
+        },
+        {
+          "p": [
+            -73.948,
+            40.859,
+            110
+          ],
+          "look": [
+            -73.965,
+            40.877,
+            50
+          ]
+        }
+      ]
+    },
+    "v6CpTreetops": {
+      "act": "mnterrain",
+      "time": "golden",
+      "duration": 5.0,
+      "ease": 0.1,
+      "warm": 240,
+      "fov": 50,
+      "flags": "terrain=p1&hhp=1&fall=0&gfx=saturation:1.16,contrast:0.2,motionBlur:0.5",
+      "title": "Valdrada 0.6 trailer: low over Central Park's Lake toward Bow Bridge, the San Remo's towers beyond (absolute heights 84 to 76 m)",
+      "keys": [
+        {
+          "p": [
+            -73.9688,
+            40.7748,
+            84
+          ],
+          "look": [
+            -73.9757,
+            40.7776,
+            88
+          ]
+        },
+        {
+          "p": [
+            -73.9702,
+            40.7755,
+            80
+          ],
+          "look": [
+            -73.9759,
+            40.7778,
+            88
+          ]
+        },
+        {
+          "p": [
+            -73.9716,
+            40.7762,
+            76
+          ],
+          "look": [
+            -73.9761,
+            40.778,
+            88
+          ]
+        }
+      ],
+      "abs": true
+    },
+    "v6CpOpen": {
+      "act": "mnterrain",
+      "time": "golden",
+      "duration": 6.0,
+      "ease": 0.05,
+      "warm": 240,
+      "fov": 55,
+      "abs": true,
+      "flags": "terrain=p1&hhp=1&fall=0&gfx=saturation:1.16,contrast:0.2,motionBlur:0.5",
+      "title": "Valdrada 0.6 trailer: high over Central Park South heading north up the park (absolute heights 362 to 364 m)",
+      "keys": [
+        {
+          "p": [
+            -73.9767199,
+            40.7647612,
+            362
+          ],
+          "look": [
+            -73.9714891,
+            40.774548,
+            111.7
+          ]
+        },
+        {
+          "p": [
+            -73.97593,
+            40.7661241,
+            363
+          ],
+          "look": [
+            -73.9706874,
+            40.7758994,
+            108.9
+          ]
+        },
+        {
+          "p": [
+            -73.9751854,
+            40.7675015,
+            364
+          ],
+          "look": [
+            -73.9698858,
+            40.7772731,
+            116.6
+          ]
+        }
+      ]
+    },
+    "v6CpBlocks": {
+      "act": "mnterrain",
+      "time": "golden",
+      "duration": 9.4,
+      "ease": 0.05,
+      "warm": 240,
+      "fov": 55,
+      "abs": true,
+      "flags": "terrain=p1&hhp=1&fall=0&gfx=saturation:1.16,contrast:0.2,motionBlur:0.5",
+      "title": "Valdrada 0.6 trailer: high over Central Park toward the Reservoir (absolute heights 378 to 392 m; the streaming grid shot)",
+      "keys": [
+        {
+          "p": [
+            -73.9714584,
+            40.7745654,
+            378
+          ],
+          "look": [
+            -73.9661606,
+            40.7843091,
+            117.1
+          ]
+        },
+        {
+          "p": [
+            -73.9701358,
+            40.7766528,
+            385
+          ],
+          "look": [
+            -73.9651538,
+            40.7864816,
+            119.4
+          ]
+        },
+        {
+          "p": [
+            -73.9687335,
+            40.7787104,
+            392
+          ],
+          "look": [
+            -73.9641828,
+            40.7886363,
+            116.2
+          ]
+        }
+      ]
+    },
+    "v6InwoodWoods": {
+      "act": "mnterrain",
+      "time": "golden",
+      "duration": 10.0,
+      "ease": 0.08,
+      "warm": 240,
+      "fov": 55,
+      "abs": true,
+      "flags": "terrain=p1&hhp=1&fall=0&gfx=saturation:1.16,contrast:0.2,motionBlur:0.5",
+      "title": "Valdrada 0.6 trailer: over Inwood Hill's woods toward Spuyten Duyvil and the Palisades (absolute heights 150 to 115 m; canopy assembly shot)",
+      "keys": [
+        {
+          "p": [
+            -73.915,
+            40.8722,
+            150
+          ],
+          "look": [
+            -73.929,
+            40.8705,
+            40
+          ]
+        },
+        {
+          "p": [
+            -73.9185,
+            40.8745,
+            132
+          ],
+          "look": [
+            -73.9305,
+            40.8722,
+            40
+          ]
+        },
+        {
+          "p": [
+            -73.922,
+            40.8768,
+            115
+          ],
+          "look": [
+            -73.932,
+            40.874,
+            40
+          ]
+        }
+      ]
+    },
+    "v6PalisadesHero": {
+      "act": "mnterrain",
+      "time": "golden",
+      "duration": 6.0,
+      "ease": 0.1,
+      "warm": 240,
+      "fov": 45,
+      "abs": true,
+      "flags": "terrain=p1&hhp=1&fall=0&gfx=saturation:1.16,contrast:0.2,motionBlur:0.5",
+      "title": "Valdrada 0.6 trailer: over the Hudson north of the George Washington Bridge, the Palisades woodland (absolute heights 120 to 110 m)",
+      "keys": [
+        {
+          "p": [
+            -73.947,
+            40.852,
+            120
+          ],
+          "look": [
+            -73.964,
+            40.87,
+            50
+          ]
+        },
+        {
+          "p": [
+            -73.9475,
+            40.8555,
+            115
+          ],
+          "look": [
+            -73.9645,
+            40.8735,
+            50
+          ]
+        },
+        {
+          "p": [
+            -73.948,
+            40.859,
+            110
+          ],
+          "look": [
+            -73.965,
+            40.877,
+            50
+          ]
+        }
+      ]
+    },
     "mnHhp79": {
       "act": "mnterrain",
       "time": "golden",

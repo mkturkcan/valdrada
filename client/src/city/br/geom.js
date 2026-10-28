@@ -349,6 +349,7 @@ function stoneize(B, S, lod) {
     const streak = sst(0.5, 0.82, vnoise2(sAlong / 1.1, y / 9, seed)) * sst(0.3, 0.7, vnoise2(sAlong / 3.7, y / 23, seed + 5));
     k *= 1 - 0.34 * streak * (0.3 + 0.7 * st);
     k *= 1 + 0.08 * (vnoise2(sAlong / 6.5, y / 6.5, seed + 11) - 0.5) * 2;   // the mottle
+    if (S.grime) k *= 1 - S.grime[2] * (1 - sst(S.grime[0], S.grime[1], y));   // grime toward the base
     if (ny < -0.6) k *= 0.76; else if (ny > 0.7) k *= 0.9;
     const wet = 1 - sst(0.5, 2.2, hw);
     col[v * 3] = k * (1 - 0.05 * wet); col[v * 3 + 1] = k * (1 + 0.02 * wet); col[v * 3 + 2] = k * (1 - 0.06 * wet);

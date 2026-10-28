@@ -208,6 +208,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--world-dest', required=True); ap.add_argument('--records', required=True); ap.add_argument('--out', required=True)
     a = ap.parse_args()
+    import asset_guard; asset_guard.require('bd_tilefac', a.world_dest.split(','))   # (shared library: city update's build stage only)
     out = os.path.abspath(a.out); os.makedirs(out, exist_ok=True)
     C = {'world_dest': a.world_dest, 'records': os.path.abspath(a.records), 'result': os.path.join(out, 'tilefac.json')}
     cp = os.path.join(out, 'tilefac_cfg.json'); json.dump(C, open(cp, 'w'), indent=1)

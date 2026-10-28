@@ -152,11 +152,19 @@ int32 UValdradaNaniteFacadesCommandlet::Main(const FString& Params)
 		AR.SearchAllAssets(true);
 		TArray<FAssetData> All; AR.GetAssetsByClass(UStaticMesh::StaticClass()->GetClassPathName(), All, true);
 		All.Sort([](const FAssetData& X, const FAssetData& Y) { return X.PackageName.LexicalLess(Y.PackageName); });
-		int32 Seen = 0, Nan = 0, Set = 0, Had = 0; TArray<FString> SetList;
+		int32 Seen = 0, Nan = 0, Set = 0, Had = 0, Known = 0; TArray<FString> SetList;
+		// (-known=<file>: packages checked by an earlier run are skipped and the file extended, so every cook can run it
+		// on the meshes made since: a block rebuilt after the one full run had its water drawn from a stripped fallback,
+		// the Central Park reservoir black and without depth, 2026-10-26)
+		FString KnownFile; FParse::Value(*Params, TEXT("known="), KnownFile);
+		TSet<FString> KnownSet; TArray<FString> KnownNew;
+		if (!KnownFile.IsEmpty()) { TArray<FString> L; FFileHelper::LoadFileToStringArray(L, *KnownFile); KnownSet.Append(L); }
 		for (int32 I = Si; I < All.Num(); I += Sn)
 		{
 			const FString Pn = All[I].PackageName.ToString();
 			if (!Pn.StartsWith(TEXT("/Game/"))) continue;
+			if (KnownSet.Contains(Pn)) { ++Known; continue; }
+			if (!KnownFile.IsEmpty()) KnownNew.Add(Pn);
 			UStaticMesh* SM = Cast<UStaticMesh>(All[I].GetAsset()); ++Seen;
 			if (!SM || !SM->GetNaniteSettings().bEnabled) { if (Seen % 2000 == 0) CollectGarbage(RF_NoFlags); continue; }
 			++Nan;
@@ -177,7 +185,9 @@ int32 UValdradaNaniteFacadesCommandlet::Main(const FString& Params)
 			}
 			if (Seen % 2000 == 0) { UE_LOG(LogValdradaNanite, Display, TEXT("keepfallback %d seen, %d Nanite, %d set"), Seen, Nan, Set); CollectGarbage(RF_NoFlags); }
 		}
-		const FString Txt = FString::Printf(TEXT("{\"meshes\": %d, \"seen\": %d, \"nanite\": %d, \"set\": %d, \"had\": %d, \"errors\": %d, \"eg\": \"%s\"}"), All.Num(), Seen, Nan, Set, Had, S.Errors.Num(), *FString::Join(SetList, TEXT(" ")));
+		if (!KnownFile.IsEmpty() && KnownNew.Num() && !S.Errors.Num())
+			FFileHelper::SaveStringToFile(FString::Join(KnownNew, TEXT("\n")) + TEXT("\n"), *KnownFile, FFileHelper::EEncodingOptions::AutoDetect, &IFileManager::Get(), FILEWRITE_Append);
+		const FString Txt = FString::Printf(TEXT("{\"meshes\": %d, \"seen\": %d, \"known\": %d, \"nanite\": %d, \"set\": %d, \"had\": %d, \"errors\": %d, \"eg\": \"%s\"}"), All.Num(), Seen, Known, Nan, Set, Had, S.Errors.Num(), *FString::Join(SetList, TEXT(" ")));
 		if (!OutFile.IsEmpty()) FFileHelper::SaveStringToFile(Txt, *OutFile);
 		UE_LOG(LogValdradaNanite, Display, TEXT("keepfallback done %s"), *Txt);
 		return S.Errors.Num() ? 1 : 0;

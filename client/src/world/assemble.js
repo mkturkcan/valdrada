@@ -196,7 +196,8 @@ import { buildTower, buildSetbacks, TOWER_H } from './towers.js';
 import { TW_BID } from '../city/tk/tkParams.js';   // TW: the tower kit's hide slot offset (world/towerKit.js)
 import { ringOffsetMiter, upTri } from './ringOffset.js';   // NM24
 import { disposeOwned, registerOwned } from './disposeOwned.js';   // SPACE r2: a tile's own materials and textures leave with it
-import { LOWMEM, geometryMark, freeArraysAfterUpload, lateSweep } from './cpuFree.js';   // SPACE r2: ?lowmem=1, the light build's memory peak
+import { LOWMEM, geometryMark, freeArraysAfterUpload, lateSweep } from './cpuFree.js';
+import { greenRoofKeep } from './greenRoof.js';   // GR07: planted roofs only where the survey's planted area covers the part   // SPACE r2: ?lowmem=1, the light build's memory peak
 
 // `?nodatum=1` — A/B switch for the 2026-09-03 seam pass (docs/notes/seams.md).
 // It restores the legacy datums (building base as serialized, furniture as
@@ -2320,7 +2321,11 @@ export async function assembleTile(key, arrayBuf, ctx) {
   const p1Bl = [];   // P1 TERRAIN: each building's footprint and lift (its roof and wall furniture moves with it)
   for (const b of buildingsOf(tile)) {
     buf.curBid = b.i;
-    b.greenRoof = !!(b.roofKind & 128);
+    // GR07: the compiled green bit marks every part of a surveyed lot; keep it where the planted area covers the part
+    if (b.roofKind & 128) {
+      let gx = 0, gz = 0; for (let k = 0; k < b.len; k++) { gx += tile.S.bldgXZ[(b.start + k) * 2]; gz += tile.S.bldgXZ[(b.start + k) * 2 + 1]; }
+      b.greenRoof = greenRoofKeep(b, gx / b.len + ox, gz / b.len + oz);
+    } else b.greenRoof = false;
     b.hasSolar = !!(b.roofKind & 64);
     b.hasTank = !!(b.roofKind & 32);
     b.membrane = (b.roofKind >> 3) & 3; // 0 silver, 1 dark, 2 gravel, 3 pavers
@@ -2886,6 +2891,19 @@ export async function assembleTile(key, arrayBuf, ctx) {
     const terrDraw = new Float32Array(n * n);
     for (let k = 0; k < n * n; k++) terrDraw[k] = terr[k] - 0.12;
     if (P1T && tile.S.terrP1 && tile.S.terrP1.length) { sections.push(['terrP1', 7]); total += tile.S.terrP1.length / 3; }   // P1: the region's base
+    if (P1T && tile.S.terrBack && tile.S.terrBack.length) {   // CRACKS: the backing under the paving, never over a stair's or a rail cut's opening
+      const hb = [...(tile.st38Holes || []), ...((tile.header.railCuts && !NO_RL36) ? tile.header.railCuts.map(([x, z, yaw, hl, hw]) => ({ x: x + ox, z: z + oz, yaw: -yaw, x0: -hl, x1: hl, z0: -hw, z1: hw })) : [])];
+      if (hb.length) {
+        const a = tile.S.terrBack, out = [];
+        for (let i = 0; i < a.length; i += 9) {
+          const t3 = [[a[i] + ox, a[i + 1], a[i + 2] + oz], [a[i + 3] + ox, a[i + 4], a[i + 5] + oz], [a[i + 6] + ox, a[i + 7], a[i + 8] + oz]];
+          const c = st38ClipTri(t3, hb);
+          for (const P of c || [t3]) for (const q of P) out.push(q[0] - ox, q[1], q[2] - oz);
+        }
+        tile.S.terrBack = Float32Array.from(out);
+      }
+      sections.push(['terrBack', 7]); total += tile.S.terrBack.length / 3;
+    }
     // P2A: the slits' faces (masonry as the board-formed concrete of matId 21, rock as terrain, schist on a vertical face)
     if (P1T) for (const [nm, id] of [['terrWall', 21], ['terrRock', 7]]) if (tile.S[nm] && tile.S[nm].length && !(nm === 'terrWall' && tile.S.terrWallUV)) { sections.push([nm, id]); total += tile.S[nm].length / 3; }
     if (!NO_TL26) {

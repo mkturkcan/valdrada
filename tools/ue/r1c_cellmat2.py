@@ -21,7 +21,7 @@ EXPORT = os.path.abspath(os.path.join(HERE, '..', '..', 'client', 'tools', 'ar34
 PROJECT = os.path.join(EXPORT, 'ue_project', 'BoundlessUE.uproject')
 UE_ROOT = os.environ.get('UE_ROOT', '/data0/projectnyc_aux/ue/UE_5.8')
 CELLCACHE = '/data0/projectnyc_aux/cellcache'
-VERSION = 9   # (9: WINFAR, the kit cladding's knee under 0.42; 8: S125, the dresser's roof decks too; 7: S125, the anti-tiling, tone and weathering; 6: GB43 KIT, the kit instances' custom data; 2: the facade kit's per-vertex tint, FkOn; 3: the vertex colour as RGB; 4: the vertex alpha as opacity, UseVCA;
+VERSION = 9   # (WHITE06 2026-10-26: a binding rule, no master change: white_flat below) (9: WINFAR, the kit cladding's knee under 0.42; 8: S125, the dresser's roof decks too; 7: S125, the anti-tiling, tone and weathering; 6: GB43 KIT, the kit instances' custom data; 2: the facade kit's per-vertex tint, FkOn; 3: the vertex colour as RGB; 4: the vertex alpha as opacity, UseVCA;
 # 5: the take's night (MPC_r1c.Night, keyed in the take's sequence by r1c_actors.py) for what three.js switches by ENV.night:
 # night-only parts, the room fills' night dimming, the kit interiors' light share and their own light by day and night, the
 # kit's window glass (its vertex colour is its reflection, dirt and opacity, not a colour), the kit shops' atlas; and the
@@ -433,6 +433,31 @@ PBR_ALIAS_PREFIX = (('alu_', 'concrete_precast'), ('panel_', 'concrete_precast')
                     ('granite_', 'granite_grey'))
 
 
+# WHITE06 (2026-10-26, the owner: "a white untextured building" in nyc_manhattan_terrain_ue7 0:19): a building's own flat
+# colour with no colour map (a normal map at most) (the landmark and custom builders' MeshStandardMaterials, the record's colour alone) drew on
+# the generic master as a blank slab, near white in the golden grade where pale. Every such surface paler than WHITE_FLAT
+# takes a masonry HQ set as WINFAR's aliases do (warm: the dressed stone courses, neutral or cool: the precast panels), its
+# colour kept as the set's mean and held under 0.48 (the alias rule below). tools/ue/white_audit.py checks the city.
+WHITE_FLAT = 0.30
+
+
+def white_flat(r):
+    """WHITE06: the alias set for a building record drawn as a pale flat colour, or None"""
+    if not r.get('_bldg') or r.get('type') not in ('MeshStandardMaterial', 'MeshPhysicalMaterial'): return None
+    tn = r.get('name') or ''
+    ud = r.get('userData') or {}
+    pbn = ((ud.get('pbr') or {}).get('name')) or ''
+    tx = r.get('textures') or {}
+    if tx.get('map') or tx.get('alphaMap') or tx.get('emissiveMap') or r.get('vertexColors') or r.get('transparent') or any(r.get('emissive') or [0, 0, 0]): return None
+    if tn in KIT_GLASS or tn == 'glass' or tn.startswith(('fk:', 'tk:glass', 'br:', 'vk')) or pbn.startswith('glass_') or 'aFkTr' in (r.get('obcAttrs') or []): return None
+    if ud.get('isFacade'): return None   # (a curtain-wall prism, uRefl, goes to M_bx_curtain before the generic master)
+    c = list(r.get('color') or [1, 1, 1])[:3]
+    if ud.get('fkBaseHex'):
+        h = ud['fkBaseHex'].lstrip('#'); c = srgb2lin([int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4)])
+    if 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2] <= WHITE_FLAT: return None
+    return 'stone_lime' if c[0] - c[2] > 0.06 else 'concrete_precast'
+
+
 def cell_records(cells):
     """{sanitised material name: three record (+ _kind ground, + _fount: FOUNT45's fountains)} over the world's cell glbs"""
     R = {}
@@ -441,16 +466,19 @@ def cell_records(cells):
         f = open(os.path.join(cells, fn), 'rb').read()
         L = struct.unpack('<I', f[12:16])[0]
         J = json.loads(f[20:20 + L])
-        ground = set()
+        ground, bldg = set(), set()
         for n in J.get('nodes', []):
             if (n.get('extras') or {}).get('class') == -1 and 'mesh' in n:
                 ground |= {pr.get('material') for pr in J['meshes'][n['mesh']]['primitives']}
+            if (n.get('extras') or {}).get('class') == 2 and 'mesh' in n:   # (WHITE06: the building class, segRender.js)
+                bldg |= {pr.get('material') for pr in J['meshes'][n['mesh']]['primitives']}
         fount = {}
         for mi, m in enumerate(J.get('materials', [])):
             r = dict((m.get('extras') or {}).get('three') or {})
             k = san(m.get('name'))
             R.setdefault(k, r)
             if mi in ground: R[k]['_kind'] = 'ground'   # (ground in any cell: the same key is the same material)
+            if mi in bldg: R[k]['_bldg'] = 1
             if is_pool(r) or is_veil(r): fount[mi] = (k, r)
             if 'taAtlas' in (r.get('obcUni') or {}) and '_tab' not in R[k]:   # BOARD45
                 ap_ = tex_path((r.get('textures') or {}).get('map'))
@@ -619,6 +647,11 @@ def in_engine():
                     if pb['name'].startswith(pre_): al_ = a_; break
             sid = (HQ.get('pbr') or {}).get(al_) if al_ else None
             if sid and sid in HQM: P['alias'] = al_; P['amean'] = list((HQM[sid].get('albedo_mean') or [0.5, 0.5, 0.5])[:3])
+        wf_ = None if (P.get('map') or sid or pb.get('name')) else white_flat(r)
+        if wf_:   # (WHITE06: a building's pale flat colour: its masonry set, the colour as its mean, held as the aliases are)
+            sid = (HQ.get('pbr') or {}).get(wf_)
+            if sid and sid in HQM: P['alias'] = wf_; P['amean'] = list((HQM[sid].get('albedo_mean') or [0.5, 0.5, 0.5])[:3]); P['white06'] = 1
+            else: sid = None
         if sid and sid in HQM:
             f = HQM[sid].get('files') or {}
             P['map'] = need(f.get('alb'), True); P['nrm'] = need(f.get('nrm'), False); P['orm'] = need(f.get('arm'), False)
@@ -956,6 +989,7 @@ def in_engine():
             am_ = P.get('amean') or [0.5, 0.5, 0.5]
             col = [min(4.0, col[i] * k_ / max(am_[i], 0.05)) for i in range(3)]
             T['pbr_alias'] = T.get('pbr_alias', 0) + 1
+            if P.get('white06'): T['white06'] = T.get('white06', 0) + 1
         vv('Color', col)
         if r.get('vertexColors'): sv('UseVC', 1)
         if tname in ('roofSilver', 'roofBlack', 'roofGravel'): sv('RoofDeck', 1)   # (S125 v8)

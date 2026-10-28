@@ -27,6 +27,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--world-dest', required=True); ap.add_argument('--cells', required=True); ap.add_argument('--out', required=True); ap.add_argument('--records', default=None)
     a = ap.parse_args()
+    import asset_guard; asset_guard.require('r1c_bind', a.world_dest.split(','))   # (shared library: city update's build stage only)
     out = os.path.abspath(a.out); os.makedirs(out, exist_ok=True)
     rp = os.path.join(out, 'records.json'); json.dump(json.load(open(a.records)) if a.records else r1c_cellmat2.cell_records(a.cells), open(rp, 'w'))   # (--records: a prepared set, e.g. tools/ue/rebind_pbr.sh)
     cm = {'world_dest': a.world_dest, 'records': rp, 'result': os.path.join(out, 'cellmat2.json'), 'hide': [], 'hide_generated_alpha': False, 'lib_from': []}

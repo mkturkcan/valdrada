@@ -147,6 +147,14 @@ def water_grid(dst):
     return g
 
 
+def on_water(g, c):
+    """points c (n, 3) over the grid's water, whatever their height"""
+    i = np.floor((c[:, 0] - g['x0']) / g['S']).astype(np.int64); j = np.floor((c[:, 2] - g['z0']) / g['S']).astype(np.int64)
+    ok = (i >= 0) & (j >= 0) & (i < g['n']) & (j < g['n']); w = np.zeros(len(c), bool)
+    w[ok] = g['m'][j[ok], i[ok]]
+    return w
+
+
 def over_water(g, c):
     """centroids c (n, 3) over the grid's water and more than 1 m above it (the water lies at 0)"""
     i = np.floor((c[:, 0] - g['x0']) / g['S']).astype(np.int64); j = np.floor((c[:, 2] - g['z0']) / g['S']).astype(np.int64)
@@ -356,6 +364,17 @@ def prep(src, dst, rect, only=None, mask_backdrop=False, keep=None):
                 I = np.concatenate([I, nv + np.arange(3 * len(NC)).reshape(-1, 3)])
                 pr['indices'] = add(I.astype('<u4').reshape(-1), 5125, 'SCALAR')
                 st['tris_out'] += len(NC); st['cut_tris'] = st.get('cut_tris', 0) + len(newt)
+            if os.environ.get('UE_FAR_SHORE') == '1' and plate_g is not None and mi_ in plate_meshes and len(I):
+                # (NJSHORE 2026-10-26: the ground clipped to the shoreline. FARPLATE drops ground over water only past 1 m (its
+                # grid is 8 m), so shore triangles kept a lip 0-1 m over the river, and Ross Dock's lawn stood on the Hudson as
+                # a straight-edged plate. Every ground vertex over the water and under 4 m goes 0.6 m under it: the land meets
+                # the river in a bank and the water's own edge is the shoreline)
+                ai = pr['attributes']['POSITION']; Pl = (made[ai] if ai in made else read(J, B, ai)).astype(np.float64).copy()
+                wv = Pl + org; dn = on_water(plate_g, wv) & (wv[:, 1] < 4.0) & (wv[:, 1] > -0.6)
+                if dn.any():
+                    Pl[dn, 1] = -0.6 - org[1]
+                    k3 = add(Pl.astype('<f4'), 5126, 'VEC3'); J['accessors'][k3]['min'] = Pl.min(0).tolist(); J['accessors'][k3]['max'] = Pl.max(0).tolist()
+                    pr['attributes']['POSITION'] = k3; st['shore_lowered'] = st.get('shore_lowered', 0) + int(dn.sum())
             if FR > 0 and mi_ in bd_meshes:   # (FARPLATE2: the backdrop let down to the flat city near its land)
                 ai = pr['attributes']['POSITION']; Pl = (made[ai] if ai in made else read(J, B, ai)).astype(np.float64).copy()
                 wx, wz = Pl[:, 0] + org[0], Pl[:, 2] + org[2]

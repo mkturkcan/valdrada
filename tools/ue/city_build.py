@@ -288,11 +288,114 @@ def empty_cells(idx):
     return out
 
 
+# NJCOVER2 (2026-10-26): the far library records the UE_FAR_* flags each package was prepared with (farlib/prep_flags.json),
+# and a package prepared with other flags is prepared again. far_stage had prepared only missing files, so a driver that
+# re-prepared the library without a flag (FARMK, 2026-10-24 20:56, without UE_FAR_COVER) left the city on those packages
+# for good: 244 covered L3/L4 and edge packages, the Palisades among them, went back to their bare precover form.
+FAR_FLAGS = 'prep_flags.json'
+
+
+def far_flags():
+    """the flags a far package's preparation reads (r1c_lodprep.prep, bd_cover): every UE_FAR_* value, and its sha"""
+    import hashlib
+    # (a file flag by its content: the same config from another worktree is the same flag, an edited table is a new one)
+    fv = lambda v: 'file:' + hashlib.sha256(open(v, 'rb').read()).hexdigest()[:16] if os.path.isfile(v) else v
+    f = {k: fv(v) for k, v in sorted(os.environ.items()) if k.startswith('UE_FAR_')}
+    if f.get('UE_FAR_COVER') == '1':   # (bd_cover's own version: a change to the cover prepares the library again)
+        import bd_cover; f['bd_cover'] = str(bd_cover.VERSION)
+    return f, hashlib.sha256(json.dumps(f, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def _glb_json(path):
+    import struct
+    with open(path, 'rb') as fh:
+        h = fh.read(20); return json.loads(fh.read(struct.unpack('<I', h[12:16])[0]))
+
+
+def _cover_missing(path):
+    """an unrecorded package (before the record existed) that bd_cover would cover but that holds no cover"""
+    import bd_cover
+    J = _glb_json(path)
+    if any(m.get('name', '').startswith('lod16BdGroundCv') for m in J.get('materials') or []): return False
+    root = J['nodes'][J['scenes'][0]['nodes'][0]]; org = root.get('translation') or [0, 0, 0]
+    for i in root.get('children') or []:
+        n = J['nodes'][i]
+        if n.get('name') != 'bdGround' or 'mesh' not in n or not (n.get('extras') or {}).get('backdrop'): continue
+        if int((n.get('extras') or {}).get('level') or 0) not in bd_cover.LV: return False
+        a = J['accessors'][J['meshes'][n['mesh']]['primitives'][0]['attributes']['POSITION']]
+        if 'min' not in a: return True
+        return bool(bd_cover.covered([a['min'][0] + org[0], a['max'][0] + org[0], a['min'][2] + org[2], a['max'][2] + org[2]]))
+    return False
+
+
+FAR_FLAGS_META = 'prep_flags_meta.json'   # (sha -> {flags, commit}: which flags a record means and the commit that prepared with them)
+
+
+def _head():
+    try: return subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=ROOT, capture_output=True, text=True).stdout.strip() or None
+    except Exception: return None
+
+
+def _is_ancestor(a, b):
+    r = subprocess.run(['git', 'merge-base', '--is-ancestor', a, b], cwd=ROOT, capture_output=True)
+    return r.returncode == 0
+
+
+def far_stale(lib=None):
+    """the far packages prepared with other flags than the current ones: (names, record, sha). Direction-safe (2026-10-26:
+    a lane seven commits behind integration, without UE_FAR_SHORE, took every shoreline package for stale and deleted
+    them): a package recorded with flags this tree's config lacks, or prepared at a commit this tree does not contain, is
+    newer than this run, so the run refuses (merge integration first) instead of preparing it again. 'pending' marks a
+    package a far stage began to replace: always stale."""
+    lib = lib or os.path.join(CITY, 'farlib')
+    rec = json.load(open(os.path.join(lib, FAR_FLAGS))) if os.path.exists(os.path.join(lib, FAR_FLAGS)) else {}
+    meta = json.load(open(os.path.join(lib, FAR_FLAGS_META))) if os.path.exists(os.path.join(lib, FAR_FLAGS_META)) else {}
+    flags, sha = far_flags(); stale = []; newer = {}
+    head = _head()
+    for fn in sorted(os.listdir(lib)) if os.path.isdir(lib) else []:
+        if not fn.endswith('.glb'): continue
+        n = fn[:-4]; r = rec.get(n)
+        if r is None:   # (prepared before the record: the cover is the one flag a package shows; the others are taken as current)
+            if flags.get('UE_FAR_COVER') == '1' and _cover_missing(os.path.join(lib, fn)): stale.append(n)
+            else: rec[n] = sha
+        elif r == 'pending': stale.append(n)
+        elif r != sha:
+            m = meta.get(r)
+            if m:
+                lacks = sorted(set(m.get('flags') or {}) - set(flags))
+                behind = m.get('commit') and head and not _is_ancestor(m['commit'], head)
+                if lacks or behind: newer.setdefault(r, (lacks, m.get('commit'), 0)); newer[r] = (lacks, m.get('commit'), newer[r][2] + 1); continue
+            stale.append(n)
+    if newer:
+        raise RuntimeError('far library: packages were prepared by a newer config than this tree\'s (' + '; '.join(
+            f"{c} packages: flags {l or '(same keys)'} at commit {str(cm)[:9]}" for _, (l, cm, c) in newer.items()) +
+            f'); this tree ({str(head)[:9]}) would undo them. Merge integration into it first.')
+    return stale, rec, sha
+
+
+def _save_far_record(lib, rec, sha=None, flags=None):
+    tmp = os.path.join(lib, FAR_FLAGS + f'.{os.getpid()}'); json.dump(rec, open(tmp, 'w'), indent=0, sort_keys=True); os.replace(tmp, os.path.join(lib, FAR_FLAGS))
+    if sha:
+        mp = os.path.join(lib, FAR_FLAGS_META); meta = json.load(open(mp)) if os.path.exists(mp) else {}
+        meta.setdefault(sha, {'flags': flags, 'commit': _head()})
+        json.dump(meta, open(mp + f'.{os.getpid()}', 'w'), indent=1, sort_keys=True); os.replace(mp + f'.{os.getpid()}', mp)
+
+
 def far_stage():
     import render_take as R
     from r1c_lodprep import prep
     ix = json.load(open(LOD_INDEX))
     lib = os.path.join(CITY, 'farlib'); os.makedirs(lib, exist_ok=True)
+    stale, rec, sha = far_stale(lib)
+    flags = far_flags()[0]
+    if stale:
+        log('far library:', len(stale), 'packages prepared with other UE_FAR_* flags, prepared again, e.g.', stale[:6])
+        # (marked pending in the record before any file goes: a stage stopped half way leaves them stale, never current)
+        for n in stale: rec[n] = 'pending'
+        _save_far_record(lib, rec)
+        for n in stale:
+            os.remove(os.path.join(lib, n + '.glb')); rec.pop(n, None)
+            if os.path.exists(os.path.join(lib, n + '.glb.empty')): os.remove(os.path.join(lib, n + '.glb.empty'))
     # (every package decompressed once, by its hash, as the worlds' far city was: r1c_decomp.mjs)
     srcs = {k: e['file'] for k, e in ix['chunks'].items()}
     srcs.update({f'LM_{k}': e['file'] for k, e in (ix.get('landmarks') or {}).items() if e.get('file')})
@@ -330,6 +433,8 @@ def far_stage():
     made += block_packages(ix, lib)
     made += ground_packages(ix, lib)
     log('far library prepared,', made, 'new chunks;', len([f for f in os.listdir(lib) if f.endswith('.glb')]), 'packages')
+    rec.update({fn[:-4]: sha for fn in os.listdir(lib) if fn.endswith('.glb') and rec.get(fn[:-4]) in (None, 'pending')})   # (made now, with these flags)
+    _save_far_record(lib, rec, sha, flags)
     S = {}; logf = os.path.join(CITY, 'far_render_take.log')
     fkeys = R.cf_far(lib, logf, S)
     json.dump({'made': time.ctime(), 'stages': S, 'keys': fkeys}, open(os.path.join(CITY, 'far.json'), 'w'), indent=1)

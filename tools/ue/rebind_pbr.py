@@ -23,6 +23,7 @@ def aliased(name):
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument('--out', required=True); a = ap.parse_args()
+    import asset_guard; asset_guard.require('rebind_pbr', ['/Game/MatLib'])   # (a whole-library rebind: `city bind rebind_pbr` only)
     os.makedirs(a.out, exist_ok=True)
     ix = ML.load_index()
     prev = os.path.join(HERE, '..', '..', 'client', 'public', 'textures', 'pbr')

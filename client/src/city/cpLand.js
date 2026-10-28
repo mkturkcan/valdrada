@@ -10,7 +10,8 @@
 //   * the Reservoir's raised embankment with its stone coping, Conservatory Water's granite coping and promenade, and the
 //     small basins' copings.
 // `?cp32l=0` turns the part off (the compiled park comes back where this part changed it).
-import { HA_ON, haBaseAt, haCpWater } from '../world/haAnchor.js';   // P1 TERRAIN (`?terrain=p1`): the water bodies at the authority's levels
+import { HA_ON, haBaseAt, haCpWater } from '../world/haAnchor.js';
+import { haGroundCap } from '../world/heightAuthority.js';   // FIX07: the ground under the standing water held under it (P1)   // P1 TERRAIN (`?terrain=p1`): the water bodies at the authority's levels
 import * as THREE from 'three';
 import earcut from 'earcut';
 import { ENV, applyLightTrim, applyStoneDetail, CP32L_GROUND } from '../world/materials.js';
@@ -548,8 +549,27 @@ function lattice(P, cell) {
 }
 
 let _applied = 0, _maskQueued = false;
+// FIX07 (2026-10-27, the Reservoir's pale green patches): on the P1 terrain the park's bare base is raised to the
+// relief's lawn less 4 cm (centralPark.js sinkBaseP1), and the relief inside a body is the bare earth's hydro-flattened
+// surface, up to 0.2 m over the drawn water: lawn-kinded base triangles floated on the Reservoir. By rule, for every
+// standing body (lake, reservoir, coped and basin; a stream runs under paths and keeps its own banks): ground more than
+// BED_PAD inside its shore never stands higher than BED_DROP under its water (heightAuthority.js haGroundCap, applied
+// last in the clamp). `?cpbed=0` turns it off.
+const CPBED = !(Q && Q.get('cpbed') === '0');
+const BED_PAD = 0.5, BED_DROP = 0.3;
+let _bedCap = false;
+const _bq = { d: 0, w: 0, b: null };
+function bedCap(x, z) {
+  for (const b of BODIES) {
+    if (b.kind === 'stream' || x < b.box[0] || x > b.box[2] || z < b.box[1] || z > b.box[3]) continue;
+    sdfAt(sdfOf(b), x, z, _bq);
+    if (_bq.d < -BED_PAD) { const y = levelOf(b, x, z); return isFinite(y) ? y - BED_DROP : null; }
+  }
+  return null;
+}
 export function apply(tile, ox, oz) {
   if (!CP32L) return;
+  if (!_bedCap && CPBED && HA_ON) { _bedCap = true; haGroundCap(bedCap); }
   // the ground-cover mask (~0.3 s) is baked off the tile's own time, once; the shader takes it when it lands
   if (!_maskQueued) {
     _maskQueued = true;

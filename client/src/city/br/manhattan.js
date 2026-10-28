@@ -12,7 +12,8 @@ import { Frame } from './frame.js';
 import * as M from './mats.js';
 import { slab, laneLines, truss, crossBeams, lateralX, railing, cableY, cablePts, suspenders, block, taper, memberSO } from './parts.js';
 
-const C = { steel: 0xa6b8c6, steelD: 0x8698a6, stone: 0x9f998d, stoneD: 0x878175, lamp: 0xffe2b0, conc: 0xa29e95 };
+// (BR06: a deeper blue-grey, photographs: the paler paint read brown under the golden grade)
+const C = { steel: 0x8197a8, steelD: 0x6c8292, stone: 0x9f998d, stoneD: 0x878175, lamp: 0xffe2b0, conc: 0xa29e95 };
 const O_IN = 5.8, O_OUT = 14.8, EDGE = 18.3;   // the inner and outer truss and cable planes; the walkway's outer edge
 const DEPTH = 7.6, PANEL = 7.32;               // the trusses' depth and panel
 const LOW = 6.7;                               // the lower level under the upper roadways
@@ -146,11 +147,22 @@ function tower(bag, F, sT, steel, steelD, stone, stoneD) {
   const colO = [-O_OUT, -O_IN, O_IN, O_OUT];
   const halfD = (yy) => 4.875 + (1.525 - 4.875) * ((yy - PED) / (TOP - PED));
   const N = 14;
+  // (BKB: each column two flanges at its tapering edges, 1.1 m along the bridge, joined on both its faces by a riveted X
+  // lattice with a batten at every panel: from the side the towers read as open lattice, as in the photographs, not as
+  // solid tapering slabs)
   for (const o of colO) {
     for (let i = 0; i < N; i++) {
-      const ya = PED + ((TOP - PED) * i) / N, yb = PED + ((TOP - PED) * (i + 1)) / N;
-      // a column segment as a tapered block (two flanges joined by the web read as one box at this scale)
-      taper(bag, F, steel, sT, o, ya, yb, halfD(ya), 0.76, halfD(yb), 0.76);
+      const ya = PED + ((TOP - PED) * i) / N, yb = PED + ((TOP - PED) * (i + 1)) / N, da = halfD(ya), db = halfD(yb);
+      for (const f of [-1, 1]) {
+        // a flange: a member along the column's tapering edge (1.52 m across, 1.1 m along the bridge)
+        memberSO(bag, F, steel, sT + f * (da - 0.55), o, ya - 0.02, sT + f * (db - 0.55), o, yb + 0.02, 1.52, 1.1);
+      }
+      for (const fo of [-0.62, 0.62]) {
+        const ia = da - 1.1, ib = db - 1.1;
+        memberSO(bag, F, steelD, sT - ia, o + fo, ya, sT + ib, o + fo, yb, 0.22, 0.32);
+        memberSO(bag, F, steelD, sT + ia, o + fo, ya, sT - ib, o + fo, yb, 0.22, 0.32);
+        memberSO(bag, F, steel, sT - ia, o + fo, yb - 0.3, sT + ia, o + fo, yb - 0.3, 0.3, 0.6);
+      }
     }
   }
   // X lattice between the two columns of each side frame, from the pedestal to the cap: panels of ~9 m
@@ -159,7 +171,7 @@ function tower(bag, F, sT, steel, steelD, stone, stoneD) {
     // (none through the deck: the track pairs pass between a frame's columns)
     const below = [], above = [];
     for (let k = 0, n = Math.max(1, Math.round((yLow - 2.2 - PED - 1) / 9)); k <= n; k++) below.push(PED + 1 + ((yLow - 2.2 - PED - 1) * k) / n);
-    for (let k = 0, n = Math.max(1, Math.round((TOP - 4.2 - yDeck - 2) / 9.5)); k <= n; k++) above.push(yDeck + 2 + ((TOP - 4.2 - yDeck - 2) * k) / n);
+    for (let k = 0, n = Math.max(1, Math.round((TOP - 11.7 - yDeck - 2) / 9.5)); k <= n; k++) above.push(yDeck + 2 + ((TOP - 11.7 - yDeck - 2) * k) / n);   // (to the side arches' springing)
     const panels = [];
     for (const L of [below, above]) for (let i = 0; i + 1 < L.length; i++) panels.push([L[i], L[i + 1]]);
     for (const [y0, y1] of panels) {
@@ -182,6 +194,13 @@ function tower(bag, F, sT, steel, steelD, stone, stoneD) {
     for (let k = 0; k + 1 < pts.length; k++) memberSO(bag, F, steel, s, pts[k][0], pts[k][1], s, pts[k + 1][0], pts[k + 1][1], 0.7, 0.9);
     // spandrel lattice between the arch and the girder
     for (let k = 1; k < 12; k += 1) memberSO(bag, F, steelD, s, pts[k][0], pts[k][1], s, pts[k][0], yGir, 0.25, 0.3);
+    // (BKB: the side frames' own arches under the girder, between each frame's columns, as in the photographs)
+    for (const sg of [-1, 1]) {
+      const c = sg * (O_IN + O_OUT) / 2, r = (O_OUT - O_IN) / 2 - 0.76, yA = yGir - 7.5, q = [];
+      for (let k = 0; k <= 8; k++) { const a = Math.PI - (Math.PI * k) / 8; q.push([c + r * Math.cos(a), yA + r * Math.sin(a)]); }
+      for (let k = 0; k + 1 < q.length; k++) memberSO(bag, F, steel, s, q[k][0], q[k][1], s, q[k + 1][0], q[k + 1][1], 0.5, 0.7);
+      for (let k = 1; k < 8; k++) memberSO(bag, F, steelD, s, q[k][0], q[k][1], s, q[k][0], yGir, 0.2, 0.25);
+    }
     // the portal under the deck between the inner columns
     for (let k = 0; k + 1 < pts.length; k++) memberSO(bag, F, steel, s, pts[k][0], pts[k][1] - yS + PED + 2 - 3, s, pts[k + 1][0], pts[k + 1][1] - yS + PED + 2 - 3, 0.6, 0.8);
   }

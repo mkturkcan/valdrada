@@ -15,10 +15,10 @@ import * as M from './mats.js';
 import { slab, laneLines, truss, crossBeams, lateralX, railing, latticeRail, cableY, cablePts, suspenders, block, taper } from './parts.js';
 
 const C = {
-  steel: 0xc6b694,    // Brooklyn Bridge tan
-  steelD: 0xa39373,
-  stone: 0xb3a996,    // the towers' granite and limestone, weathered
-  stoneD: 0x9b917f,
+  steel: 0xb3ab98,    // Brooklyn Bridge tan: a grey buff (BR06, photographs: the khaki read orange in the golden grade)
+  steelD: 0x948c7a,
+  stone: 0x9d9688,    // the towers' granite and limestone, weathered: a grey beige (BKB, photographs: 0xb3a996 read cream)
+  stoneD: 0x8b8578,
   wood: 0x7b6650,
   lamp: 0xffd9a0,
 };
@@ -34,7 +34,8 @@ export function buildBrooklyn(rec, bag) {
   const F = new Frame(rec), lay = rec.layout;
   // (the granite: rock-faced, the mouldings dressed; soot under the plinth, the arch floor, the string course, the cornice
   // and the anchorages' cornices)
-  const ST = { ledges: [2.4, 25.7, 35.2, 60.6, 82.8] };
+  // (BKB: the grime: the stone darker toward the base, as the photographs show it, by a quarter at the water)
+  const ST = { ledges: [1.2, 33.4, 60.2, 80.1, 81.2, 83.4], grime: [2, 48, 0.26] };
   const steel = M.paint(C.steel), steelD = M.paint(C.steelD), stone = M.ashlar(C.stone, 1.6, ST), stoneD = M.ashlar(C.stoneD, 1.6, { ...ST, style: 'dressed' });
   const asph = M.asphalt(), wood = M.planks(C.wood), lw = M.lineWhite(), ly = M.lineYellow(), lamp = M.glow(C.lamp, 2.2);
   const cab = M.cable(C.steel, { px: 0.0003 }), hang = M.cable(C.steelD, { px: 0.00008 }), neck = M.glow(0xfff1d6, 2.8);
@@ -88,7 +89,7 @@ export function buildBrooklyn(rec, bag) {
   for (const [a, b] of splitAround(s0, s1, towersS, T_T / 2 + 9)) for (const sg of [-1, 1]) latticeRail(bag, F, steel, a, b, sg * PROM, promY, 1.25, 2.29, 0.9, sg);
   for (const sT of towersS) for (const sg of [-1, 1]) {
     // the walk splits round the pier: a platform each side, in the arch over the inner lane
-    const a = sT - T_T / 2 - 9, b = sT + T_T / 2 + 9, o0 = sg > 0 ? PIER_HALF + 0.05 : -4.6, o1 = sg > 0 ? 4.6 : -PIER_HALF - 0.05;
+    const a = sT - T_T / 2 - 9, b = sT + T_T / 2 + 9, o0 = sg > 0 ? PIER_HALF - 0.1 : -4.6, o1 = sg > 0 ? 4.6 : -PIER_HALF + 0.1;   // (into the pier: no slit of light down its face, BKB)
     slab(bag, F, wood, a, b, o0, o1, promY, 0.18, 3);
     latticeRail(bag, F, steel, a, b, sg * 4.6, promY, 1.25, 2.29, 0.9, sg);
   }
@@ -156,68 +157,116 @@ function splitAround(s0, s1, towers, h) {
   return runs;
 }
 
-// a tower: the battered base to the arch floor, the shaft pierced by the two pointed arches (each opening splayed in two
-// orders at the faces), pilasters, a string course at the springing, the cornice and the cable saddle housings
+// the footing course at the water (the caisson's top lies under the river bed, nothing of it shows), the battered pier to
+// the belt course under the arch floor, then three pillars (the outer two and the central pier) to the springing, each
+// with its buttress on both river faces and buttresses at the corners of the ends; a string course at the springing, a
+// set-back of 0.35 m and the upper shaft over the two pointed arches, every opening in two orders (the outer reveal 0.9 m
+// wider) with a moulded ring; a corbel table under the cornice, the cornice, the attic and its coping, the saddle houses
 function tower(bag, F, sT, stone, stoneD, steelD) {
   const fr = F.at(sT), yFloor = F.yAt(sT) - 1.2;
-  // base: the waterline plinth and the battered pier up to the arch floor
-  taper(bag, F, stoneD, sT, 0, -3, 2.4, BASE_T / 2 + 0.8, BASE_W / 2 + 0.8, BASE_T / 2 + 0.6, BASE_W / 2 + 0.6);
-  taper(bag, F, stone, sT, 0, 2.4, yFloor, BASE_T / 2, BASE_W / 2, T_T / 2 + 0.35, T_W / 2 + 0.35);
-  // the shaft: an extrusion through the tower's thickness of its front elevation (the openings as notches)
-  const mtx = (o0, depth) => {
-    const m = new THREE.Matrix4();
-    const p = F.P(sT, 0, 0);
+  const yTop = T_TOP - 3.6, ySpring = ARCH_APEX - 11.8, yBelt = yFloor - 1.8;
+  const hw = T_W / 2, ht = T_T / 2, SET = 0.35;
+  const OPEN = [[-PIER_HALF - ARCH_W, -PIER_HALF], [PIER_HALF, PIER_HALF + ARCH_W]];
+  const PIL = [[-hw, -PIER_HALF - ARCH_W], [-PIER_HALF, PIER_HALF], [PIER_HALF + ARCH_W, hw]];
+  // footing and the battered pier
+  taper(bag, F, stoneD, sT, 0, -4, 1.2, BASE_T / 2 + 1.0, BASE_W / 2 + 1.0, BASE_T / 2 + 0.9, BASE_W / 2 + 0.9);
+  taper(bag, F, stone, sT, 0, 1.2, yBelt, BASE_T / 2, BASE_W / 2, ht + 0.45, hw + 0.45);
+  // the belt course under the arch floor
+  block(bag, F, stoneD, sT - ht - 0.95, sT + ht + 0.95, -hw - 0.95, hw + 0.95, yBelt, yBelt + 0.7);
+  block(bag, F, stone, sT - ht - 0.5, sT + ht + 0.5, -hw - 0.5, hw + 0.5, yBelt + 0.7, yFloor);
+  // the lower shaft: three pillars, each a core and its two face slabs (the reveal: 0.9 m back from the opening)
+  const face = 1.1, REV = 0.9;
+  for (const [o0, o1] of PIL) {
+    block(bag, F, stone, sT - ht + face, sT + ht - face, o0, o1, yFloor, ySpring + 0.2);
+    const f0 = o0 > -hw + 0.01 ? o0 + REV : o0, f1 = o1 < hw - 0.01 ? o1 - REV : o1;
+    for (const sg of [-1, 1]) block(bag, F, stone, sT + (sg > 0 ? ht - face : -ht), sT + (sg > 0 ? ht : -ht + face), f0, f1, yFloor, ySpring + 0.2);
+  }
+  // the upper shaft: an extrusion through the tower's thickness of its elevation from the springing (the openings as notches)
+  const mtx = (o0) => {
+    const m = new THREE.Matrix4(), p = F.P(sT, 0, 0);
     m.makeBasis(new THREE.Vector3(...fr.n), new THREE.Vector3(0, 1, 0), new THREE.Vector3(...fr.t));
     m.setPosition(p[0] + fr.t[0] * o0, 0, p[2] + fr.t[2] * o0);
     return m;
   };
-  const yTop = T_TOP - 3.6, ySpring = ARCH_APEX - 11.8;
+  const uw = hw - SET, ut = ht - SET;
   const elev = (grow) => {
     const s = new THREE.Shape();
-    const h = T_W / 2;
-    s.moveTo(-h, yFloor);
-    for (const [a, b] of [[-PIER_HALF - ARCH_W, -PIER_HALF], [PIER_HALF, PIER_HALF + ARCH_W]]) {
+    s.moveTo(-uw, ySpring);
+    for (const [a, b] of OPEN) {
       const aa = a - grow, bb = b + grow;
-      s.lineTo(aa, yFloor);
+      s.lineTo(aa, ySpring);
       for (const p of lancet(aa, bb, ySpring, ARCH_APEX + grow)) s.lineTo(p[0], p[1]);
-      s.lineTo(bb, yFloor);
+      s.lineTo(bb, ySpring);
     }
-    s.lineTo(h, yFloor); s.lineTo(h, yTop); s.lineTo(-h, yTop); s.lineTo(-h, yFloor);
+    s.lineTo(uw, ySpring); s.lineTo(uw, yTop); s.lineTo(-uw, yTop); s.lineTo(-uw, ySpring);
     return s;
   };
-  const face = 1.1, core = T_T - 2 * face;
+  const core = 2 * ut - 2 * face;
   const ext = (shape, depth) => new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 6 });
-  bag.addGeometry(stone, ext(elev(0), core), mtx(-core / 2, core));
-  const gFace = ext(elev(0.9), face);
-  bag.addGeometry(stone, gFace, mtx(-T_T / 2, face));
-  bag.addGeometry(stone, gFace, mtx(T_T / 2 - face, face));
-  // the arch orders: a moulded ring round each opening on both faces
-  for (const sgF of [-1, 1]) for (const [a, b] of [[-PIER_HALF - ARCH_W, -PIER_HALF], [PIER_HALF, PIER_HALF + ARCH_W]]) {
-    const ring = new THREE.Shape();
-    const outer = lancet(a - 1.7, b + 1.7, ySpring, ARCH_APEX + 1.7), inner = lancet(a - 0.9, b + 0.9, ySpring, ARCH_APEX + 0.9);
-    ring.moveTo(a - 1.7, ySpring - 0.01);
-    for (const p of outer) ring.lineTo(p[0], p[1]);
-    ring.lineTo(b + 0.9, ySpring - 0.01);
-    for (const p of inner.slice().reverse()) ring.lineTo(p[0], p[1]);
-    ring.lineTo(a - 1.7, ySpring - 0.01);
-    const g = ext(ring, 0.35);
-    bag.addGeometry(stoneD, g, mtx(sgF > 0 ? T_T / 2 : -T_T / 2 - 0.35, 0.35));
+  bag.addGeometry(stone, ext(elev(0), core), mtx(-core / 2));
+  const gFace = ext(elev(REV), face);
+  bag.addGeometry(stone, gFace, mtx(-ut));
+  bag.addGeometry(stone, gFace, mtx(ut - face));
+  // the arch orders: a moulded ring round each opening on both faces, stopped on the string course
+  for (const sgF of [-1, 1]) for (const [a, b] of OPEN) {
+    const g = ext(ring(a - REV - 0.8, b + REV + 0.8, a - REV, b + REV, ySpring, ARCH_APEX + REV + 0.8, ARCH_APEX + REV), 0.35);
+    bag.addGeometry(stoneD, g, mtx(sgF > 0 ? ut : -ut - 0.35));
   }
-  // pilasters on both faces of the outer pillars and the central pier, a string course at the springing, the cornice
-  const pil = (o0, o1, y0, y1) => { for (const sg of [-1, 1]) block(bag, F, stone, sT + sg * (T_T / 2 + 0.2) - 0.2, sT + sg * (T_T / 2 + 0.2) + 0.2, o0, o1, y0, y1); };
+  // the buttresses: on both river faces of every pillar (the central pier's broad one, the outer pillars' at their outer
+  // edges), stepping back at the springing; on the ends, one at each corner
   for (const sg of [-1, 1]) {
-    const o0 = sg * (PIER_HALF + ARCH_W + 0.9), o1 = sg * (T_W / 2);
-    pil(Math.min(o0, o0 + sg * 1.6), Math.max(o0, o0 + sg * 1.6), yFloor, yTop);
-    pil(Math.min(o1, o1 - sg * 1.8), Math.max(o1, o1 - sg * 1.8), yFloor, yTop);
+    const sf = sT + sg * ht, su = sT + sg * ut;
+    const bt = (o0, o1, d0, d1) => {
+      block(bag, F, stone, Math.min(sf, sf + sg * d0), Math.max(sf, sf + sg * d0), o0, o1, yFloor, ySpring - 0.6);
+      block(bag, F, stone, Math.min(su, su + sg * d1), Math.max(su, su + sg * d1), o0 + 0.15, o1 - 0.15, ySpring - 0.6, yTop - 1.0);
+    };
+    bt(-1.7, 1.7, 0.9, 0.75);
+    bt(-hw, -hw + 2.4, 0.9, 0.75 + SET);
+    bt(hw - 2.4, hw, 0.9, 0.75 + SET);
   }
-  pil(-1.1, 1.1, ARCH_APEX + 2.2, yTop);
-  for (const [o0, o1] of [[-T_W / 2 - 0.3, -PIER_HALF - ARCH_W - 0.9], [-PIER_HALF + 0.9, PIER_HALF - 0.9], [PIER_HALF + ARCH_W + 0.9, T_W / 2 + 0.3]]) {
-    for (const sg of [-1, 1]) block(bag, F, stoneD, sT + sg * (T_T / 2 + 0.25) - 0.25, sT + sg * (T_T / 2 + 0.25) + 0.25, o0, o1, ySpring - 0.6, ySpring + 0.4);
+  for (const sgO of [-1, 1]) {
+    const of = sgO * hw, ou = sgO * uw;
+    for (const sgS of [-1, 1]) {
+      const s0 = sT + sgS * ht, s1 = s0 - sgS * 2.6;
+      block(bag, F, stone, Math.min(s0, s1), Math.max(s0, s1), Math.min(of, of + sgO * 0.7), Math.max(of, of + sgO * 0.7), yFloor, ySpring - 0.6);
+      const u0 = sT + sgS * ut, u1 = u0 - sgS * 2.45;
+      block(bag, F, stone, Math.min(u0, u1), Math.max(u0, u1), Math.min(ou, ou + sgO * (0.6 + SET)), Math.max(ou, ou + sgO * (0.6 + SET)), ySpring - 0.6, yTop - 1.0);
+    }
   }
-  block(bag, F, stoneD, sT - T_T / 2 - 0.9, sT + T_T / 2 + 0.9, -T_W / 2 - 0.9, T_W / 2 + 0.9, yTop, yTop + 1.6);
-  block(bag, F, stone, sT - T_T / 2 - 0.3, sT + T_T / 2 + 0.3, -T_W / 2 - 0.3, T_W / 2 + 0.3, yTop + 1.6, T_TOP);
-  // the saddle housings the cables cross
+  // the string course at the springing, round the pillars and the buttresses
+  for (const sg of [-1, 1]) for (const [o0, o1] of PIL) {
+    const f0 = o0 > -hw + 0.01 ? o0 + REV : o0 - 1.1, f1 = o1 < hw - 0.01 ? o1 - REV : o1 + 1.1;
+    block(bag, F, stoneD, Math.min(sT + sg * (ht - 0.5), sT + sg * (ht + 1.25)), Math.max(sT + sg * (ht - 0.5), sT + sg * (ht + 1.25)), f0, f1, ySpring - 0.6, ySpring + 0.25);
+  }
+  for (const sgO of [-1, 1]) block(bag, F, stoneD, sT - ht - 1.25, sT + ht + 1.25, Math.min(sgO * (hw - 0.5), sgO * (hw + 1.1)), Math.max(sgO * (hw - 0.5), sgO * (hw + 1.1)), ySpring - 0.6, ySpring + 0.25);
+  // the corbel table under the cornice: a bracket every 1.5 m on the four faces
+  const cW = uw + 0.9, cT = ut + 0.9;
+  for (let o = -cW + 0.75; o < cW - 0.5; o += 1.5) for (const sg of [-1, 1]) {
+    const s0 = sT + sg * cT, s1 = s0 - sg * 0.9;
+    block(bag, F, stoneD, Math.min(s0, s1), Math.max(s0, s1), o - 0.3, o + 0.3, yTop - 1.1, yTop);
+  }
+  for (let s = -cT + 0.75; s < cT - 0.5; s += 1.5) for (const sg of [-1, 1]) {
+    const o0 = sg * cW, o1 = o0 - sg * 0.9;
+    block(bag, F, stoneD, sT + s - 0.3, sT + s + 0.3, Math.min(o0, o1), Math.max(o0, o1), yTop - 1.1, yTop);
+  }
+  // the cornice, the attic, its coping
+  block(bag, F, stoneD, sT - cT - 0.35, sT + cT + 0.35, -cW - 0.35, cW + 0.35, yTop, yTop + 1.3);
+  block(bag, F, stone, sT - ut - 0.2, sT + ut + 0.2, -uw - 0.2, uw + 0.2, yTop + 1.3, T_TOP - 0.5);
+  block(bag, F, stoneD, sT - ut - 0.45, sT + ut + 0.45, -uw - 0.45, uw + 0.45, T_TOP - 0.5, T_TOP);
+  // the saddle houses the cables cross
   for (const o of [-O_OUT, -O_IN, O_IN, O_OUT]) block(bag, F, steelD, sT - 4.5, sT + 4.5, o - 1.3, o + 1.3, T_TOP - 0.2, CABLE_TOP + 0.6);
+}
+
+// a moulded arch ring between an outer arch (a0..b0, apex ya0) and an inner one (a1..b1, apex ya1), both springing at ys
+function ring(a0, b0, a1, b1, ys, ya0, ya1) {
+  const sh = new THREE.Shape();
+  const outer = lancet(a0, b0, ys, ya0), inner = lancet(a1, b1, ys, ya1);
+  sh.moveTo(a0, ys - 0.01);
+  for (const p of outer) sh.lineTo(p[0], p[1]);
+  sh.lineTo(b1, ys - 0.01);
+  for (const p of inner.slice().reverse()) sh.lineTo(p[0], p[1]);
+  sh.lineTo(a0, ys - 0.01);
+  return sh;
 }
 
 // a pointed (lancet) arch from jamb a to jamb b springing at ys with its apex at ya: the points from the left springing
@@ -231,23 +280,46 @@ function lancet(a, b, ys, ya, n = 10) {
   return out;
 }
 
-// an anchorage: a battered block of ashlar from its river face (sAn) away from the river, the cornice, pilasters at the
-// corners and two arched panels a side
+// an anchorage (89 ft high, 129 x 119 ft at the base, 117 x 104 ft at the top): a battered block of rock-faced ashlar
+// from its river face (sAn) away from the river on a dressed plinth; buttresses at the corners and between the bays; on each
+// long side two tall blind arches (moulded rings on dressed jambs over the recessed panels); a corbel table, the cornice
+// and a parapet with its coping (the deck runs over it)
 function anchorage(bag, F, sAn, away, stone, stoneD) {
   const L0 = 39.3, L1 = 35.7, B0 = 36.3 / 2, B1 = 31.7 / 2;
-  const sc = sAn + away * L0 / 2, yTop = F.yAt(sc) - 1.4;
-  taper(bag, F, stone, sc, 0, 0, yTop - 1.8, L0 / 2, B0, L1 / 2, B1);
-  block(bag, F, stoneD, sc - L1 / 2 - 0.7, sc + L1 / 2 + 0.7, -B1 - 0.7, B1 + 0.7, yTop - 1.8, yTop);
-  // corner pilasters and arched panels on the long sides
+  const sc = sAn + away * L0 / 2, yTop = F.yAt(sc) - 1.4, yC = yTop - 3.2, fr = F.at(sc);
+  taper(bag, F, stoneD, sc, 0, -2, 3.0, L0 / 2 + 0.6, B0 + 0.6, L0 / 2 + 0.6, B0 + 0.6);
+  taper(bag, F, stone, sc, 0, 3.0, yC, L0 / 2, B0, L1 / 2, B1);
+  const at = (y) => (y - 3.0) / (yC - 3.0);   // the batter's share at y
+  const hb = (y) => B0 + (B1 - B0) * at(y), hl = (y) => L0 / 2 + (L1 / 2 - L0 / 2) * at(y);
+  // buttresses on the long sides: the corners and between the two bays
   for (const sg of [-1, 1]) for (const k of [-1, 0, 1]) {
-    const s = sc + k * (L1 / 2 - 1.2);
-    block(bag, F, stone, s - 1.2, s + 1.2, sg * (B0 + 0.35) - 0.35, sg * (B0 + 0.35) + 0.35, 0, yTop - 1.8);
+    const s = sc + k * (L1 / 2 - 1.6);
+    // (its outer face 0.6 m proud of the battered wall at the plinth and 0.5 m under the cornice, its inner face in the wall)
+    taper(bag, F, stone, s, sg * (B1 - 1.0), 3.0, yC, 1.6, B0 + 0.6 - (B1 - 1.0), 1.4, 1.5);
   }
+  // the blind arches: round heads (the panels 12 m wide, the springing at 0.62 of the wall)
+  const ys = 3.0 + (yC - 3.0) * 0.55;
   for (const sg of [-1, 1]) for (const k of [-0.5, 0.5]) {
-    const s = sc + k * L1 / 2;
-    // a recessed window bay: three dark slits under an arch
-    for (const d of [-1.4, 0, 1.4]) block(bag, F, stoneD, s + d - 0.45, s + d + 0.45, sg * (B0 - 0.2) - 0.25, sg * (B0 - 0.2) + 0.25, yTop * 0.38, yTop * 0.62);
+    const s = sc + k * (L1 / 2 - 1.6), w = 11.6, sl = (B1 - B0) / (yC - 3.0), o = sg * (B0 - 3.0 * sl);
+    const m = new THREE.Matrix4(), p = F.P(s, 0, 0);
+    // (x along the bridge, y up the battered wall, z outward across it: the ring and its jambs stand 0.45 m proud)
+    m.makeBasis(new THREE.Vector3(...fr.t), new THREE.Vector3(fr.n[0] * sg * sl, 1, fr.n[2] * sg * sl), new THREE.Vector3(...fr.n).multiplyScalar(sg));
+    m.setPosition(p[0] + fr.n[0] * o, 0, p[2] + fr.n[2] * o);
+    const ex = (sh) => new THREE.ExtrudeGeometry(sh, { depth: 0.45, bevelEnabled: false, curveSegments: 8 });
+    bag.addGeometry(stoneD, ex(ring(-w / 2 - 0.9, w / 2 + 0.9, -w / 2, w / 2, ys, ys + w / 2 + 0.9, ys + w / 2)), m);
+    for (const d of [-1, 1]) {
+      const x0 = d < 0 ? -w / 2 - 0.9 : w / 2, j = new THREE.Shape();
+      j.moveTo(x0, 3.0); j.lineTo(x0 + 0.9, 3.0); j.lineTo(x0 + 0.9, ys); j.lineTo(x0, ys); j.lineTo(x0, 3.0);
+      bag.addGeometry(stoneD, ex(j), m);
+    }
   }
+  // the corbel table, the cornice, the parapet and its coping
+  const cB = B1 + 0.5, cL = L1 / 2 + 0.5;
+  for (let s = -cL + 0.75; s < cL - 0.5; s += 1.5) for (const sg of [-1, 1]) block(bag, F, stoneD, sc + s - 0.3, sc + s + 0.3, Math.min(sg * B1, sg * cB), Math.max(sg * B1, sg * cB), yC - 1.0, yC);
+  for (let o = -cB + 0.75; o < cB - 0.5; o += 1.5) for (const sg of [-1, 1]) block(bag, F, stoneD, Math.min(sc + sg * hl(yC), sc + sg * cL), Math.max(sc + sg * hl(yC), sc + sg * cL), o - 0.3, o + 0.3, yC - 1.0, yC);
+  block(bag, F, stoneD, sc - cL - 0.6, sc + cL + 0.6, -cB - 0.6, cB + 0.6, yC, yC + 1.2);
+  block(bag, F, stone, sc - L1 / 2, sc + L1 / 2, -B1, B1, yC + 1.2, yTop - 0.4);
+  block(bag, F, stoneD, sc - L1 / 2 - 0.3, sc + L1 / 2 + 0.3, -B1 - 0.3, B1 + 0.3, yTop - 0.4, yTop);
 }
 
 // a masonry approach from station a to b (dir = the side away from the river): arched bays on piers where the deck

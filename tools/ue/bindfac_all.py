@@ -45,6 +45,7 @@ def facade_records(ix):
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument('--out', required=True); a = ap.parse_args()
+    import asset_guard; asset_guard.require('bindfac_all', ['/Game/MatLib'])   # (a whole-library rebind: `city bind bindfac_all` only)
     V = os.environ.get('BD_TILEFAC_V'); H = os.environ.get('BD_TILEFAC_HLSL', 'bd_tilefac.hlsl')
     if not V: sys.exit('BD_TILEFAC_V must name the master version')
     os.makedirs(a.out, exist_ok=True)

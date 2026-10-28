@@ -38,7 +38,9 @@ function makePaint(hex, o, tag) {
   const f = m.customProgramCacheKey.bind(m);
   m.customProgramCacheKey = () => f() + '|' + tag + (o.flood ? '|flood' : '');
   m.name = `br:${tag}:` + hexStr(hex);
-  m.userData.pbr = { name: 'metal_painted', opts: { tint: hexStr(hex), chips: 0.04 } };
+  // (BR06: the bridges' own weathered painted-steel set for the renderers that bind sets (tools/assets/bridge_sets.py,
+  // ue_families.json hq.pbr br_steel_paint): rain streaks, a real paint level; the page draws the clean coat above)
+  m.userData.pbr = { name: 'br_steel_paint', opts: { tint: hexStr(hex), chips: 0.04 } };
   return m;
 }
 export const paint = (hex, o = {}) => once('paint' + hex + JSON.stringify(o), () => makePaint(hex, o, 'paint'));
@@ -78,7 +80,8 @@ export const cable = (hex, o = {}) => once('cable' + hex + JSON.stringify(o), ()
 // the ground, `scale` x 0.55 m high), and weathered per vertex (stoneize: the wet band over the water, soot streaks under
 // the ledges `o.ledges`, a mottle over the walls); the faces are cut to `o.sub` metres so the weathering has vertices.
 // The maps, the uvs and the vertex colours are what the packages carry, so every renderer draws the same stone.
-// o: { style: 'rock' | 'dressed', ledges: [y...], wl: the water's height, sub: metres }
+// o: { style: 'rock' | 'dressed', ledges: [y...], wl: the water's height, sub: metres, grime: [y0, y1, k] (darker by k
+// at y0 fading out by y1) }
 function makeStone(hex, scale, o, tag) {
   const T = stoneTextures(o.style || 'rock');
   // (the colour divided by the maps' mean and the weathering's, so the stone keeps the builder's colour on average)
@@ -87,7 +90,11 @@ function makeStone(hex, scale, o, tag) {
   const m = applyLightTrim(applyCityAO(new THREE.MeshStandardMaterial({ color: c, map: T.map, normalMap: T.normalMap, normalScale: new THREE.Vector2(1, 1),
     roughnessMap: T.ormMap, aoMap: T.ormMap, aoMapIntensity: 0.3, roughness: 1, metalness: 0, vertexColors: true })));
   { const b0 = new THREE.Color(hex); m.userData.brBase = { r: b0.r, g: b0.g, b: b0.b }; }   // (the builder's colour, for the silhouettes: tools/lod/bake_landmarks)
-  m.userData.brStone = { course: 0.55 * scale, ledges: o.ledges || [], wl: o.wl ?? 0, sub: o.sub ?? 1.6, seed: o.seed ?? 3 };
+  m.userData.brStone = { course: 0.55 * scale, ledges: o.ledges || [], wl: o.wl ?? 0, sub: o.sub ?? 1.6, seed: o.seed ?? 3, grime: o.grime || null };
+  // (BR06: for the renderers that bind sets, the bridges' own weathered ashlar (tools/assets/bridge_sets.py) in the builder's
+  // colour, box-mapped at its real size; the weathering per vertex above multiplies it. Unreal drew the generated maps at the
+  // colour divided by their mean: a 0.40 albedo, the Brooklyn Bridge's towers a blank cream slab in the golden grade)
+  m.userData.pbr = { name: (o.style || 'rock') === 'dressed' ? 'br_ashlar_dressed' : 'br_ashlar_rock', opts: { tint: hexStr(hex) } };
   if (o.flood) {
     // floodlit after dark (the Brooklyn Bridge's towers): the stone's colour times a warm light strongest a little over
     // y0, fading toward y1

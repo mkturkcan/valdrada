@@ -2122,21 +2122,34 @@ export function haApplyTile(tile, ox, oz) {
     return out;
   };
   stats.baseSkipped = 0;
-  for (let t = 0; t < ch.nT; t++) {
-    if (ch.tag[t] >= 3) continue;
-    if (fullOpaque[t]) { stats.baseSkipped++; continue; }
-    const v = [0, 1, 2].map((k) => { const q = ch.tri[3 * t + k]; return [ch.x[q], baseY(t, k), ch.z[q]]; });
-    const pc = sq(v);
-    if (pc.length < 3) continue;
+  // CRACKS (2026-10-27): the TIN triangles an opaque area section covers wholly are not drawn as the base (they would
+  // fight the asphalt laid on the grade), but nothing then lay under the paving, and the paving's pieces (cut along the
+  // TIN's edges, unwelded, T-junctions along kerbs) open sub-pixel cracks to the void in Unreal (Nanite's quantised
+  // positions): 20,000 void px a frame over Midtown. The land's TIN is laid again as the backing (tile.S.terrBack), BACKING
+  // m under the base, its own soup so no pass that reads or grades the base sees it: paving and ground always overlap.
+  // (every TIN triangle of the land, covered or not: where the base is drawn it hides the backing; under the paving,
+  // whose cut leaves no base, and under a wholly covered triangle the backing is what a crack shows)
+  const BACKING = 0.3, back = [];
+  const emit = (dst, pc) => {
     for (let k = 1; k + 1 < pc.length; k++) {
       let p0 = pc[0], p1 = pc[k], p2 = pc[k + 1];
       const ny = (p1[2] - p0[2]) * (p2[0] - p0[0]) - (p1[0] - p0[0]) * (p2[2] - p0[2]);
       if (Math.abs(ny) < 1e-10) continue;
       if (ny < 0) { const tmp = p1; p1 = p2; p2 = tmp; }
-      for (const p of [p0, p1, p2]) base.push(p[0] - ox, p[1], p[2] - oz);
+      for (const p of [p0, p1, p2]) dst.push(p[0] - ox, p[1], p[2] - oz);
     }
+  };
+  for (let t = 0; t < ch.nT; t++) {
+    if (ch.tag[t] >= 3) continue;
+    const v = [0, 1, 2].map((k) => { const q = ch.tri[3 * t + k]; return [ch.x[q], baseY(t, k), ch.z[q]]; });
+    const pc = sq(v);
+    if (pc.length < 3) continue;
+    emit(back, pc.map((p) => [p[0], p[1] - BACKING, p[2]]));
+    if (fullOpaque[t]) { stats.baseSkipped++; continue; }
+    emit(base, pc);
   }
   tile.S.terrP1 = Float32Array.from(base);
+  tile.S.terrBack = Float32Array.from(back);
   wallFaces(tile, ch, ox, oz, stats);
   if (shore) shoreCheck(tile, ox, oz, shore.probes, stats);
   tile.p1 = { stats, baseTris: base.length / 9 };

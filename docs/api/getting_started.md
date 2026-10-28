@@ -4,9 +4,9 @@ Valdrada is the Valdrada digital twin of New York City as a simulation server. L
 and simulates, and your code drives it over TCP through a Python API: you spawn and control vehicles and pedestrians,
 attach cameras, step the world, and read back images, segmentation, depth and bounding boxes.
 
-The Windows x64 release, `Valdrada-0.6.0-win64.zip` and `Valdrada-0.6.0-win64-tiles.zip` on the GitHub release
+The Windows x64 release, `Valdrada-0.6.1-win64.zip` and `Valdrada-0.6.1-win64-tiles.zip` on the GitHub release
 page, holds the server, the compiled city (`Content/`, its tiles in the second archive) and the Python package. Extract
-both archives into the same place; the commands below run in the extracted folder `Valdrada_0.6.0_win64`.
+both archives into the same place; the commands below run in the extracted folder `Valdrada_0.6.1_win64`.
 
 ## Start the server
 

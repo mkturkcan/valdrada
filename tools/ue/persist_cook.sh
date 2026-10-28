@@ -28,6 +28,9 @@ fi
 t1=$(date +%s)
 # (the packed facades' material copies made again from their instances first: a library binding run by any lane
 # re-parents an instance and, before bd_tilefac.py skipped them, its '_nan' copy; ValdradaNaniteFacades -refreshvariants, ~40 s)
+# (the meshes made since the last cook: a translucent or water section keeps its Nanite fallback, which the cook strips
+# elsewhere; without it a rebuilt block's water drew black and wrote no depth. ValdradaNaniteFacades -keepfallback -known=)
+[ $STAGE_ONLY = 1 ] || env "UE-LocalDataCachePath=/data0/projectnyc_aux/ue/ddc" "UE-SharedDataCachePath=None" $UE/Engine/Binaries/Linux/UnrealEditor-Cmd "$PROJECT" -run=ValdradaNaniteFacades -keepfallback -known=$OUT/keepfallback_known.txt -list=/dev/null -out=$OUT/logs/keepfallback.json -unattended -nosplash -nullrhi > $OUT/logs/keepfallback.log 2>&1 || { echo "keepfallback failed"; exit 7; }
 [ $STAGE_ONLY = 1 ] || env "UE-LocalDataCachePath=/data0/projectnyc_aux/ue/ddc" "UE-SharedDataCachePath=None" $UE/Engine/Binaries/Linux/UnrealEditor-Cmd "$PROJECT" -run=ValdradaNaniteFacades -refreshvariants -list=/dev/null -out=$OUT/logs/refreshvariants.json -unattended -nosplash -nullrhi > $OUT/logs/refreshvariants.log 2>&1 || { echo "refreshvariants failed"; exit 6; }
 [ $STAGE_ONLY = 1 ] || env "UE-LocalDataCachePath=/data0/projectnyc_aux/ue/ddc" "UE-SharedDataCachePath=None" $UE/Engine/Binaries/Linux/UnrealEditor-Cmd "$PROJECT" -run=cook -targetplatform=Linux \
   -map=/Game/City/L_City+/MovieRenderPipeline/MoviePipelineEntryMap -cookdir=$(dirname "$PROJECT")/Content/City/Shots -cookdir=$(dirname "$PROJECT")/Content/City/MRQ -cookdir=$(dirname "$PROJECT")/Content/Kit ${PC_COOK_FULL:+-forcecookall} $([ -n "${PC_COOK_FULL:-}" ] || echo -cookincremental) -CookProcessCount=${PC_COOK_PROCESSES:-6} \

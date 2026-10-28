@@ -19,6 +19,14 @@ const isNode = typeof window === 'undefined';
 const PIER_Y = 3.40;
 const own = (x, z, tx0, tz0) => x >= tx0 && x < tx0 + 512 && z >= tz0 && z < tz0 + 512;
 let D = null, P = null;
+// (BKB: the bridge towers that stand in the river: a mapped pier outline wholly within 55 m of one is the tower's fender or
+// caisson outline, not a pier: the kit draws the tower's own footing there, the pale deck on piles is left out)
+let TOWERS = [];
+export function setBridgeTowers(bridges) {
+  TOWERS = [];
+  for (const b of bridges || []) for (const t of (b.layout && b.layout.towers) || b.towers || []) if (Number.isFinite(t.x) && Number.isFinite(t.z)) TOWERS.push([t.x, t.z]);
+}
+const towerPier = (ring) => TOWERS.some(([x, z]) => ring.every((q) => Math.hypot(q[0] - x, q[1] - z) < 55));
 export function wshCoastReady() {
   if (!P) P = (async () => {
     try {
@@ -75,7 +83,8 @@ export function wshCoast(tile, ox, oz) {
   // ---- piers
   const deck = { plaza: [], curb: [] };
   for (const p of T.piers) {
-    if (marinaDropPier(ox, oz, p.id)) { st.marinaDrop = (st.marinaDrop || 0) + 1; continue; }   // (MARINA KIT: a dock outline drawn as a slab; the kit's floating docks there)
+    if (marinaDropPier(ox, oz, p.id)) { st.marinaDrop = (st.marinaDrop || 0) + 1; continue; }
+    if (p.ring && towerPier(p.ring)) { st.towerDrop = (st.towerDrop || 0) + 1; continue; }   // (MARINA KIT: a dock outline drawn as a slab; the kit's floating docks there)
     // (one level for every pier, so a pier split over tiles meets itself: the compile's flat pier level, 0.45 m under its
     // bulkheads' caps)
     const y = PIER_Y;

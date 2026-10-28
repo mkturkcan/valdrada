@@ -25,6 +25,7 @@ LV = {3: (9.0, (0.42, 0.78), (13.0, 24.0)), 4: (14.0, (0.42, 0.78), (14.0, 25.0)
 # (summer deciduous, the near Inwood woods' yellow-green: oak, maple, tulip tree, a darker birch/beech share)
 FOLIAGE = np.array([(0.066, 0.104, 0.028), (0.080, 0.118, 0.032), (0.056, 0.090, 0.030), (0.092, 0.124, 0.036), (0.060, 0.096, 0.040), (0.050, 0.078, 0.026)], np.float32)
 _T = {}
+VERSION = 2   # (the far library's record: a new version prepares the covered packages again; 2 = NJSHORE lawns)
 
 
 def tcc():
@@ -144,6 +145,15 @@ def apply(path):
     floor = np.array([0.15, 0.22, 0.08], np.float32)
     kk = np.clip(k * 1.3, 0, 1)
     out = out * (1 - 0.8 * kk) + floor * 0.8 * kk * (0.85 + 0.3 * out.mean(2, keepdims=True))
+    # (NJSHORE 2026-10-26: open lawns, the map's light OSM grass (Ross Dock's picnic lawn read as a pale plate on the shore
+    # from across the river), toned to the cover's summer grass: darker, less yellow, broken by a soft noise; trees' floor kept)
+    from scipy.ndimage import gaussian_filter as _gf
+    gness = np.clip((im[..., 1] - np.maximum(im[..., 0], im[..., 2])) / 0.06, 0, 1) * land * (~paved)
+    lawn = (gness * np.clip(1.0 - 1.6 * T, 0, 1))[..., None]
+    ln = _gf(np.random.default_rng(11).uniform(0, 1, (Hh, Ww)), 2.0); ln = ((ln - ln.mean()) / (ln.std() + 1e-9))[..., None]
+    grass = np.array([0.19, 0.25, 0.10], np.float32) * (0.85 + 0.3 * np.clip(im.mean(2, keepdims=True) / max(float(im.mean()), 1e-3) - 0.5, 0, 1) + 0.08 * ln)
+    out = out * (1 - 0.8 * lawn) + grass * 0.8 * lawn
+    st['lawn_texels'] = int((lawn[..., 0] > 0.5).sum())
     R = rock(); texm = abs(1.0 / (au[0] * Ww))
     rr = ((WZ / 20.0 * 256).astype(np.int64)) % 256; rc = ((WX / 20.0 * 256).astype(np.int64)) % 256
     # (columns: the Palisades' joints are vertical, so seen from the river a column is a line down the slope: bands across

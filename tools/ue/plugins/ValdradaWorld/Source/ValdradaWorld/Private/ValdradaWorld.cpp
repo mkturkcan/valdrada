@@ -45,6 +45,8 @@ static TAutoConsoleVariable<FString> CVarDumpCmds(TEXT("valdrada.DumpCmds"), TEX
 static TAutoConsoleVariable<int32> CVarKit(TEXT("valdrada.Kit"), 1, TEXT("0: the kit cells build nothing (memory attribution)"));
 static TAutoConsoleVariable<int32> CVarFarRT(TEXT("valdrada.FarInstancesInRayTracing"), 0, TEXT("0: the far stand-ins' instanced meshes (trees, kit) stay out of the ray tracing scene (over 16 M instances overflowed it: zero-sized FRayTracingScene::SceneBuffer)"));
 static TAutoConsoleVariable<float> CVarBlocksM(TEXT("valdrada.BlocksRangeM"), 0.f, TEXT("per-render loading range of the grid Blocks in metres (0: the level's), through wp.Runtime.OverrideRuntimeLoadingRange once the level is up (a job cvar)"));
+static TAutoConsoleVariable<float> CVarDefBlocksM(TEXT("valdrada.DefaultBlocksRangeM"), 4000.f, TEXT("metres: the near blocks' range when valdrada.BlocksRangeM is 0 (no tier); 0: every block World Partition loads (its coarse hash cells reached ~11 km, beyond the far city's hand-over)"));
+static TAutoConsoleVariable<float> CVarBlockKitM(TEXT("valdrada.BlockKitRangeM"), 0.f, TEXT("metres: a near block builds its own reduced kit only within this distance (0: all of it, no cracks; the capped tiers set their reduced-kit range: the whole blocks' kit did not fit 8/12/16 GB)"));
 static TAutoConsoleVariable<float> CVarRTRangeM(TEXT("valdrada.RTRangeM"), 0.f, TEXT("metres: blocks farther than this from the lens leave the ray tracing scene (their geometry is evicted); 0 keeps all"));
 static TAutoConsoleVariable<int32> CVarLevelCollision(TEXT("valdrada.LevelCollision"), 0, TEXT("0: the streamed levels' components lose collision before they register (renders: a cooked city made a physics body per instance and spent minutes adding and removing them)"));
 static TAutoConsoleVariable<float> CVarKitFarM(TEXT("valdrada.KitFarRangeM"), 0.f, TEXT("per-render loading range of the grid KitFar (reduced kit) in metres (0: the level's)"));
@@ -54,6 +56,9 @@ static TAutoConsoleVariable<int32> CVarInstDF(TEXT("valdrada.InstanceDistanceFie
 static TAutoConsoleVariable<int32> CVarTier(TEXT("valdrada.Tier"), -1, TEXT("graphics tier: 0 low (8 GB), 1 medium (12 GB), 2 high (16 GB), 3 cinematic; applies the tier's console variables from valdrada.TierFile"));
 static TAutoConsoleVariable<FString> CVarTierFile(TEXT("valdrada.TierFile"), TEXT("/data0/projectnyc_aux/v2_wt/city-v2/tools/ue/persist_tiers.json"), TEXT("the tiers' table (tools/ue/persist_tiers.json)"));
 static TAutoConsoleVariable<float> CVarLog(TEXT("valdrada.SwapLogSeconds"), 10.f, TEXT("seconds between swap counts in the log (0 off)"));
+
+// (the near blocks' range in metres: the tier's, else the default; 0 none)
+static float NearBlocksM() { const float M = CVarBlocksM.GetValueOnGameThread(); return M > 0.f ? M : CVarDefBlocksM.GetValueOnGameThread(); }
 
 // ---- the kit cell (the table format: tools/ue/vcel_write.py; the reader as ValdradaCells' AValdradaCell)
 namespace
@@ -202,7 +207,7 @@ void AValdradaLevelStreamer::BeginPlay()
 	// (a far stand-in loads only when the swap wants it: loaded at once and dropped a tick later under a loaded block,
 	// thousands of levels' physics bodies were added and removed, minutes in Chaos's pending spatial queue)
 	if (Tags.Num() >= 1 && Tags[0] == FName(TEXT("vf"))) return;
-	if (CVarBlocksM.GetValueOnGameThread() > 0.f) return;   // (the swap loads the block by distance, valdrada.BlocksRangeM)
+	if (NearBlocksM() > 0.f) return;   // (the swap loads the block by distance, valdrada.BlocksRangeM / DefaultBlocksRangeM)
 	if (Level.IsNull() || Streaming) return;
 	StartStreaming();
 }
@@ -240,17 +245,18 @@ void AValdradaLevelStreamer::EndPlay(const EEndPlayReason::Type Reason)
 	Super::EndPlay(Reason);
 }
 
-void AValdradaLevelStreamer::SetWanted(bool bWanted)
+bool AValdradaLevelStreamer::SetWanted(bool bWanted)
 {
 	if (!Streaming)
 	{
-		if (!bWanted || Level.IsNull()) return;
+		if (!bWanted || Level.IsNull()) return false;
 		StartStreaming();
-		return;
+		return true;
 	}
-	if (Streaming->ShouldBeLoaded() == bWanted) return;
+	if (Streaming->ShouldBeLoaded() == bWanted && Streaming->ShouldBeVisible() == bWanted) return false;
 	Streaming->SetShouldBeLoaded(bWanted);
 	Streaming->SetShouldBeVisible(bWanted);
+	return true;
 }
 
 bool AValdradaLevelStreamer::IsReady() const
@@ -270,6 +276,7 @@ static const FName NAME_VN(TEXT("vn")), NAME_VF(TEXT("vf"));
 static bool NearIsReady(AActor* A)
 {
 	if (AValdradaLevelStreamer* S = Cast<AValdradaLevelStreamer>(A)) return S->IsReady();
+	if (AValdradaStreamCell* C = Cast<AValdradaStreamCell>(A)) return C->bBuilt;
 	if (ILevelInstanceInterface* LI = Cast<ILevelInstanceInterface>(A))
 	{
 		ULevel* L = LI->IsLoaded() ? LI->GetLoadedLevel() : nullptr;
@@ -355,15 +362,25 @@ void UValdradaSwapSubsystem::Tick(float DeltaTime)
 		Range(CVarKitM.GetValueOnGameThread(), AppliedKN, TEXT("Kit"));
 		Range(CVarFarM.GetValueOnGameThread(), AppliedF, TEXT("Far"));
 		Range(CVarBlocksM.GetValueOnGameThread(), AppliedM, TEXT("Blocks"));
-		Range(CVarKitFarM.GetValueOnGameThread(), AppliedK, TEXT("KitFar"));
+		// (the reduced kit's actors loaded as far as the near blocks reach: a near block draws its own reduced kit, below)
+		{
+			const float BK = CVarBlockKitM.GetValueOnGameThread(), KF = CVarKitFarM.GetValueOnGameThread();
+			Range(NearBlocksM() > 0.f ? FMath::Max(KF, BK > 0.f ? BK : NearBlocksM() + 1500.f) : KF, AppliedK, TEXT("KitFar"));
+		}
 	}
 	if (!CVarSwap.GetValueOnGameThread()) return;
 	TMap<FName, bool> Ready; TArray<TPair<AActor*, FName>> Fars;
+	TSet<FName> NearWanted;   // (block keys whose near level is in range: their reduced kit is built whatever its own range)
 	// (2026-10-25: the near blocks and kit quads loaded by their distance to the lens when valdrada.BlocksRangeM /
 	// valdrada.KitRangeM are set: World Partition's grid ranges did not bound them, a block's bounds a little over its
 	// 1 km cell put it in a coarser cell, and the low tier loaded 69 blocks at a 600 m range. A near actor out of range
 	// is not ready, so its far stand-in stays.)
-	const float NearBM = CVarBlocksM.GetValueOnGameThread() * 100.f, NearKM = CVarKitM.GetValueOnGameThread() * 100.f;
+	// (2026-10-26, holes over far Brooklyn and Queens: a key counted as ready while its near actor was merely in range, and
+	// with no tier every block World Partition loaded (~380, to ~11 km) hid its far stand-in. A far stand-in is hidden only
+	// when every near actor of its key is in range, loaded and visible; a near block leaving the range is kept until its far
+	// stand-ins are loaded and visible.)
+	bool bStreamChanged = false;
+	const float NearBM = NearBlocksM() * 100.f, NearKM = CVarKitM.GetValueOnGameThread() * 100.f;
 	APlayerController* PC0 = W->GetFirstPlayerController();
 	const bool bEye = PC0 && PC0->PlayerCameraManager && !PC0->PlayerCameraManager->GetCameraLocation().IsNearlyZero();
 	const FVector Eye0 = bEye ? PC0->PlayerCameraManager->GetCameraLocation() : FVector::ZeroVector;
@@ -376,7 +393,13 @@ void UValdradaSwapSubsystem::Tick(float DeltaTime)
 			bool bIn = true;
 			if (AValdradaLevelStreamer* St = Cast<AValdradaLevelStreamer>(A))
 			{
-				if (NearBM > 0.f) { bIn = bEye && (!St->StreamBounds.IsValid || St->StreamBounds.ComputeSquaredDistanceToPoint(Eye0) < NearBM * NearBM); if (bEye) St->SetWanted(bIn); }
+				if (NearBM > 0.f)
+				{
+					bIn = bEye && (!St->StreamBounds.IsValid || St->StreamBounds.ComputeSquaredDistanceToPoint(Eye0) < NearBM * NearBM);
+					const bool* FRp = FarReadyPrev.Find(A->Tags[1]);
+					const bool bKeep = !bIn && St->IsReady() && FRp && !*FRp;   // (until the far stand-in shows)
+					if (bEye) bStreamChanged |= St->SetWanted(bIn || bKeep);
+				}
 			}
 			else if (AValdradaStreamCell* Ce = Cast<AValdradaStreamCell>(A))
 			{
@@ -386,7 +409,10 @@ void UValdradaSwapSubsystem::Tick(float DeltaTime)
 					if (bEye) { if (bIn && !Ce->bBuilt) Ce->Build(); else if (!bIn && Ce->bBuilt) Ce->Clear(); }
 				}
 			}
-			bool& R = Ready.FindOrAdd(A->Tags[1]); R = R || bIn; (void)NearIsReady;
+			if (bIn && A->IsA<AValdradaLevelStreamer>()) NearWanted.Add(A->Tags[1]);
+			bool* R = Ready.Find(A->Tags[1]);
+			const bool bOk = bIn && NearIsReady(A);
+			if (R) *R = *R && bOk; else Ready.Add(A->Tags[1], bOk);
 		}
 		else if (A->Tags[0] == NAME_VF) Fars.Emplace(A, A->Tags[1]);
 	}
@@ -412,19 +438,44 @@ void UValdradaSwapSubsystem::Tick(float DeltaTime)
 	}
 	int32 NR = 0; for (const auto& KV : Ready) NR += KV.Value ? 1 : 0;
 	int32 H = 0, S = 0;
+	TMap<FName, bool> FarReady;
 	for (const auto& F : Fars)
 	{
 		AActor* A = F.Key; bool bHide = Ready.FindRef(F.Value);
+		bool bRanged = false;
 		{   // (far stand-ins and reduced kit beyond their tier's range dropped as well: valdrada.FarRangeM, valdrada.KitFarRangeM)
 			const bool bCell = A->IsA<AValdradaStreamCell>();
 			const float FM = (bCell ? CVarKitFarM.GetValueOnGameThread() : CVarFarM.GetValueOnGameThread()) * 100.f;
 			const FBox* Bx = bCell ? &Cast<AValdradaStreamCell>(A)->StreamBounds : (A->IsA<AValdradaLevelStreamer>() ? &Cast<AValdradaLevelStreamer>(A)->StreamBounds : nullptr);
-			if (FM > 0.f && bEye && Bx && Bx->IsValid && Bx->ComputeSquaredDistanceToPoint(Eye0) > FM * FM) bHide = true;
+			// (2026-10-26: a near block beyond the reduced kit's range was drawn without the kit it holds (street and lot
+			// pieces among it): cracks to the void 1.5-4 km out. The reduced kit of a quad in a near block in range is built
+			// with the block; elsewhere the kit's own range (the level's KitFar grid, 1.5 km, when no tier sets one).)
+			const float FMe = bCell && FM <= 0.f && NearBlocksM() > 0.f ? 150000.f : FM;
+			bool bOwnBlock = false;
+			if (bCell)
+			{
+				FString Ks = F.Value.ToString(), Sx, Sz;
+				if (Ks.RemoveFromStart(TEXT("Q_")) && Ks.Split(TEXT("_"), &Sx, &Sz))
+					bOwnBlock = NearWanted.Contains(FName(*FString::Printf(TEXT("B_%d_%d"), FMath::FloorToInt(FCString::Atoi(*Sx) / 4.f), FMath::FloorToInt(FCString::Atoi(*Sz) / 4.f))));
+			}
+			const float BKM = CVarBlockKitM.GetValueOnGameThread() * 100.f;
+			if (bOwnBlock && BKM > 0.f && bEye && Bx && Bx->IsValid && Bx->ComputeSquaredDistanceToPoint(Eye0) > BKM * BKM) bOwnBlock = false;
+			if (FMe > 0.f && bEye && Bx && Bx->IsValid && !bOwnBlock && Bx->ComputeSquaredDistanceToPoint(Eye0) > FMe * FMe) { bHide = true; bRanged = true; }
 		}
 		bHide ? ++H : ++S;
 		if (AValdradaLevelStreamer* St = Cast<AValdradaLevelStreamer>(A))
 		{
-			St->SetWanted(!bHide);   // (unloaded, not hidden)
+			// (no far stand-in is loaded before the lens is known, nor for a block already in range: its near level comes in
+			// this tick (block streaming); loading both at once made the capped high tier's peak at the first frame, 2026-10-27)
+			bool bComing = false;   // (a near block in range for under 5 s that is not visible yet; one that never loads lets its far in)
+			if (NearWanted.Contains(F.Value) && !Ready.FindRef(F.Value))
+			{
+				const double Now_ = FPlatformTime::Seconds(); const double T_ = NearWaitSince.FindOrAdd(F.Value, Now_);
+				bComing = Now_ - T_ < 5.0;
+			}
+			if (!bHide && !St->GetLoadedLevel() && (!bEye || bComing)) { bHide = true; bRanged = true; }
+			bStreamChanged |= St->SetWanted(!bHide);   // (unloaded, not hidden)
+			if (!bRanged) { bool* FR = FarReady.Find(F.Value); const bool bR = St->IsReady(); if (FR) *FR = *FR && bR; else FarReady.Add(F.Value, bR); }
 			ULevel* FL = St->GetLoadedLevel();
 			if (FL && !CVarFarRT.GetValueOnGameThread() && !FarRTDone.Contains(FL))
 			{
@@ -449,6 +500,11 @@ void UValdradaSwapSubsystem::Tick(float DeltaTime)
 		else if (A->IsHidden() != bHide) A->SetActorHiddenInGame(bHide);
 		Applied.Add(A, TPair<TWeakObjectPtr<ULevel>, bool>(Lv, bHide));
 	}
+	FarReadyPrev = MoveTemp(FarReady);
+	for (auto It = NearWaitSince.CreateIterator(); It; ++It) if (!NearWanted.Contains(It.Key()) || Ready.FindRef(It.Key())) It.RemoveCurrent();
+	// (offline renders: what this tick asked of streaming is done before the frame, so no frame shows a block's far
+	// stand-in unloaded before the block is in, or the reverse)
+	if (bStreamChanged && CVarBlock.GetValueOnGameThread() && !W->GetIsInBlockTillLevelStreamingCompleted()) W->BlockTillLevelStreamingCompleted();
 	NearReady = NR; FarHidden = H; FarShown = S;
 	const float LogS = CVarLog.GetValueOnGameThread(); const double Now = FPlatformTime::Seconds();
 	if (LogS > 0.f && Now - LastLog > LogS)

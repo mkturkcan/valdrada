@@ -20,7 +20,7 @@ const fs = require('node:fs');
 const tcp = require('node:net');
 const { pathToFileURL } = require('node:url');
 
-const VERSION = '0.6.0';
+const VERSION = '0.6.1';
 
 // ---------------------------------------------------------------- options
 // --name value or --name=value. A URL must use the = form: Chromium takes a bare URL argument as the page to open

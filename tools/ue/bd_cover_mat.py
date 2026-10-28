@@ -12,21 +12,23 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import r1c_lodmat as LM  # noqa: E402
 
-COVV = 1
+COVV = 2   # (v2 2026-10-26: no horizontal bands)
 ROCK_OLD = '''float3 rock = float3(0.105, 0.098, 0.090) * (0.65 + 0.7 * joints);
 c = lerp(c, rock, steep * 0.9);'''
 ROCK_NEW = '''// (NJCOVER: diabase columns: the face's horizontal direction from its normal, a hashed shade per 2.6 m column)
+// (v2, NJCOVER2: no horizontal bands. The shared master's `joints` term floors WPos.z into 21 m rows of random shade, and v1's
+// 9 m rows kept it: the Palisades read as strata stripes from across the river. Now one shade per column the full height,
+// a smooth low-frequency variation along and up the face, the columns faded by the pixel footprint)
 float2 tg = normalize(float2(-N.y, N.x) + float2(1e-4, 0.0));
 float ac = dot(WPos.xy, tg) / 260.0 + 0.35 * sin(WPos.z * 0.004);
 float cid = floor(ac);
 float h1 = frac(sin(cid * 12.9898) * 43758.5453);
-float rowi = floor(WPos.z / 900.0 + h1 * 2.0);
-float h2 = frac(sin(cid * 7.13 + rowi * 3.71) * 24634.6345);
 float fc = frac(ac);
 float jt = smoothstep(0.0, 0.10, fc) * smoothstep(1.0, 0.90, fc);
 float fw = saturate(1.0 - 1.5 * fwidth(ac));
-float colv = lerp(1.0, (0.70 + 0.45 * h1) * (0.90 + 0.20 * h2) * lerp(0.55, 1.0, jt), fw);
-float3 rock = float3(0.078, 0.081, 0.086) * colv * (0.85 + 0.3 * joints);
+float colv = lerp(1.0, (0.78 + 0.34 * h1) * lerp(0.62, 1.0, jt), fw);
+float lv = 0.5 + 0.25 * sin(dot(WPos.xy, tg) / 3700.0 + 1.7 * sin(WPos.z / 2300.0)) + 0.25 * sin(dot(WPos.xy, tg) / 1300.0 + 2.9);
+float3 rock = float3(0.078, 0.081, 0.086) * colv * (0.86 + 0.28 * lv);
 c = lerp(c, rock, steep * 0.92);'''
 
 

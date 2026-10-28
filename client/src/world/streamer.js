@@ -1,3 +1,4 @@
+import { setBridgeTowers } from '../city/wshCoast.js';
 import * as THREE from 'three';
 import { StaticPool } from './staticPool.js';
 import { assembleTile } from './assemble.js';
@@ -49,6 +50,7 @@ export class Streamer {
     this.base = base;
     this.manifest = await (await fetch(`${base}/manifest.json`)).json();
     this.bridges = await (await fetch(`${base}/bridges.json`)).json();
+    setBridgeTowers(this.bridges);   // (BKB: no pier decks at the river towers)
     if (HA_P1) { try { await haAnchorBridges(this.bridges); } catch (e) { console.warn('[terrain p1] bridges', e); } }   // P1 TERRAIN: the Manhattan ends
     // ==== R1A cells (client/src/cells/, docs/specs/cell-package.md): ?cells=1 draws the baked cells from their packages
     if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('cells') === '1') {

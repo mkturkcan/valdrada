@@ -13,7 +13,7 @@
 #   * QA37 (2026-10-03) the temporal checks of tools/ad/temporal_scan.py on every take: FLICKER (z-fighting, shimmering
 #     water), ALTERNATION (a mode toggling frame by frame), STEP / STEPSCAN (shadow, LoD and reflection pops) and the
 #     recorder's REFLECTION DROPOUT log; `--notemporal` skips them.
-#   python tools/ad/qa_scan.py <clips root> <take[:f0-f1]> ... [--out dir] [--json file] [--notemporal]
+#   python tools/ad/qa_scan.py <clips root> <take[:f0-f1]> ... [--out dir] [--json file] [--notemporal] [--nostream]
 # Exit 2 when a take has a transient black block, else 3 when a take fails a temporal check, else 0.
 import sys, os, json
 import numpy as np
@@ -27,6 +27,7 @@ def opt(name, default=None):
     return default
 notemporal = '--notemporal' in args
 if notemporal: args.remove('--notemporal')
+if '--nostream' in args: args.remove('--nostream')
 out_dir = opt('--out', None)
 json_out = opt('--json', None)
 BK37 = opt('--bk37', '1') != '0'   # see nan_block() below
@@ -169,6 +170,24 @@ if not notemporal:
         if name in report: report[name]['temporal'] = rep
         tfail |= bool(rep.get('fail'))
         print(temporal_scan.line(rep), flush=True)
+# stream06 (2026-10-26): STREAM, tools/qa/stream_scan.py on every take with a _depth folder: progressive draw-in (geometry
+# that arrives in place over frames, Nanite pages streaming late: mnFdrSchurz's towers as window grids) and far shimmer
+# (far pixels flipping against both reprojected neighbours); `--nostream` skips it. Fails the take as a temporal check.
+if '--nostream' not in sys.argv:
+    import subprocess
+    ss = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'qa', 'stream_scan.py')
+    for t in takes:
+        name, rng = (t.split(':') + [None])[:2]
+        d = os.path.join(root, name)
+        if not os.path.exists(os.path.join(d, '_depth', 'cams.json')): continue
+        jp = os.path.join(out_dir or d, f'{name}_stream.json')
+        if out_dir: os.makedirs(out_dir, exist_ok=True)
+        cmd = [sys.executable, ss, d, '--json', jp] + (['--out', os.path.join(out_dir, f'{name}_stream')] if out_dir else []) + (['--frames', rng] if rng else [])
+        code = subprocess.call(cmd)
+        try: rep = json.load(open(jp)); rep.pop('per_frame', None)
+        except Exception: rep = {'error': f'stream_scan exit {code}'}
+        if name in report: report[name]['stream'] = rep
+        tfail |= code == 1
 if json_out:
     with open(json_out, 'w') as fh: json.dump(report, fh, indent=1)
 sys.exit(2 if fail else (3 if tfail else 0))

@@ -109,7 +109,7 @@ def ballast(pci, cap, rdir):
     return p, int(open(rf).read().split()[1])
 
 
-COOKED = os.path.join(PDIR, 'cooked', 'stage', 'Linux', 'BoundlessUE', 'Binaries', 'Linux', 'BoundlessUE')
+COOKED = os.environ.get('PERSIST_COOKED_BIN') or os.path.join(PDIR, 'cooked', 'stage', 'Linux', 'BoundlessUE', 'Binaries', 'Linux', 'BoundlessUE')   # (PERSIST_COOKED_BIN: another staged game, e.g. a plugin fix tried on the current paks)
 
 
 def cooked(a):

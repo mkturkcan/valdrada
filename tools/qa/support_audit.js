@@ -111,6 +111,10 @@
       wp[v * 3 + 1] = e[1] * x + e[5] * y + e[9] * z + e[13];
       wp[v * 3 + 2] = e[2] * x + e[6] * y + e[10] * z + e[14];
     }
+    // (BKB: a tile facade the dresser replaced is discarded by the facade shader through the tile's hide mask: it holds
+    // nothing up, so its vertices go far away; without this a dressed building whose walls are missing reads as supported)
+    { const mt = M.o.material, hd = mt && mt.userData && mt.userData.isFacade && mt.userData.hideTex && mt.userData.hideTex.image && mt.userData.hideTex.image.data, bid = g.attributes.aBid;
+      if (hd && bid) for (let v = 0; v < n; v++) if (hd[Math.round(bid.getX(v))] > 127) { wp[v * 3] = 1e7; wp[v * 3 + 1] = -1e7; wp[v * 3 + 2] = 1e7; } }
     const idx = g.index ? g.index.array : null;
     const nt = Math.floor((idx ? Math.min(g.index.count, idx.length) : n) / 3);
     M.wp = wp; M.idx = idx; M.nt = nt; M.base = triTotal; triTotal += nt;

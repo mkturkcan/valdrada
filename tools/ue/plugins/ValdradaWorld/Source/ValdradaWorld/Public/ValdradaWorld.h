@@ -91,8 +91,9 @@ public:
 	FBox StreamBounds = FBox(ForceInit);
 	bool IsReady() const;
 	ULevel* GetLoadedLevel() const;
-	/** a far stand-in's level loaded or unloaded by the swap (unloaded, not hidden, under a loaded block) */
-	void SetWanted(bool bWanted);
+	/** a level loaded or unloaded by the swap (a far stand-in unloaded, not hidden, under a visible block); true when
+	    this call changed what streaming should do */
+	bool SetWanted(bool bWanted);
 	/** the level loaded, not yet in the world: its components lose collision before they register (valdrada.LevelCollision 0) */
 	UFUNCTION()
 	void HandleLevelLoaded();
@@ -125,6 +126,11 @@ private:
 	TMap<TWeakObjectPtr<AActor>, TPair<TWeakObjectPtr<ULevel>, bool>> Applied;
 	TSet<TWeakObjectPtr<ULevel>> FarRTDone;
 	TMap<TWeakObjectPtr<ULevel>, bool> RTIn;
+	/** per key: every far stand-in the swap wants for it is loaded and visible (last tick); a near block leaving the
+	    range stays loaded until then, so no frame has neither */
+	TMap<FName, bool> FarReadyPrev;
+	/** per key: since when its near block is in range and not yet visible (its far stand-in is not loaded meanwhile) */
+	TMap<FName, double> NearWaitSince;
 	double LastLog = 0.0;
 };
 
