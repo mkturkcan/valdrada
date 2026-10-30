@@ -12,10 +12,10 @@ checkout. The [installation guide](install.md) covers requirements, servers with
 The release contains the server, the compiled city (`Content/`) and the Python package, in four archives: one
 archive of the five boroughs would exceed GitHub's 2 GiB limit for a release file.
 
-1. Download `Valdrada-0.6.1-win64.zip` (1.5 GB), `Valdrada-0.6.1-win64-tiles.zip` (0.8 GB, the city's tiles) and,
-   for the measured ground (`?terrain=p1`), `Valdrada-0.6.1-win64-terrain1.zip` and `-terrain2.zip` (1.0 GB each)
+1. Download `Valdrada-0.6.2-win64.zip` (1.5 GB), `Valdrada-0.6.2-win64-tiles.zip` (0.8 GB, the city's tiles) and,
+   for the measured ground (`?terrain=p1`), `Valdrada-0.6.2-win64-terrain1.zip` and `-terrain2.zip` (1.0 GB each)
    from the [releases page](https://github.com/mkturkcan/valdrada/releases) and extract them into the same folder.
-2. In the extracted folder `Valdrada_0.6.1_win64`, double-click `StartServer.bat`. A window opens; on the first
+2. In the extracted folder `Valdrada_0.6.2_win64`, double-click `StartServer.bat`. A window opens; on the first
    start the city appears after one to two minutes, while the shaders compile. `StartServer_Headless.bat` starts the
    same server without a window.
 3. Open a terminal in that folder and install the Python package:
@@ -36,7 +36,7 @@ git clone https://github.com/mkturkcan/valdrada.git
 cd valdrada
 (cd server && npm install)
 pip install -U "huggingface_hub>=1.0"
-hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.6.1 --include "Content/*" --local-dir .
+hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.6.2 --include "Content/*" --local-dir .
 cd server
 env -u ELECTRON_RUN_AS_NODE npx electron . --content ../Content
 ```
@@ -69,7 +69,7 @@ npm install
 (cd client && npm install)
 (cd server && npm install)
 pip install -U "huggingface_hub>=1.0"
-hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.6.1 \
+hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.6.2 \
     --include "Content/tiles/*" --include "Content/models/*" --include "Content/textures/*" --local-dir .cache/hf
 mv .cache/hf/Content/tiles .cache/hf/Content/models .cache/hf/Content/textures client/public/
 ```

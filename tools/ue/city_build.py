@@ -172,7 +172,7 @@ def manifest():
     return json.load(open(p)) if os.path.exists(p) else {'cells': {}, 'rounds': []}
 
 
-def build_cells(subset, index):
+def build_cells(subset, index, force_blocks=None):
     """the cells of subset (cell -> package hash) through the cache, checked, tabled and imported; merged into the manifest"""
     os.environ.setdefault('UE_KITCELLS', '1')
     os.environ.setdefault('UE_DD_WORKERS', '1'); os.environ.setdefault('UE_CC_JOBS', '96')
@@ -190,7 +190,7 @@ def build_cells(subset, index):
     logf = os.path.join(CITY, 'build_render_take.log'); S = {}
     t0 = time.time()
     log('build:', len(subset), 'cells and', len(extra), 'built neighbours')
-    dkey = R.cc_cells(I, logf, S)
+    dkey = R.cc_cells(I, logf, S) if I['cells'] else {}
     full.update(dkey)
     log('packed and deduplicated', {k: v for k, v in S.items()})
     for rnd in range(0 if R.V2 else 3):   # (city v2: no overlap pass, nothing to check against)
@@ -201,8 +201,20 @@ def build_cells(subset, index):
     R.cc_load_kit(dkey, logf, S)
     if R.V2_BLOCKS:   # (city v2: every block these cells touch, with all its built cells, merged and imported once)
         M0 = manifest(); allk = {k: c['key'] for k, c in M0['cells'].items()}; allk.update(dkey)
-        blocks = {block_of(k) for k in dkey}
-        bk = R.cc_blocks({k: d for k, d in allk.items() if block_of(k) in blocks}, logf, S)
+        blocks = {block_of(k) for k in dkey} | {tuple(b) for b in (force_blocks or ())}
+        # (2026-10-29: a block is merged from its cells' unique-mesh packages (cc/ddu); one cleared from the cache was
+        # skipped without a word, and 7,085 built cells were missing from 202 blocks (Brooklyn behind the Brooklyn Bridge
+        # a void). A built cell with something drawn whose package is gone is made again from its baked package first)
+        import registry as REG
+        gone = {k: index[k] for k, d in allk.items() if block_of(k) in blocks and k not in dkey and k in index
+                and not os.path.exists(os.path.join(R.CC, 'ddu', d + '.glb')) and ((REG.meta_of(index[k]) or {}).get('stats') or {}).get('tris', 1) > 0}
+        if gone:
+            log('build: remaking', len(gone), 'built cells of these blocks whose packages were cleared')
+            dk2 = R.cc_cells({'cells': gone, 'index': index}, logf, S); R.cc_load_kit(dk2, logf, S)
+            allk.update(dk2); dkey.update(dk2); I['cells'].update(gone); S['remade'] = len(dk2)
+        miss = [k for k, d in allk.items() if block_of(k) in blocks and k in gone and not os.path.exists(os.path.join(R.CC, 'ddu', d + '.glb'))]
+        if miss: raise RuntimeError(f'build: {len(miss)} cells of these blocks have no package after remaking, e.g. {miss[:3]}')
+        bk = R.cc_blocks({k: d for k, d in allk.items() if block_of(k) in blocks}, logf, S, force={'%d_%d' % b for b in (force_blocks or ())})
     S['secs'] = round(time.time() - t0, 1)
     import registry as REG
     with REG.file_lock(os.path.join(CITY, 'cells.json.lock')):   # (CITY: two builds merging at once lost each other's cells)

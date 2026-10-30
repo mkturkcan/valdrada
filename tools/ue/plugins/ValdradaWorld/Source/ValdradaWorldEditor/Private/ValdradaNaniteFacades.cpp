@@ -74,6 +74,21 @@ static const TCHAR* Prologue = TEXT(
 
 struct FNanStats { TMap<FString, int32> Hist; int32 Meshes = 0, Done = 0, Already = 0, SkipUV = 0, SkipMat = 0, SkipLoad = 0, Variants = 0, Masters = 0; int64 Verts = 0, Clamped = 0, RoundTripBad = 0; TArray<FString> Errors; };
 
+// the kit's glass sets (tk:fac:glass_*): every pane a separate quad, which Nanite drops at a distance (a tower drew its
+// frames and spandrels with the sky through the panes, 2026-10-28: PreserveArea and the finest Nanite detail left 2 to 11 %
+// of the panes open, the city's root pages hold the streaming pool at 512 MB); the glass stays out of Nanite, drawn whole.
+// The same for the kit's other pane sets: tk:glass_* (the punched windows and the towers' own glass) and tk:litWindow_*
+static bool KitGlass(const TArray<FStaticMaterial>& Mats)
+{
+	for (const FStaticMaterial& Sm : Mats)
+	{
+		if (!Sm.MaterialInterface) continue;
+		const FString N = Sm.MaterialInterface->GetName();
+		if (N.StartsWith(TEXT("tk_fac_glass")) || N.StartsWith(TEXT("tk_glass_")) || N.StartsWith(TEXT("tk_litWindow"))) return true;
+	}
+	return false;
+}
+
 static bool SaveAsset(UObject* Obj)
 {
 	UPackage* P = Obj->GetOutermost();
@@ -192,6 +207,35 @@ int32 UValdradaNaniteFacadesCommandlet::Main(const FString& Params)
 		UE_LOG(LogValdradaNanite, Display, TEXT("keepfallback done %s"), *Txt);
 		return S.Errors.Num() ? 1 : 0;
 	}
+	// (-glassraster -list=<meshes>: the packed meshes of the kit's glass sets taken out of Nanite; the packing does it for
+	// meshes packed since, this mode for the ones packed before)
+	if (FParse::Param(*Params, TEXT("glassraster")))
+	{
+		TArray<FString> L; FFileHelper::LoadFileToStringArray(L, *ListFile);
+		int32 Seen = 0, Glass = 0, Set = 0, Had = 0;
+		for (const FString& Path : L)
+		{
+			if (Path.IsEmpty()) continue;
+			UStaticMesh* SM = LoadObject<UStaticMesh>(nullptr, *Path, nullptr, LOAD_NoWarn | LOAD_Quiet); ++Seen;
+			if (!SM) { S.Errors.Add(Path + TEXT(": not loaded")); continue; }
+			if (KitGlass(SM->GetStaticMaterials()))
+			{
+				++Glass;
+				FMeshNaniteSettings NS = SM->GetNaniteSettings();
+				if (!NS.bEnabled) ++Had;
+				else
+				{
+					NS.bEnabled = false; SM->SetNaniteSettings(NS); SM->MarkPackageDirty();
+					if (SaveAsset(SM)) ++Set; else S.Errors.Add(Path + TEXT(": not saved"));
+				}
+			}
+			if (Seen % 100 == 0) { UE_LOG(LogValdradaNanite, Display, TEXT("glassraster %d seen, %d set"), Seen, Set); CollectGarbage(RF_NoFlags); }
+		}
+		const FString Txt = FString::Printf(TEXT("{\"seen\": %d, \"glass\": %d, \"set\": %d, \"had\": %d, \"errors\": %d}"), Seen, Glass, Set, Had, S.Errors.Num());
+		if (!OutFile.IsEmpty()) FFileHelper::SaveStringToFile(Txt, *OutFile);
+		UE_LOG(LogValdradaNanite, Display, TEXT("glassraster done %s"), *Txt);
+		return S.Errors.Num() ? 1 : 0;
+	}
 	// (-refreshvariants: every '<instance>_nan' made again from its instance: parented to the packed master of the
 	// instance's master, the instance's parameters copied. The library's binding (bd_tilefac.py) had matched the copies
 	// by their key and re-parented them to the unpacked master: packed facades read as garbage, pink roofs)
@@ -305,7 +349,7 @@ int32 UValdradaNaniteFacadesCommandlet::Main(const FString& Params)
 		FStaticMeshSourceModel& Src = SM->GetSourceModel(0);
 		Src.BuildSettings.bUseFullPrecisionUVs = true; Src.BuildSettings.bGenerateLightmapUVs = false;
 		if (SM->GetLightMapCoordinateIndex() > 3) SM->SetLightMapCoordinateIndex(0);
-		FMeshNaniteSettings NS = SM->GetNaniteSettings(); NS.bEnabled = true; SM->SetNaniteSettings(NS);
+		FMeshNaniteSettings NS = SM->GetNaniteSettings(); NS.bEnabled = !KitGlass(Mats); SM->SetNaniteSettings(NS);
 		SM->SetStaticMaterials(Mats);
 		SM->Build(true);
 		SM->MarkPackageDirty();

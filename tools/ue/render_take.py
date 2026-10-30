@@ -517,9 +517,11 @@ def _merge_block(job):
     return block_merge.merge(paths, out, origin)
 
 
-def cc_blocks(cells, logf, S):
+def cc_blocks(cells, logf, S, force=()):
     """city v2: each 1 km block of cells ({cell: key}, every built cell of the block) as one package (block_merge.py),
-    keyed by its cells' keys, imported once over the material library into /Game/CCB/<key>/L. Returns {block: key}"""
+    keyed by its cells' keys, imported once over the material library into /Game/CCB/<key>/L. Returns {block: key}.
+    force: blocks ('bx_bz') merged and imported again under the same key (a package built while some of its cells'
+    packages were cleared lacked those cells: city_build.build_cells remakes them, this replaces the package)"""
     import city_build as CB
     from concurrent.futures import ProcessPoolExecutor
     t = time.time(); os.makedirs(os.path.join(CC, 'blk'), exist_ok=True)
@@ -530,6 +532,13 @@ def cc_blocks(cells, logf, S):
         bkey[b] = sha(sorted(cs.items()) + ['blk1', fsha(os.path.join(HERE, 'block_merge.py'))])[:20]
         out = os.path.join(CC, 'blk', bkey[b] + '.glb')
         paths = [os.path.join(CC, 'ddu', d + '.glb') for _, d in sorted(cs.items()) if os.path.exists(os.path.join(CC, 'ddu', d + '.glb'))]
+        if len(paths) < len(cs):   # (an empty cell has no package; any other is remade by build_cells before this, and counted here)
+            S.setdefault('block_cells_without_package', {})['%d_%d' % b] = len(cs) - len(paths)
+            log(f'cc_blocks: block {b[0]}_{b[1]}: {len(cs) - len(paths)} of {len(cs)} cells have no package (empty cells, or cleared)')
+        if '%d_%d' % b in force:   # (the package, its import record and its level's folder, so the import starts clean)
+            for f_ in (out, os.path.join(CC, 'impb', bkey[b] + '.json')):
+                if os.path.exists(f_): os.remove(f_)
+            shutil.rmtree(os.path.join(EXPORT, 'ue_project', 'Content', CCB_ROOT[len('/Game/'):], bkey[b]), ignore_errors=True)
         if not os.path.exists(out): jobs.append((out, (b[0] * CB.BLOCK, b[1] * CB.BLOCK), paths))
     if jobs:
         with ProcessPoolExecutor(min(16, len(jobs))) as ex: list(ex.map(_merge_block, jobs))
@@ -915,7 +924,11 @@ def patch_manifest(src, dst, rawdir, a, b, cvars=None):
         if isinstance(o, dict):
             if cvars and isinstance(o.get('CVars'), dict) and isinstance(o['CVars'].get('__Value'), list):
                 L = o['CVars']['__Value']; have = {e['Name']['__Value']: e for e in L if isinstance(e, dict) and 'Name' in e}
-                for k, v in cvars.items():
+                # (a value that is not a number, e.g. r.BufferVisualizationTarget BaseColor: a console command at the start)
+                txt = {k: v for k, v in cvars.items() if isinstance(v, str) and not re.fullmatch(r'-?[0-9.]+(e-?[0-9]+)?', v.strip())}
+                if txt:
+                    o['StartConsoleCommands'] = {'__Type': 'ArrayProperty(StrProperty)', '__Value': [{'__Type': 'StrProperty', '__Value': f'{k} {v}'} for k, v in txt.items()]}
+                for k, v in ((k, v) for k, v in cvars.items() if k not in txt):
                     if k in have: have[k]['Value']['__Value'] = float(v); have[k]['bIsEnabled']['__Value'] = 1
                     else: L.append({'Name': {'__Type': 'StrProperty', '__Value': k}, 'Value': {'__Type': 'FloatProperty', '__Value': float(v)}, 'bIsEnabled': {'__Type': 'BoolProperty', '__Value': 1}})
             if 'OutputDirectory' in o and 'CustomEndFrame' in o:

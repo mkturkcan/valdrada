@@ -22,7 +22,7 @@ subway entrances) and `?tn38=0` (junction turns kept on the carriageway). A feat
 can be bisected by turning flags off in the URL, for example `http://127.0.0.1:5219/?gf38=0&tn38=0`, without
 checking out older code. Node tools that import a module have no `location`, so every flag is on there.
 
-The measured ground is off by default in 0.6.1. `?terrain=p1` lays the city on the 2017 bare earth LiDAR through a
+The measured ground is off by default in 0.6.2. `?terrain=p1` lays the city on the 2017 bare earth LiDAR through a
 height authority (client/src/world/heightAuthority.js), with the ground graded to every paving edge and the parks'
 woodland from the LiDAR canopy; the data set shipped in `client/public/data/terrain_p1` covers the five boroughs (4.9 GB,
 3,625 files), and `?terrainData=<folder under data/>` reads another set. `?hhp=1` adds the highways: the Henry Hudson

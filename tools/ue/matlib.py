@@ -57,6 +57,17 @@ open(C['out'], 'w').write(json.dumps({'made': made}))
 '''
 
 
+def _bound_with(m, msig, facade):
+    """a key bound with today's tools: the cell material tools for every key, and for a facade the master it is bound to
+    (bindfac_all stamps only that: the facade code's own hashes are in its stamp, and a non-facade key does not depend on
+    them; 2026-10-29: comparing the whole signature made every lane's import refuse the library after each facade bind)"""
+    a, b = dict(m or {}), dict(msig)
+    for d in (a, b):
+        d.pop('bd_tilefac.py', None); d.pop('bd_tilefac.hlsl', None)
+        if not facade: d.pop('bd_tilefac_master', None)
+    return a == b
+
+
 def ensure(cells_dir, logf=None):
     """every material key of the glbs in cells_dir in the library and bound with today's tools; returns
     {'keys', 'new', 'rebound', 'secs'}"""
@@ -70,7 +81,9 @@ def ensure(cells_dir, logf=None):
     try:
         ix = load_index(); msig = R.mat_sig()
         new = sorted(k for k in keys if k not in ix)
-        stale_folders = sorted({ix[k]['path'].rsplit('/', 1)[0] for k in keys if k in ix and ix[k].get('mat') != msig})
+        try: fac = set(json.load(open(os.path.join(DIR, 'fac_records.json'))))   # (bindfac_all's facade keys)
+        except Exception: fac = None   # (unknown: every key compared as a facade)
+        stale_folders = sorted({ix[k]['path'].rsplit('/', 1)[0] for k in keys if k in ix and not _bound_with(ix[k].get('mat'), msig, fac is None or k in fac)})
         S = {'keys': len(keys), 'new': len(new), 'rebound_folders': len(stale_folders)}
         folders = list(stale_folders)
         if new:
@@ -90,17 +103,21 @@ def ensure(cells_dir, logf=None):
             out = os.path.join(DIR, f'bind_{os.getpid()}')
             # (asset_guard: the shared folders open only for city update's build stage; a new batch folder is this run's own)
             stale_shared = [f for f in folders if f in stale_folders]
-            if stale_shared and not asset_guard.token():
-                raise RuntimeError(f'matlib: {len(stale_shared)} shared library folders are bound with other tools than today\'s '
-                                   f'({stale_shared[:3]}); only city update\'s build stage may rebind them (tools/ue/asset_guard.py)')
-            guard = asset_guard.unlocked(stale_shared, 'matlib.ensure') if stale_shared else contextlib.nullcontext()
-            with guard, R.editor_slot():
-                code, _ = R.run(['python3', os.path.join(HERE, 'r1c_bind.py'), '--world-dest', ','.join(folders), '--cells', cells_dir, '--out', out],
-                                logf or os.path.join(DIR, 'bind.log'))
-            if code or not os.path.exists(os.path.join(out, 'cellmat2.json')): raise RuntimeError(f'matlib: binding failed (see {logf})')
-            for k in keys:
-                if ix[k]['path'].rsplit('/', 1)[0] in folders: ix[k]['mat'] = msig
-            save_index(ix)
+            if stale_shared and os.environ.get('MATLIB_SHARED') == 'asis':   # (a reader of the library, e.g. the dioramas: the shared
+                # folders drawn as the city draws them today, only this run's new batch bound)
+                S['shared_as_is'] = len(stale_shared); folders = [f for f in folders if f not in stale_shared]; stale_shared = []
+            if folders:
+                if stale_shared and not asset_guard.token():
+                    raise RuntimeError(f'matlib: {len(stale_shared)} shared library folders are bound with other tools than today\'s '
+                                       f'({stale_shared[:3]}); only city update\'s build stage may rebind them (tools/ue/asset_guard.py)')
+                guard = asset_guard.unlocked(stale_shared, 'matlib.ensure') if stale_shared else contextlib.nullcontext()
+                with guard, R.editor_slot():
+                    code, _ = R.run(['python3', os.path.join(HERE, 'r1c_bind.py'), '--world-dest', ','.join(folders), '--cells', cells_dir, '--out', out],
+                                    logf or os.path.join(DIR, 'bind.log'))
+                if code or not os.path.exists(os.path.join(out, 'cellmat2.json')): raise RuntimeError(f'matlib: binding failed (see {logf})')
+                for k in keys:
+                    if ix[k]['path'].rsplit('/', 1)[0] in folders: ix[k]['mat'] = msig
+                save_index(ix)
         S['secs'] = round(time.time() - t0, 1)
         return S
     finally:

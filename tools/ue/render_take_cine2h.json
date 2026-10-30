@@ -28,7 +28,7 @@
   "r.ViewDistanceScale": 4.0,
   "r.StaticMeshLODDistanceScale": 0.25,
   "foliage.LODDistanceScale": 4.0,
-  "r.Nanite.MaxPixelsPerEdge": 0.5,
+  "r.Nanite.MaxPixelsPerEdge": 0.02,
   "r.Lumen.ScreenProbeGather.ShortRangeAO.FoliageOcclusionStrength": 1.0,
   "r.Lumen.HardwareRayTracing": 1,
   "r.Lumen.Reflections.HardwareRayTracing": 1,
@@ -112,5 +112,6 @@
    "r.Nanite.MaxPixelsPerEdge": 4.0
   }
  },
+ "_doc_mppe002": "2026-10-29: MaxPixelsPerEdge 0.5 -> 0.02. The punched facades are quad soups (a block's brick wall 178k triangles in 81k islands); at 0.5 Nanite removed the about one pixel piers and spandrels of towers 0.8-1.5 km out and they opened onto the sky (v061 features 0:06; v6CpOpen's far towers). At 0.02 they stay whole at the same frame time (v6CpOpen 2.649 vs 2.642 s, v6CpTreetops likewise) and the same far shimmer (0.011 %). The lasting fix is the glass backing behind each punched face (tkBuild.js masonryFaceF), city-wide as blocks are rebaked",
  "_doc_cvars_shot": "stream06 (2026-10-26): per-shot cvars over cvars (render_take.py; the take is shared). pLibGold, the end card over the harbour: Lower Manhattan's tile facades 1.9-4.9 km out shimmered (whole faces and triangles of a facade switching colour for a frame, white specks along edges; stream_scan 3-6 tiles over 1 % of their far pixels flickering). Not anti-aliasing or the sun: 32 spatial samples, Lumen reflections off, MaxRayIntensity 8, a 2 or 4 degree sun all left the flicker map the same (correlation 0.98-0.99); it follows Nanite's level of detail (MaxPixelsPerEdge 0.15 worse, 1 and 2 still failing, 4: 0.05 %, no tile), i.e. the facades' cluster cut changing between frames as the lens moves (likely the packed per-wall codes of the Nanite facades decoding differently on other clusters). At 4 px per edge the far facades stay on one cut; the statue, the island's trees and the near water look the same (stream06/b_mppe_near.jpg). The lasting fix is in the facade packing (ValdradaNaniteFacades), not a preset"
 }

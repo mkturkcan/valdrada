@@ -982,6 +982,11 @@ def in_engine():
         if pbn and not P.get('map') and min(col) > 0.9:   # (a PBR set with no texture of its own here: its kind's albedo)
             g = 0.06 if 'epdm' in pbn or 'black' in pbn or 'tar' in pbn else 0.55 if 'membrane' in pbn or 'white' in pbn else 0.35
             col = [g, g, g]
+        if pbn and P.get('alias') and min(col) > 0.9:   # (2026-10-29: an aliased set keeps its kind's colour under the alias's
+            # map: alu_black and steel_black drew as the alias's pale precast concrete (0.48), a tower's black fins a pale screen
+            # over its glass that crawled at 3.6 km (pLibGold); the black granites and rubber roofs likewise)
+            dk = [0.05, 0.05, 0.05] if any(w in pbn for w in ('black', 'epdm', 'tar')) else [0.13, 0.09, 0.06] if 'bronze' in pbn else None
+            if dk: col = dk
         if P.get('alias'):   # (WINFAR: the set's own colour as the aliased map's mean, a pale cladding held under 0.48: at 0.78 a
             # sunlit white-panel tower clipped to a blank slab in the golden grade)
             lum_ = 0.2126 * col[0] + 0.7152 * col[1] + 0.0722 * col[2]

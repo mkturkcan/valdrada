@@ -15,20 +15,20 @@ For building the application and its content from source, see [Building the Unre
 
 | Component | Requirement |
 |---|---|
-| Operating system | Linux x86-64 (tested on Ubuntu 22.04, kernel 6.8). Release 0.6.1 ships the Linux build only; on Windows 10/11 x64 the client is built from source as the [build guide](ue-client-build.md#windows) describes |
-| GPU | A GPU with hardware ray tracing and 64-bit atomics for Nanite and Lumen: NVIDIA RTX (Turing or newer) or AMD Radeon RX 6000 or newer. Tested on NVIDIA RTX 6000 Ada (48 GB): with two places loaded at 1280 × 720 the GPU's memory peaked at 7.7 GiB with `--quality low` and 12.8 GiB with `--quality high` |
+| Operating system | Linux x86-64 (tested on Ubuntu 22.04, kernel 6.8). Release 0.6.2 ships the Linux build only; on Windows 10/11 x64 the client is built from source as the [build guide](ue-client-build.md#windows) describes |
+| GPU | A GPU with hardware ray tracing and 64-bit atomics for Nanite and Lumen: NVIDIA RTX (Turing or newer) or AMD Radeon RX 6000 or newer. Tested on NVIDIA RTX 6000 Ada (48 GB): with two places loaded at 1280 × 720 the GPU's memory peaked at 9.7 GiB with `--quality low` and 13.1 GiB with `--quality high` |
 | Driver | Linux: the NVIDIA proprietary driver with its Vulkan ICD (tested with 580.159.03). Windows: a current vendor driver with Direct3D 12 |
 | Memory | 16 GB or more: in a run at 1280 × 720 with two places loaded, the renderer held 13.1 GB and the core 0.8 GB |
-| Disk | Linux: 47.5 GB installed (the renderer's content 28.0 GB, the kit tables 15.5 GB, the core with the city's tiles 3.7 GB); the download is kept until the install has finished, and the script asks for 79 GB free |
+| Disk | Linux: 50.1 GB installed (the renderer's content 30.7 GB, the kit tables 15.5 GB, the core with the city's tiles 3.7 GB); the download is kept until the install has finished, and the script asks for 84 GB free |
 | Python | 3.8 or later for the `valdrada` package; `numpy` is optional and used by most examples |
-| Network | The download, 30.7 GB in 33 files for Linux; afterwards none, unless the core and the renderer run on different machines |
+| Network | The download, 33.3 GB in 34 files for Linux; afterwards none, unless the core and the renderer run on different machines |
 
 The core alone (`--core-only`) needs no GPU: it simulates, answers map queries and moves actors, and answers sensor
 requests with the error `needs_renderer` until a renderer is attached.
 
 ## Download and verify
 
-The current Unreal client is release 0.6.1. A release consists
+The current Unreal client is release 0.6.2. A release consists
 of a manifest, `ValdradaUE-<version>-<platform>.json`, and the files it lists, published as assets of the [GitHub
 release](https://github.com/mkturkcan/valdrada/releases) and mirrored in the Hugging Face dataset
 `mehmetkeremturkcan/valdrada-ue`. `fetch_valdrada_ue.py`, published with them, downloads every file, resumes
@@ -36,17 +36,17 @@ interrupted downloads, checks each file against the SHA256 of the manifest, join
 and unpacks the archives. It needs Python 3.8 or later and nothing else.
 
 ```bash
-curl -LO https://github.com/mkturkcan/valdrada/releases/download/v0.6.1/fetch_valdrada_ue.py
-python3 fetch_valdrada_ue.py --version 0.6.1       # for this system, into ./ValdradaUE-0.6.1-<platform>
-python3 fetch_valdrada_ue.py --version 0.6.1 --dest ~/ValdradaUE
-python3 fetch_valdrada_ue.py --version 0.6.1 --mirror huggingface  # from the Hugging Face copy
+curl -LO https://github.com/mkturkcan/valdrada/releases/download/v0.6.2/fetch_valdrada_ue.py
+python3 fetch_valdrada_ue.py --version 0.6.2       # for this system, into ./ValdradaUE-0.6.2-<platform>
+python3 fetch_valdrada_ue.py --version 0.6.2 --dest ~/ValdradaUE
+python3 fetch_valdrada_ue.py --version 0.6.2 --mirror huggingface  # from the Hugging Face copy
 ```
 
-On Windows, once a Windows build is published (release 0.6.1 has none; build it as the [build guide](ue-client-build.md#windows)
+On Windows, once a Windows build is published (release 0.6.2 has none; build it as the [build guide](ue-client-build.md#windows)
 describes), in PowerShell:
 
 ```powershell
-Invoke-WebRequest https://github.com/mkturkcan/valdrada/releases/download/v0.6.1/fetch_valdrada_ue.py -OutFile fetch_valdrada_ue.py
+Invoke-WebRequest https://github.com/mkturkcan/valdrada/releases/download/v0.6.2/fetch_valdrada_ue.py -OutFile fetch_valdrada_ue.py
 python fetch_valdrada_ue.py --version <version>
 ```
 
@@ -82,7 +82,7 @@ The installed folder:
 ```
 
 The launcher starts the core, waits until its world is ready, starts the renderer connected to it, and stops both when
-either exits, on Ctrl+C or on SIGTERM. Measured on Linux with an RTX 6000 Ada in release 0.6.1's smoke test
+either exits, on Ctrl+C or on SIGTERM. Measured on Linux with an RTX 6000 Ada in release 0.6.2's smoke test
 (`ue_client/packaging/smoke_test.py`, installed release, `--quality low`): the core was ready in 3.8 s, the renderer
 attached 15 s after the launcher started it, `world.wait_until_loaded()` returned 3.8 s after the camera was placed at W 120th St and Amsterdam Ave and 3.7 s after it moved to Times Square, and the first tick with an
 RGB and a depth camera at 1280 × 720 took 2.4 to 2.5 s and the following ones 0.14 to 0.26 s.

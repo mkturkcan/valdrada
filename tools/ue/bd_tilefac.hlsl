@@ -87,6 +87,7 @@ float UE_glass = 0.0, UE_f0 = 0.04;
 // reveal, painted mullions, spandrel and AC unit), the spandrel glass's share, the pane's pixel footprint, its cell and seed
 float UE_gm = 0.0, UE_sp = 0.0, UE_aa = 1.0, UE_pU = 0.0, UE_pV = 0.0, UE_pS = 0.0, UE_fx = 0.5, UE_fy = 0.5, UE_gs = 0.0;
 float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
+float3 FAC_base0 = diffuseColor.rgb;   // (v125: the wall's own colour, for the far facade's average)
 // ---- the page's colour block
       {
 
@@ -955,6 +956,14 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
             FAC_rough = lerp(0.9, FAC_rough, winMask);
           } else {
             FAC_dbg = 0.0;
+            // (v125 WINFAR, from the 2026-10-24 draft: the wall between and in place of windows too small to draw (tiny: a
+            // cell under ~2 px) takes the facade's mean of wall and glass, as the window pixels do while they are still drawn:
+            // past tiny 0.9 the windows left this branch with the bare wall colour, and a pale tower 400 m off drew as a flat
+            // white slab (nyc_aerials_ue13 112-120 s, the 34-storey tower at Broadway and 125th St))
+            if (inBay && tiny > 0.0) {
+              float fillT = (x1 - x0) * (y1 - y0);
+              albedo = lerp(albedo, lerp(albedo * 0.98, float3(0.06, 0.07, 0.08), fillT * 0.85), tiny);
+            }
             float tone = H.fbm(float2(u, v) * 0.03 + cvar * 7.0) * 0.2 - 0.1;
             float mottle = H.vnoise(float2(u, v) * 0.7 + cvar * 31.0) * 0.14 - 0.07;
             albedo *= 1.0 + tone + mottle;
@@ -1715,6 +1724,28 @@ float4 diffuseColor = float4(UV6.y, UV7.x, UV7.y, 1.0) * float4(Tint.rgb, 1.0);
         FAC_emis += float3(0.35, 0.24, 0.12) * night * (1.0 - smoothstep(0.0, 6.5, vFUv.y)) * 0.14;
         diffuseColor.rgb = albedo;
       }
+
+// ---- v125 (2026-10-29): the far facade. Once a window is a few pixels or less, every per-window term (the rooms' parallax,
+// sashes, hashed cells, the glass masks and their metallic F0, the panes' tilts) aliases into patches that crawl with the
+// lens: the Battery towers in pLibGold at 3.6 km showed pale glass patches that read as holes, through every lighting test.
+// Past that footprint the facade is its average: the wall and its glass in their shares, a plain dielectric, no glass
+// layer, no tilts; by day no window light (a night facade keeps it). One smooth fade on the pixel's size in metres.
+{
+  float mpp = max(H.fwk(vWP.x), max(H.fwk(vWP.y), H.fwk(vWP.z)));
+  float bay = max(vAux.y, 1.0);
+  float farK = smoothstep(0.2, 0.6, mpp / bay);   // (a 1.5 m bay: full detail to about 1.2 km, the average by about 3 km)
+  if (farK > 0.0) {
+    float sty = vAux.w;
+    bool gSty = (sty > 2.5 && sty < 3.5) || (sty > 10.5 && sty < 11.5);
+    float3 avgC = gSty ? lerp(FAC_base0 * 0.5, float3(0.10, 0.125, 0.14), 0.55) : lerp(FAC_base0 * 0.98, float3(0.06, 0.07, 0.08), 0.3);
+    diffuseColor.rgb = lerp(diffuseColor.rgb, avgC, farK);
+    FAC_rough = lerp(FAC_rough, gSty ? 0.35 : 0.8, farK);
+    FAC_emis *= 1.0 - farK * (1.0 - night);
+    FAC_metal *= 1.0 - farK;
+    UE_gm *= 1.0 - farK; UE_sp *= 1.0 - farK; UE_glass *= 1.0 - farK;
+    FAC_nrmAdj *= 1.0 - farK;
+  }
+}
 
 // ---- roughness: the facade's, then rain-damp masonry
 float roughnessFactor = FAC_rough;

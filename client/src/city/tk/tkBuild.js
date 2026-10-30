@@ -546,6 +546,12 @@ function masonryFaceF(out, F, P, o) {
   if (!cols.length || !rows.length) return;
   const rev = facWall(P, rec, o, base | FF_BLIND), revB = baseSt ? fp.st(base | FF_BLIND) : rev;
   const glassSt = facWall(P, rec, o, base);
+  // the backing: one pane across the face's window grid just behind the reveals. Unreal's Nanite simplifies a distant
+  // facade by dropping its thin piers and spandrels, every quad its own island (a slab 860 m off showed the sky through
+  // its walls, 2026-10-29); behind them this sheet shows the glass's windows instead, and one sheet is a surface it keeps
+  G.wall(glassSt);
+  quadW(G, F, Math.min(...cols.map((c) => c.a)), Math.max(...cols.map((c) => c.b)), Math.min(...rows.map((r) => r.s)),
+    Math.max(...rows.map((r) => r.h)), -d - 0.01);
   const trimM = o.trimM;
   const sillDeep = P.arch === ARCH.SLAB ? 0.03 : 0.06;
   const lintel = P.arch === ARCH.MASONRY;
@@ -705,6 +711,9 @@ function curtainFaceF(out, F, P, o) {
   // the curtain wall itself as the shader draws it (vision glass, spandrels, its reflections and rooms), set back behind
   // the mullions, and its returns to the wall line at the corners
   quadW(G, F, u0, u1, vBase, vTop, -gIn);
+  // the backing: an opaque dark sheet 0.6 m behind the glass. Unreal draws the curtain glass dithered and the towers are
+  // hollow, so a far tower showed the sky through its glass in a patch that crawled with the lens (2026-10-29)
+  quadW(out.sink(partMat('panel_grey', '#1c1e22'), o.we), F, u0, u1, vBase, vTop, -gIn - 0.6);
   G.wall(facWall(P, rec, o, FF_BLIND));
   // (city v2: a lot-line face's returns end 3 mm inside the line and it has no members proud of it: two glass towers on one
   // lot line had their returns and their middle mullion in one plane, the overlap scan's glass on glass and alu on panel)

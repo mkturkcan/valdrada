@@ -113,6 +113,14 @@ def in_engine():
         mel.recompile_material(m); eal.save_loaded_asset(m)
         T['master_built'] = MASTER
     master = eal.load_asset(MASTER)
+    # (2026-10-29: an existing master must carry this source's code. M_bd_tilefac_v124 had been made on 10-24 from a
+    # draft, so the v124 bind of 10-29 put every facade on the draft and the far facade never compiled. A version
+    # number names one source: a different one stops the bind, the next free version is the fix)
+    have = [e.get_editor_property('code') for e in mel.get_material_expressions(master) if isinstance(e, unreal.MaterialExpressionCustom)]
+    if [h.replace('\r\n', '\n') for h in have] != [code.replace('\r\n', '\n')]:
+        T['error'] = f'{MASTER} exists with other code than {HLSL}: move BD_TILEFAC_V to a free version'
+        json.dump(T, open(C['result'], 'w'), indent=1); unreal.log_error('[bd] ' + T['error'])
+        raise SystemExit(3)
     # ---- the records: the facades', matched to the world's instances as r1c_cellmat2.py matches them
     recs = json.load(open(C['records']))
     norm = lambda x: re.sub(r'[^a-z0-9]', '', x.lower())

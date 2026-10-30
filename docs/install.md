@@ -20,10 +20,10 @@ The Python package has no required dependencies and runs on any machine that can
 
 ## Windows
 
-**Release.** Download `Valdrada-0.6.1-win64.zip`, `Valdrada-0.6.1-win64-tiles.zip`,
-`Valdrada-0.6.1-win64-terrain1.zip` and `Valdrada-0.6.1-win64-terrain2.zip` from the
+**Release.** Download `Valdrada-0.6.2-win64.zip`, `Valdrada-0.6.2-win64-tiles.zip`,
+`Valdrada-0.6.2-win64-terrain1.zip` and `Valdrada-0.6.2-win64-terrain2.zip` from the
 [releases page](https://github.com/mkturkcan/valdrada/releases) and extract them into the same place: all hold the
-folder `Valdrada_0.6.1_win64`, the second only its `Content/tiles/` and the last two only its `Content/data/terrain_p1/`
+folder `Valdrada_0.6.2_win64`, the second only its `Content/tiles/` and the last two only its `Content/data/terrain_p1/`
 (the measured ground, read with `?terrain=p1`; the server runs without them). The folder contains:
 
 | Path | Contents |
@@ -64,7 +64,7 @@ cd valdrada
 (cd server && npm install)
 ls server/node_modules/electron/dist/electron        # the runtime; if missing: (cd server && node node_modules/electron/install.js)
 pip install -U "huggingface_hub>=1.0"
-hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.6.1 --include "Content/*" --local-dir .
+hf download mehmetkeremturkcan/valdrada --repo-type dataset --revision v0.6.2 --include "Content/*" --local-dir .
 cd server
 env -u ELECTRON_RUN_AS_NODE npx electron . --content ../Content
 ```
