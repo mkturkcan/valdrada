@@ -153,7 +153,7 @@ private:
 	void ReportLoaded(bool bForce);
 
 	// ---- road users (render.state: actors.add / remove and the ATRK frame block)
-	struct FStatic { FString Type; int32 Kind = -1; FTransform Xf; };
+	struct FStatic { FString Type; int32 Kind = -1; FTransform Xf; float Skin = -1.f; };
 	TMap<int32, FStatic> Statics;          // id -> what the add said (parked vehicles carry their pose)
 	TArray<FString> KindNames;             // hello vehicle_kinds
 	TArray<FVector3f> KindSizes;           // [w, h, l] m per kind
@@ -163,13 +163,101 @@ private:
 	TArray<bool> KindTaxiPaint;
 	// an actor keeps its instance slot while it is drawn, so the renderer's motion vectors (TSR, motion blur) follow it;
 	// a freed slot is parked at zero scale for the next actor
-	struct FSlots { TMap<int32, int32> Slot; TArray<int32> Free; };
+	struct FSlots { TMap<int32, int32> Slot; TArray<int32> Free; TMap<int32, uint8> Lamps; };
 	TArray<FSlots> KindSlots;
 	FSlots WalkerSlots, TrainSlots;
+	// the kinds' wheels (Data/fleet.json, Tools/make_fleet.py): each its own mesh centred on its hub, turned by the record's
+	// spin about the axle and the front pair steered (fleet24.js f24Wheel); one instanced mesh per kind and wheel
+	struct FWheel
+	{
+		UStaticMesh* Mesh = nullptr;
+		FVector3f Hub = FVector3f::ZeroVector;   // the hub in the model's frame (metres: x left, y up, z forward)
+		bool bFront = false;
+		UInstancedStaticMeshComponent* ISM = nullptr;
+		UInstancedStaticMeshComponent* IdISM = nullptr;
+		FSlots Slots;
+	};
+	TArray<TArray<FWheel>> KindWheels;
+	TSharedPtr<FJsonObject> FleetTable;
+	// the train cars (Data/trains.json, Tools/make_trains.py): per kind of the hello's train_kinds its mesh, one instanced
+	// mesh each; a kind without a mesh draws boxes of the car's size
+	TArray<FString> TrainKinds;
+	TArray<UStaticMesh*> TrainMesh;
+	TArray<UInstancedStaticMeshComponent*> TrainKindISM;
+	TArray<FSlots> TrainKindSlots;
+	void SetupTrains(const TArray<TSharedPtr<class FJsonValue>>& Kinds);
 	UPROPERTY() TObjectPtr<UInstancedStaticMeshComponent> WalkerISM;
 	UPROPERTY() TObjectPtr<UInstancedStaticMeshComponent> TrainISM;
 	void SetupKinds(const TArray<TSharedPtr<class FJsonValue>>& Kinds);
+	// a kind's instanced meshes (the body with its glass, lamps and paint, its wheels, their id copies), made once
+	void EnsureKindISM(int32 K);
 	void OnState(FValdradaMessage& M);
+
+	// ---- instance segmentation and labels (segRender.js's codes): every road user drawn has a copy seen only by the
+	// instance capture, in M_client_id (unlit, its 24-bit code as colour); the capture's depth against the full scene's
+	// keeps the pixels where the road user is what the camera sees, the copy's own pixels are its silhouette among the road
+	// users alone (amodal)
+	struct FThing
+	{
+		int32 Id = 0;          // the core's id (API actors keep theirs; the recorder's start at 1,000,000)
+		int32 Label = 0;       // the label id (stable per key for the session, as segRender.js newId)
+		uint32 Code = 0;       // (Label x 3635641) mod 2^24
+		uint8 Cls = 0;         // its semantic class
+		FString Key;           // veh:<kind>:api<id> / ped:api<id> for API actors (bridge.js labelActor), the core's id otherwise
+		float P[3] = { 0, 0, 0 };   // the body's origin in the core's frame (metres, x east, y up, z south)
+		float Yaw = 0;         // heading about +y, 0 facing +z
+		FVector3f Dims = FVector3f(1.9f, 1.5f, 4.6f);   // [w, h, l] m
+		FString Kind;          // the vehicle kind, the walker's variant or the train's
+		float Speed = 0;
+		bool bMoving = false;
+	};
+	TArray<FThing> Things;                 // this state's road users
+	TMap<uint32, int32> ThingOfCode;       // code -> index in Things
+	TMap<FString, int32> LabelIds;
+	int32 NextLabel = 1;
+	uint32 CodeFor(const FString& Key);
+	UPROPERTY() TObjectPtr<class UMaterialInterface> IdMat;
+	UPROPERTY() TObjectPtr<class UMaterialInterface> GlassMat;   // the fleet's windows (M_client_glass)
+	UPROPERTY() TObjectPtr<class UMaterialInterface> LampMat;    // the fleet's lamps and sirens (M_client_lamp)
+	UPROPERTY() TArray<TObjectPtr<UInstancedStaticMeshComponent>> KindIdISM;   // per kind: the vehicles' copies
+	UPROPERTY() TObjectPtr<UInstancedStaticMeshComponent> WalkerIdISM;
+	UPROPERTY() TObjectPtr<UInstancedStaticMeshComponent> TrainIdISM;
+	UPROPERTY() TArray<TObjectPtr<class UPrimitiveComponent>> IdComponents;   // every copy, for the captures' lists
+	UInstancedStaticMeshComponent* MakeIdISM(UStaticMesh* Mesh);
+
+	// ---- the crowd's photoreal walkers (Data/crowd.json from Tools/make_crowd.py): per walker a skeletal body of its variant
+	// playing its walk, run or idle clip at the web crowd's rate (crowd.js), and an id copy following its pose; without the
+	// table the walkers are capsules
+	struct FCrowdVariant
+	{
+		FString Name, Gender;
+		class USkeletalMesh* Mesh = nullptr;
+		TArray<TPair<FName, class UMaterialInterface*>> Slots;
+		class UAnimSequence* Anim[3] = { nullptr, nullptr, nullptr };   // idle, walk, run
+		float Seconds[3] = { 1, 1, 1 };
+		float Speed[3] = { 0, 1, 1 };    // the clip's natural speed, m/s
+		float Scale = 1.f, Height = 1.8f, Hips = 1.f, RefHips = 1.f;
+		bool bChild = false;
+	};
+	TArray<FCrowdVariant> Crowd;
+	struct FWalkerBody
+	{
+		class USkeletalMeshComponent* Body = nullptr;
+		class USkeletalMeshComponent* Id = nullptr;
+		class UMaterialInstanceDynamic* IdMid = nullptr;
+		int32 Variant = -1, Clip = -1;
+		double T = 0;
+		uint32 Code = 0;
+	};
+	TMap<int32, FWalkerBody> WalkerBodies;
+	TArray<FWalkerBody> FreeBodies;
+	FWalkerBody NewWalkerBody();   // a walker's body and its id copy, registered
+	void LoadCrowd();
+	struct FWalkerRec { int32 Id; float P[3]; float Yaw, V, Phase, Sxz, Sy; uint8 Amp, Pose; uint32 Code; };
+	void DrawWalkerBodies(const TArray<FWalkerRec>& Recs, float Dt);
+	void AddIdComponent(class UPrimitiveComponent* C);
+	TArray<TSharedPtr<class FJsonValue>> HelloClasses;   // the core's class table (map.get_semantic_classes)
+	TMap<int32, FString> ClassNames;
 
 	// ---- captures
 	struct FCaptureJob
@@ -194,12 +282,15 @@ private:
 		bool bDenoise = true;          // the path tracer's denoiser on the last sample
 		double TRender = 0;            // its first render submitted (timing)
 		int32 Renders = 0;
+		int32 Amodal = 0;              // the group's amodal attribute: > 0 measures each road user's full box and occlusion
+		int32 MinPixels = 30;          // labels for road users with at least this many visible pixels
+		TSharedPtr<FJsonObject> Camera;   // the request's camera (the core's frame), for the labels' camera block
 	};
 	TArray<FCaptureJob> Captures;
 	struct FCam
 	{
-		TObjectPtr<USceneCaptureComponent2D> Rgb, Depth, Sem, Alb, Nrm;
-		TObjectPtr<UTextureRenderTarget2D> RgbRT, DepthRT, SemRT, AlbRT, NrmRT;
+		TObjectPtr<USceneCaptureComponent2D> Rgb, Depth, Sem, Alb, Nrm, Inst;
+		TObjectPtr<UTextureRenderTarget2D> RgbRT, DepthRT, SemRT, AlbRT, NrmRT, InstRT;
 		FTransform Last;
 		bool bUsed = false;
 		TObjectPtr<UMaterialInstanceDynamic> Film;   // this camera's film look (its own exposure)
@@ -214,6 +305,8 @@ private:
 	void Finish(FCaptureJob& J);
 	void Fail(const FCaptureJob& J, const FString& Code, const FString& Message);
 	void ApplyExposure(FCam& K, const FCaptureJob& J);
+	/** the instance plane and the labels from the instance capture and the full scene's depth (metres, +inf where nothing is drawn) */
+	bool InstancesAndLabels(FCam& K, const FCaptureJob& J, const TArray<float>& SceneDepthM, TArray<uint8>* Plane, TSharedPtr<FJsonObject>& Labels, TSharedRef<FJsonObject> Timing);
 	void Meter(FCam& K, const FCaptureJob& J, const TArray<FColor>& Px);
 
 	double LastWarn = 0;

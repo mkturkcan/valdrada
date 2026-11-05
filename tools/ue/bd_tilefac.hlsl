@@ -765,6 +765,7 @@ float3 FAC_base0 = diffuseColor.rgb;   // (v125: the wall's own colour, for the 
               float glassW = winMask * grazeVis * (1.0 - grime * 0.7);
               glassW *= 0.55 + 0.9 * H.hash12(float2(cellUS * 5.3, cellV * 8.9 + cvar * 17.0));
               UE_glass = max(UE_glass, glassW); UE_f0 = fGlass ? FAC_glassF.x : 0.075;
+              FAC_rough = min(FAC_rough, lerp(FAC_rough, fGlass ? FAC_glassF.y : 0.08, saturate(glassW)));
               float f0P = fGlass ? FAC_glassF.x : 0.075;
               float fresP = H.fresnelR(max(dot(Vw, Nj), 0.0), f0P);
               float fpP = max(aaU, aaV) * 0.35;

@@ -592,8 +592,8 @@ export function buildTower(buf, ring, cx, cz, y0, topY, b, opts = {}) {
       col.map((v) => v * 0.95), aux, [0, b.lit, cv, mechFlags], y0, MECH_OPTS);
     roofRing = pRing; roofY = topY; areaF = 0.75;
   } else {
-    // everything else over 45 m: a modest bulkhead so no tower is bald
-    if (rectness > 0.5 && obb.w > 6 && obb.h > 5) {
+    // everything else over 45 m: a modest bulkhead so no tower is bald (M64: a measured level has its own: opts.noMech)
+    if (!opts.noMech && rectness > 0.5 && obb.w > 6 && obb.h > 5) {
       const [mw] = fitBox(obb.w * 0.5, Math.max(1.6, obb.w * (0.15 + r0 * 0.1)), 0);
       const [mh] = fitBox(obb.h * 0.5, Math.max(1.5, obb.h * (0.24 + r1 * 0.14)), 0);
       const pl4 = placeInside(ring, obb.center[0], obb.center[1], mw, mh, obb.ang);   // RB34

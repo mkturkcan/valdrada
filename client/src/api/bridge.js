@@ -19,6 +19,9 @@ import { project, unproject, LAT0, LON0 } from '../shared/geo.js';
 import { signalState, walkTimeLeft } from '../sim/signals.js';
 // CONTROL (docs/notes/ar34-control.md): the play mode's bodies, follow camera and take recorder for API heroes
 import { CarBody, WalkerBody, FollowCam, TakeRecorder, makeProbe } from '../game/control.js';
+import { st38PushOut } from '../city/stations/subEnt38.js';   // DK04: walkers on a route keep out of the subway stair heads
+// DK04 (2026-11-04, `?dk04=0` as before): see placeWalker
+const DK04 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('dk04') === '0');
 
 export const API_VERSION = '0.1.0';
 const D2R = Math.PI / 180, R2D = 180 / Math.PI;
@@ -97,7 +100,7 @@ export function initApi(ctx) {
     const cams = Object.keys(SENSORS).map((id) => ({
       id, tags: ['sensor', 'camera'],
       attributes: { image_size_x: W, image_size_y: H, fov: 90, sensor_tick: 0, amodal: 0, min_pixels: 30,
-        ...(id === 'sensor.camera.rgb' ? { exposure_mode: 'auto', exposure_compensation: 0 } : {}) },
+        ...(id === 'sensor.camera.rgb' ? { exposure_mode: 'auto', exposure_compensation: 0, render_mode: 'raster', samples_per_pixel: 64 } : {}) },
     }));
     return [
       ...vehicleKinds.map((k) => {
@@ -241,6 +244,25 @@ export function initApi(ctx) {
   };
 
   // ---------------------------------------------------------------- spawning
+  // the background cars a new API car would stand on, taken off the road: spawned on an occupied point the two were drawn
+  // in one place, and the car behind drove on through the API car (it follows leaders ahead of its own front). Boxes
+  // 0.5 m longer and 0.3 m wider each side than the bodies, on the same level
+  function clearSpawn(kind, x, y, z, h) {
+    const box = (cx, cz, hh, k) => { const [w, , l] = vehDims(k); return { c: [cx, cz], f: [Math.sin(hh), Math.cos(hh)], r: [Math.cos(hh), -Math.sin(hh)], hw: w / 2 + 0.3, hl: l / 2 + 0.5 }; };
+    const over = (P, Q) => [P.f, P.r, Q.f, Q.r].every((ax) => {
+      const d = Math.abs((Q.c[0] - P.c[0]) * ax[0] + (Q.c[1] - P.c[1]) * ax[1]);
+      const rad = (B) => B.hl * Math.abs(B.f[0] * ax[0] + B.f[1] * ax[1]) + B.hw * Math.abs(B.r[0] * ax[0] + B.r[1] * ax[1]);
+      return d <= rad(P) + rad(Q);
+    });
+    const A = box(x, z, h, kind);
+    let n = 0;
+    for (let i = traffic.cars.length - 1; i >= 0; i--) {
+      const c = traffic.cars[i], p = c._pose;
+      if (c.api || !p || Math.abs(p[1] - y) > 3 || Math.hypot(p[0] - x, p[2] - z) > 30) continue;
+      if (over(A, box(p[0], p[2], p[3], c.kind))) { traffic._remove(i); n++; }
+    }
+    return n;
+  }
   function spawnVehicle(bpId, attrs, T) {
     need(traffic, 'no_traffic', 'the traffic simulation is not running');
     const kind = bpId.slice('vehicle.'.length);
@@ -250,6 +272,7 @@ export function initApi(ctx) {
     const p3 = toThree(T.location);
     const h = yawToH(T.rotation.yaw || 0);
     const y = groundAt(p3.x, p3.z, p3.y);
+    clearSpawn(kind, p3.x, y, p3.z, h);
     let color = 0xffffff;
     if (attrs.color) {
       const c = String(attrs.color).split(',').map(Number);
@@ -455,6 +478,8 @@ export function initApi(ctx) {
       const ux = c.direction.x / dl, uy = c.direction.y / dl;
       s.x += ux * speed * dt;
       s.z += -uy * speed * dt;
+      // DK04: a walker on a route slides along a subway stair head instead of through it (the sidewalk graph runs through)
+      if (DK04 && a.route) { const q = st38PushOut(s.x, s.z); if (q) { s.x = q[0]; s.z = q[1]; } }
       // turn toward the walking direction at <= 300 deg/s (as sim/peds.js does)
       const want = Math.atan2(uy, ux) * R2D;
       let d = wrap180(want - s.yaw);
@@ -722,7 +747,9 @@ export function initApi(ctx) {
         r = await P.group({ frame, t: simTime, primary: g.includes(pr), sensors: g.map((a) => a.id), outputs: outs, width: W, height: H, fov: lead.attributes.fov,
           transform: T, pose: poseFor(T, lead.attributes.fov, W / H), amodal: Math.max(0, ...g.map((a) => a.attributes.amodal || 0)),
           min_pixels: Math.min(...g.map((a) => a.attributes.min_pixels || 30)),
-          exposure: (({ attributes: x }) => ({ mode: x.exposure_mode || 'auto', compensation: x.exposure_compensation || 0 }))(g.find((a) => a.type_id === 'sensor.camera.rgb') || lead) });
+          exposure: (({ attributes: x }) => ({ mode: x.exposure_mode || 'auto', compensation: x.exposure_compensation || 0 }))(g.find((a) => a.type_id === 'sensor.camera.rgb') || lead),
+          // (render_mode 'pathtrace': the renderer's path tracer, samples_per_pixel samples, for a renderer that has one)
+          ...(((x) => (x && x.attributes.render_mode === 'pathtrace' ? { mode: 'pathtrace', spp: x.attributes.samples_per_pixel || 64 } : {}))(g.find((a) => a.type_id === 'sensor.camera.rgb'))) });
       } catch (e) {
         if (tlog) tlog.push({ sensors: g.map((a) => a.id), error: e.code || 'internal' });
         continue;
@@ -1200,6 +1227,12 @@ export function initApi(ctx) {
         car.manual = false;
         const ok = snapCarToLane(car, p3.x, p3.z, yawToH(tr.rotation.yaw), 12);
         if (!ok) { car.manual = true; throw new ApiError('off_road', `vehicle ${a.id} is not within 12 m of a lane it can drive`); }
+        // DK04: the towed rear axle (sim/traffic.js _placeCar VT29) starts from the car's own heading, so the body swings
+        // onto its lane instead of taking the lane's heading in one step
+        if (DK04) {
+          const h0 = yawToH(tr.rotation.yaw), lr0 = car._lr || (car._lr = Math.max(1.25, Math.min(3.4, 0.56 * traffic.carHalf(car)[1])));
+          car._yawL = h0; car._rear = [p3.x - Math.sin(h0) * lr0, p3.z - Math.cos(h0) * lr0];
+        }
         car.v = Math.max(car.v || 0, Math.abs(a.st.v));
         car.next = null; car.turn = null; car.dead = false; car._lfv = 0;
         car.routePlan = Array.isArray(p.route) ? p.route.map((s) => String(s).toLowerCase()) : null;

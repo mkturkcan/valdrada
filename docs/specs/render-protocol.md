@@ -180,8 +180,35 @@ code above; the Unreal plugin implements the same messages over the socket.
   `train_kinds` and `formats`; `render.capture` `exposure` `{mode: "auto" | "manual", compensation}` from the group's RGB
   camera (its attributes `exposure_mode` and `exposure_compensation`, EV).
 - The Unreal renderer: `ue_client/ValdradaUE` (the plugin ValdradaRender; its notes are the plugin's sources).
-  Since 0.5.1 it also reads fields of `render.capture` that the core does not send, used by the replay of a recorded take
-  (`tools/core/replay.mjs`): `mode` (`lumen`, the default, or `pathtrace`, Unreal's path tracer in place of the raster
+  Since 0.5.1 it also reads fields of `render.capture` used by the replay of a recorded take (`tools/core/replay.mjs`;
+  since 0.7 the core sends `mode` and `spp` for a path-traced camera too, section 11): `mode` (`lumen`, the default, or `pathtrace`, Unreal's path tracer in place of the raster
   frame), `spp` (the path tracer's samples a frame), `denoise` (its denoiser on the last sample, default true), `warm`
   (the frames rendered before the one read) and `burst` (those frames in one engine tick); and it serves two more
   outputs, `albedo` and `normal`, the guides of a denoiser run outside the renderer (`tools/core/oidn_worker.py`).
+
+## 11. Additions (2026-11-04, Unreal client 0.7)
+
+- `render.capture` `mode` (`pathtrace`) and `spp`: the RGB camera's attributes `render_mode` and `samples_per_pixel`
+  (bridge.js); a renderer with a path tracer renders the RGB plane with that many samples, denoised; others ignore them.
+  The core waits `spp` seconds longer for such a capture's answer.
+- The Unreal renderer serves `instance` and `labels` for road users: each vehicle and walker it draws has a copy that only
+  its instance capture draws, unlit in the label's code; a pixel is the road user the camera sees where the copy's depth
+  is not behind the full scene's. Rows carry `id`, `code`, `class_id`, `class`, `key` (veh:<kind>:api<id> / ped:api<id>
+  for API actors, the core's id otherwise), `bbox`, `area`, `truncated`, with `amodal` > 0 `amodal_bbox`, `amodal_area`
+  and `occlusion` (the copy's own pixels: occlusion by other road users is not counted), and `pose` {pos, yaw, dims,
+  speed_mps, moving, kind}. The camera block is section 6's.
+- Its walkers are the crowd's bodies (Data/crowd.json), its vehicles' wheels turn with the record's `spin` and the front
+  pair steers with `steer`, its vehicles' lamps and sirens light by the record's `lamps` byte (M_client_lamp: each lamp
+  vertex's role from the model's `_LAMP`, the instance's mask, the blinkers and sirens flashing on the material's time),
+  its train cars are the page's models (Data/trains.json).
+- The ground's classes: a renderer that labels by component (the Unreal one: a stencil a component) leaves the ground
+  unlabelled, its meshes holding roads, sidewalks and grass in one piece. For such a renderer (`renderer: unreal`) the core
+  asks for `depth` with every `semantic` plane, and each unlabelled pixel whose point lies within 0.3 m of the
+  simulation's surface takes that surface's class (core/api/render.mjs `groundClasses`: the streamer's `surfaceInfoAt`
+  kinds asphalt, gutter, busred, sidewalk, brick, plaza, path, gravel and grass as road, gutter, bus_lane, sidewalk,
+  plaza, footpath and grass; the measured ground off the streets terrain). The tile answers' kinds are 0.5 m cells; where
+  the cells round a pixel hold other kinds, the cell whose surface the pixel lies on gives the kind, so kerb lines follow
+  the step. Near a tile's edge the neighbouring tiles are asked too (a road may overhang the tile that lays it, and a
+  cached tile's answers stop at its own edge), and where none answers, the nearest answer across the edge on the pixel's
+  surface. Painted markings are not in the surface and read as road. The depth plane is dropped again unless the
+  camera asked for it; `timing` gains `ground_ms` and `ground_px`. `VALDRADA_GROUND_CLASSES=0` turns it off.

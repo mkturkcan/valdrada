@@ -219,7 +219,8 @@ export function towerParams(b, lr) {
       P.fpCap = !!corn && !P.wallSet.startsWith('stone') && r() < 0.6;
     }
     // FP18: two thirds of the post-war apartment slabs carry balcony stacks (tkBuild.js fp18Balconies); NYCHA's do not
-    if (FP18 && arch === ARCH.SLAB && P.resi && style !== STYLE.PROJECT_BRICK && H > 30 && r() < 0.65) {
+    // (not where the record says it has none: landmarkSpec `noBalc`, world/tiledata.js)
+    if (FP18 && arch === ARCH.SLAB && P.resi && style !== STYLE.PROJECT_BRICK && H > 30 && !b.noBalc && r() < 0.65) {
       P.fpBalc = { period: 2 + Math.floor(r() * 3), phase: Math.floor(r() * 4), d: 1.2 + r() * 0.5, span: r() < 0.5 ? 2 : 1 };
     }
   }

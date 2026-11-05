@@ -958,7 +958,7 @@ function wallTopEdges(tile, P) {
         const [x0, z0] = boxCorner(b, k, o0), [x1, z1] = boxCorner(b, k + 1, o1);
         const L = Math.hypot(x1 - x0, z1 - z0);
         if (L < 0.05) continue;
-        const T = b.wallTop || b.top, y0 = T[k - b.i0], y1 = T[k + 1 - b.i0];
+        const T = (sd === 'lo' ? b.wallTopLo : b.wallTopRo) || b.wallTop || b.top, y0 = T[k - b.i0], y1 = T[k + 1 - b.i0];   // (a cut: each wall's own top)
         if (!Number.isFinite(y0) || !Number.isFinite(y1)) continue;
         // (outward: away from the strip's centreline)
         const cx = b.c.X[k], cz = b.c.Z[k];

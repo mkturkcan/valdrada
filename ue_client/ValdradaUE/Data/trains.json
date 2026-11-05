@@ -1,0 +1,38 @@
+{
+ "about": "the client's train cars (Tools/make_trains.py): per kind its mesh, the car's centre at rail height, +X its front",
+ "kinds": {
+  "m7a": {
+   "mesh": "/Game/Client/Trains/m7a/SM_m7a",
+   "bounds_cm": [
+    -1295.4,
+    -161.2,
+    -7.7,
+    1295.4,
+    161.2,
+    404.0
+   ]
+  },
+  "m8": {
+   "mesh": "/Game/Client/Trains/m8/SM_m8",
+   "bounds_cm": [
+    -1295.4,
+    -159.9,
+    -7.7,
+    1295.4,
+    159.9,
+    445.8
+   ]
+  },
+  "r62a": {
+   "mesh": "/Game/Client/Trains/r62a/SM_r62a",
+   "bounds_cm": [
+    -784.0,
+    -161.0,
+    -2.5,
+    784.0,
+    161.0,
+    362.4
+   ]
+  }
+ }
+}

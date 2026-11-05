@@ -77,10 +77,11 @@ def main():
             if not (g and isinstance(c, int) and c > 0): continue
             # the tile's ground (one merged mesh on the ground shader, its kinds per vertex in three.js: roads, sidewalks,
             # kerbs, markings) carries one node class; a component has one stencil, so it stays unlabelled rather than all
-            # of it 'sidewalk'
+            # of it 'sidewalk'. On the measured ground (terrain cells) the ground is laid in pieces on plain standard
+            # materials, every piece still classed 'sidewalk' whatever its kind (roads included): unlabelled too
             if g.group(1).startswith('g') and 3 <= c <= 14 and 'mesh' in n:
                 prims = J['meshes'][n['mesh']].get('primitives', [])
-                if any(str((mats[p_['material']] if 'material' in p_ and p_['material'] < len(mats) else {}).get('name', '')).startswith('ShaderMaterial') for p_ in prims):
+                if any(str((mats[p_['material']] if 'material' in p_ and p_['material'] < len(mats) else {}).get('name', '')).startswith(('ShaderMaterial', 'MeshStandardMaterial')) for p_ in prims):
                     continue
             m[g.group(1)] = c
         classes[d['level']] = m; nodes += len(m)

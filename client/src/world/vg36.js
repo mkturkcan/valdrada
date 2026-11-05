@@ -305,6 +305,9 @@ const CAP_FS = /* glsl */ `
     float vgMs = dot(vgMq, vec2(0.2756, -0.9613)), vgMr = abs(dot(vgMq, vec2(0.9613, 0.2756)));
     float vgMall = ${VGMALL ? '1.0' : '0.0'} * step(5.0, vgMs) * step(vgMs, 425.0) * step(4.5, vgMr) * step(vgMr, 30.0);
     float lawn = (abs(vM - 5.0) < 0.5 || abs(vM - 15.0) < 0.5 || (vgMall > 0.5 && abs(vM - 7.0) < 0.5)) ? 1.0 : 0.0;
+    // LP27 (world/materials.js): no lawn within 4.9 m of Low Plaza's fountains, the court's paving there
+    { vec2 lpQ = vXZ - vec2(764.23, -2747.81); float lpA = dot(lpQ, vec2(0.483478, -0.875042)), lpC = dot(lpQ, vec2(0.875042, 0.483478));
+      if (length(vec2(lpA + 20.1, abs(lpC) - 22.9)) < 4.9) lawn = 0.0; }
     if (lawn > 0.5 && cp32lOn > 0.5 && vgMall < 0.5) {
       // Central Park's ground cover (world/materials.js CP32L, the same ragged edge): no lawn grass in the woods, on the
       // ball fields' clay or on the courts; the wet banks keep it

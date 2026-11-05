@@ -4930,6 +4930,40 @@ if (fs.existsSync(path.join(RAW, 'osm_gateway.json'))) {
   }
   log(' Gateway National Recreation Area:', nArea, 'land-cover areas laid,', nUnitFill, 'unit outlines laid whole');
 }
+// WATERFRONT PARKS the parks file lacks (other jurisdictions: Brooklyn Bridge Park, its piers and Empire Fulton Ferry, drew as
+// the shore's paved apron). data/raw/osm_waterfront.json (OSM, ODbL; tools/pipeline/fetch_osm_extras.mjs waterfront): each
+// park's outline and the land cover inside it, laid as the Gateway's (grass and wetland lawn, wood lawn with dense trees,
+// sand bare), largest first, one inside another adding only its trees. The piers are filled land under the park; a cover
+// area counts by its centroid in the outline, its trees stand only on land (parkPolygon)
+if (fs.existsSync(path.join(RAW, 'osm_waterfront.json'))) {
+  const WF = loadJSON('osm_waterfront.json');
+  let nWf = 0;
+  for (const [key, G] of Object.entries(WF)) {
+    const units = G.units.flatMap((u) => u.rings.map((r) => r.map(([lon, lat]) => project(lon, lat))));
+    if (!units.length) continue;
+    const inUnit = (x, z) => units.some((r) => pointInPoly(x, z, r));
+    const cand = [];
+    for (const c of G.cover) for (const ring of c.rings) {
+      const r = ring.map(([lon, lat]) => project(lon, lat));
+      if (r.length < 4) continue;
+      const [cx, cz] = centroid(r);
+      if (!inTileRange(cx, cz) || !inUnit(cx, cz)) continue;
+      cand.push({ kind: c.kind, r, cx, cz, area: Math.abs(signedArea(r)) });
+    }
+    cand.sort((a, b) => b.area - a.area);
+    const laid = [];
+    for (const c of cand) {
+      if (c.kind === 'sand') continue;
+      const under = laid.some((l) => pointInPoly(c.cx, c.cz, l));
+      if (under && c.kind !== 'wood') continue;
+      parkPolygon([c.r], c.kind === 'wood' ? 70 : c.kind === 'wetland' ? 0 : 420, !under);
+      if (!under) laid.push(c.r);
+      nWf++;
+    }
+    log(' waterfront park', key, cand.length, 'land-cover areas in the outline');
+  }
+  log(' waterfront parks:', nWf, 'land-cover areas laid');
+}
 
 // ---------------------------------------------------------------- Columbia campus (OSM micro-map -> lawns/paths/brick/trees/benches; rest to runtime kit)
 if (HAVE_CAMPUS && BOROS.includes(1)) { // campus is Manhattan data: a partial non-1 run must not emit its tiles

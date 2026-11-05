@@ -5060,6 +5060,10 @@ export function makeGroundMaterial() {
         int mRaw = m;                       // 11 gutter / 12 red bus lane are asphalt variants${GP32 ? String.fromCharCode(10) + '        bool gpGhost = mRaw == 11 && vK.y > 65000.0 && vK.x < 0.5;   // GP32: a corner-return gutter lying out in the junction (gpKerbWorker gp32Ties)' : ''}
         if (m == 11 || m == 12) m = 0;
         if (m == 15) m = 5;                 // TL26: the campus lawn underlay is lawn (its own id only for the depth order)
+        // LP27: the lawns stop 4.9 m from Low Plaza's fountains (CU.fountA, CU.fountC): within it the court's paving (the
+        // brick branch's ring), where the compiled lawns ran under the basins
+        if (m == 5) { vec2 lpQ = vWPos.xz - vec2(764.23, -2747.81); float lpA = dot(lpQ, vec2(0.483478, -0.875042)), lpC = dot(lpQ, vec2(0.875042, 0.483478));
+          if (length(vec2(lpA + 20.1, abs(lpC) - 22.9)) < 4.9) m = 10; }
         GND_patch = 0.0; GND_manhole = 0.0; GND_oil = 0.0; GND_tn = vec3(0.0, 0.0, 1.0); GND_tnW = 0.0;
         GND_paint = 0.0; GND_rock = 0.0; GND_spec = 1.0; GND_vgC = -1;
         GND_age = 0.5; GND_wheel = 0.0; GND_cast = 0.0;
@@ -5762,46 +5766,38 @@ vec3 worn = mix(asph, paintC * 0.80, 0.62);
           float jointVis = smoothstep(0.45, 0.12, fwidth(bc.y));
           albedo = mix(albedo, vec3(0.176, 0.160, 0.143), joint * 0.55 * jointVis);
           GND_rough = 0.86;
-          // ---- Low Plaza granite motifs (McKim paving: nested square panels,
-          // fountain medallions, granite frame) — campus-axis coords rel. Alma
+          // ---- Low Plaza's paving (LP27, 2026-11-03, the owner: "the pattern near the fountains still has issues with
+          // clipping"): in the McKim frame of world/campusGround.js (the court, its walls and flights), as the top view
+          // lays it. Five rectangles across (9.15 m apart, 7.64 m wide) by two along (8.7 m long, the rows from a' -11.1
+          // to -19.8 and -21.3 to -30, 0.9 m short of the grand flights' foot and 3 m of the south steps' head), each a
+          // red frame 1 m wide, a pale band, a red band 0.75 m wide round a pale centre; the outer two run up to the
+          // fountains (CU.fountA, CU.fountC: a' -20.1, c' +-22.9) and are cut by the basin's circle (3.7 m), their bands
+          // following the arc. Round each basin the frames' red goes on as a ring to 4.65 m, broken by the walks through
+          // the fountain (the gap between the rows, the walk across 0.78 m either side of its centre, the walk between
+          // the parterres west and east); the lawns stop at 4.9 m (LP27 above). The court was in the compile's pad
+          // frame, 1.2 degrees off, its squares drawn round a 6.2 m medallion the basins no longer fill
           {
-            float pa = (vWPos.x - 764.23) * 0.465 + (vWPos.z + 2747.81) * -0.885;
-            float pc = (vWPos.x - 764.23) * 0.885 + (vWPos.z + 2747.81) * 0.465;
-            if (pa > -45.0 && pa < -6.0 && abs(pc) < 56.0) {
+            vec2 lpD = vWPos.xz - vec2(764.23, -2747.81);
+            float pa = dot(lpD, vec2(0.483478, -0.875042)), pc = dot(lpD, vec2(0.875042, 0.483478));
+            if (pa > -33.6 && pa < 2.6 && abs(pc) < 50.6) {
               float gm = 0.0;
-              float aaP = fwidth(pa) + fwidth(pc);
-              float e = max(0.06, aaP * 0.75);
-              // fountain medallion distance (field panels yield to the circles —
-              // the outer panels read as the photo's chamfered pentagons)
-              float rrW = length(vec2(pa, pc) - vec2(-21.0, -23.0));
-              float rrE = length(vec2(pa, pc) - vec2(-21.0, 23.0));
-              float rr = min(rrW, rrE);
-              // nested-square panel field: 7 x 2 cells (outer two cut by medallions)
-              if (pa > -31.4 && pa < -10.6 && abs(pc) < 27.5 && rr > 6.2) {
-                vec2 cell = vec2((pc + 27.5) / 7.857, (pa + 31.4) / 10.4);
-                vec2 cu = abs(fract(cell) - 0.5) * vec2(7.857, 10.4); // meters from cell center
-                float m1 = max(cu.x, cu.y);
-                gm = max(gm, smoothstep(3.55 - e, 3.55, m1));                      // cell border
-                gm = max(gm, smoothstep(2.3 - e, 2.3, m1) * smoothstep(2.95 + e, 2.95, m1)); // outer band
-                gm = max(gm, smoothstep(1.05 - e, 1.05, m1) * smoothstep(1.65 + e, 1.65, m1)); // inner band
-                gm = max(gm, smoothstep(0.45 + e, 0.45, m1));                      // center block
+              float e = max(0.06, (fwidth(pa) + fwidth(pc)) * 0.75);
+              float rr = length(vec2(pa + 20.1, abs(pc) - 22.9));
+              if (abs(pc) < 22.12) {
+                // the rectangles' inset (metres in from the nearest edge or the basin's circle)
+                float dc = pc - 9.15 * clamp(floor(pc / 9.15 + 0.5), -2.0, 2.0);
+                float da = pa - (pa > -20.55 ? -15.45 : -25.65);
+                float d = min(min(3.82 - abs(dc), 4.35 - abs(da)), rr - 3.7);
+                gm = smoothstep(-e, 0.0, d) * smoothstep(1.0 + e, 1.0, d)                      // the frame
+                   + smoothstep(1.85 - e, 1.85, d) * smoothstep(2.6 + e, 2.6, d);                // the inner band
+              } else if (abs(pc) - 22.9 > 0.78 && abs(pa + 20.1) > 0.95) {
+                gm = smoothstep(3.7 - e, 3.7, rr) * smoothstep(4.65 + e, 4.65, rr);              // the ring by the lawns
               }
-              // medallions: granite ring + X diagonals + hub around the basin
-              if (rr < 6.6) {
-                gm = max(gm, smoothstep(5.4 - e, 5.4, rr) * smoothstep(6.05 + e, 6.05, rr)); // outer ring
-                vec2 d2 = vec2(pa, pc) - (rrW < rrE ? vec2(-21.0, -23.0) : vec2(-21.0, 23.0));
-                float diag = min(abs(d2.x - d2.y), abs(d2.x + d2.y));
-                gm = max(gm, smoothstep(0.5 + e, 0.5 - e, diag) * smoothstep(5.4, 2.2, rr));
-                gm = max(gm, smoothstep(2.55 + e, 2.55, rr));                      // hub under the fountain
-              }
-              // ref photo: the WHOLE court reads tan granite; red brick is the
-              // accent — pattern bands, medallions, and the border frames
+              // red along the flank walls
               float redM = clamp(gm, 0.0, 1.0);
-              redM = max(redM, smoothstep(52.6 - e, 52.6 + e, abs(pc)));  // side border strips at the Kent/Dodge building line
-              redM = max(redM, smoothstep(-8.2 - e, -8.2 + e, pa));       // north band at the parterre wall
-              redM = max(redM, smoothstep(-43.6 + e, -43.6 - e, pa));     // south band at the walk flight
+              redM = max(redM, smoothstep(49.1 - e, 49.1 + e, abs(pc)));
               vec3 gran2 = mix(vec3(0.246, 0.233, 0.211), vec3(0.278, 0.264, 0.242), n2);
-              // faint 1.5m paver joints on the tan court
+              // faint 1.5 m paver joints on the pale stone
               vec2 pj = abs(fract(vec2(pa, pc) / 1.5) - 0.5);
               float pjw = max(fwidth(pa) / 1.5, 0.015);
               float pjoint = smoothstep(0.5 - pjw * 1.5, 0.5 - pjw * 0.2, max(pj.x, pj.y)) * smoothstep(0.4, 0.1, fwidth(pa));

@@ -275,6 +275,28 @@ function fieldAt(bodies, x, z, out) {
 // is (x, z) on the water (pad m inside the shore)? The water surface y there, or null. For the walkers, the bridges,
 // the boats and the furniture (other parts: `land.cpWaterY?.(x, z)`).
 const _q = { d: 0, w: 0, b: null };
+// BE03: a point on one of the park's sports grounds (OSM pitches: the ballfields' infields, the courts, the Great Lawn's
+// own multi-sport oval and the North Meadow's fields), outer ring less its holes; no tree stands on one
+let _pitchIx = null;
+export function cpOnPitch(x, z) {
+  if (!_pitchIx) _pitchIx = PITCHES.map((p) => {
+    const R = [p.outer, ...(p.holes || [])];
+    let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+    for (let i = 0; i < p.outer.length; i += 2) { x0 = Math.min(x0, p.outer[i]); x1 = Math.max(x1, p.outer[i]); z0 = Math.min(z0, p.outer[i + 1]); z1 = Math.max(z1, p.outer[i + 1]); }
+    return { R, x0, z0, x1, z1 };
+  });
+  for (const q of _pitchIx) {
+    if (x < q.x0 || x > q.x1 || z < q.z0 || z > q.z1) continue;
+    let inside = false;
+    for (const ring of q.R) for (let i = 0, j = ring.length - 2; i < ring.length; j = i, i += 2) {
+      const xi = ring[i], zi = ring[i + 1], xj = ring[j], zj = ring[j + 1];
+      if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+    }
+    if (inside) return true;
+  }
+  return false;
+}
+
 export function cpWaterY(x, z, pad = 0) {
   if (!CP32L) return null;
   for (const X of WATER_EXT) {

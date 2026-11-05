@@ -26,7 +26,7 @@ export const HHP = (() => {
   return false;
 })();
 import { HA_P1, HA_BASE, haInit, haS, haGradeAt, haRelief, HA_GROUND, haInfo } from '../world/heightAuthority.js';
-import { haPreload, haAnchors, haAnchorBridges, HA_BR_UPPER } from '../world/haAnchor.js';
+import { haPreload, haAnchors, haAnchorBridges, HA_BR_UPPER, HA_BR_LOWER } from '../world/haAnchor.js';
 import { roadsOf } from '../world/tiledata.js';
 import { buildBoxes, boxQuads, boxAt, cutQuadOf, topIn, BOXES } from './fdrBox.js';   // the FDR's covered and stacked stretches as one structure each
 
@@ -80,6 +80,7 @@ function chainOf(id, d) {
     lanes: d.lanes, speed: d.speed, edgeL: d.edgeL, edgeR: d.edgeR, gapL: d.gapL, structs: d.structs, ends: d.ends, pids: d.pids,
     splice: d.splice, trimStart: d.trim_start, trimEnd: d.trim_end, dem: d.dem, loop: d.kind === 'loop',
     raw: d.raw || null, rawW: d.raw_w || 7,
+    prom: d.prom || null,   // (the triple cantilever's promenade over this carriageway, hhpKit.js)
   };
 }
 
@@ -143,6 +144,10 @@ export function hhpReady() {
               }
             }
           }
+          // (a double-deck kit whose record is the top roadway: a carriageway whose own profile ends nearer the lower
+          // roadway lands on it, under the deck)
+          const lo = HA_BR_LOWER[e.key] || 0;
+          if (lo && Math.abs(c.Y[i] - (best[1] - lo)) < Math.abs(c.Y[i] - best[1])) best[1] -= lo;
           const dy = best[1] - c.Y[i];
           e.yT = best[1];
           blendEnd(c, k, dy, Math.min(c.S[c.n - 1] * 0.5, Math.max(30, 1.5 * Math.abs(dy) / 0.04)));
@@ -523,6 +528,20 @@ export function hhpSurface(x, z, yHint = null, margin = 0) {
 // traffic (sim/traffic.js _placeCar): a car on the parkway stands on its paving (the road line is the centre line; the
 // lanes are off it across the cross slope)
 if (HHP && typeof globalThis !== 'undefined') globalThis.__hhpSurf = (x, z, y) => { if (!HHP_CH.length) return null; const h = hhpSurface(x, z, y); return h && Math.abs(h.y - y) < 1.0 ? h.y : null; };
+// landmarks (city/lmGCT.js: the terminal's roadway skins, the Helmsley Building's portals): the paving at (x, z) and its two
+// edges across it there, { y, id, l: [x, y, z], r: [x, y, z] } in world metres, or null off the parkway's paving
+if (HHP && typeof globalThis !== 'undefined') globalThis.__hhpPave = (x, z, yHint = null) => {
+  if (!HHP_CH.length) return null;
+  const h = hhpSurface(x, z, yHint);
+  if (!h) return null;
+  const c = h.c, i = h.i, j = Math.min(c.n - 1, i + 1), t = h.t;
+  const ed = (sg) => {
+    const at = (k) => { const w = sg < 0 ? c.WL[k] : c.WR[k]; return [c.X[k] + c.NX[k] * sg * w, c.Y[k] + c.E[k] * sg * w, c.Z[k] + c.NZ[k] * sg * w]; };
+    const a = at(i), b = at(j);
+    return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  };
+  return { y: h.y, id: c.id, l: ed(-1), r: ed(1) };
+};
 
 // ---------------------------------------------------------------- before the cut: the compiled parkway out
 const mineSet = () => {
@@ -530,6 +549,13 @@ const mineSet = () => {
   const s = new Set();
   for (const c of HHP_CH) for (const p of c.pids) s.add(+p);
   return (mineSet.s = s);
+};
+// (the replaced segments of the ramps that end on a bridge kit's deck)
+const bridgeSet = () => {
+  if (bridgeSet.s) return bridgeSet.s;
+  const s = new Set();
+  for (const c of HHP_CH) if (c.ends.some((e) => e.type === 'bridge')) for (const p of c.pids) s.add(+p);
+  return (bridgeSet.s = s);
 };
 function tileRoads(tile, ox, oz) {
   const RV = tile.S.roadVerts, out = [];
@@ -586,7 +612,9 @@ export function hhpPre(tile, ox, oz, terrTile = false) {
   const onPaving = (r, p, q) => {
     // (a replaced segment's own record: anywhere within 6 m of the paving, whatever its compiled height (a ramp the
     // compile dug into a cut lies metres under its real level, and its centre line wanders off the roadbed's))
-    if (mineSet().has(r.segId)) return hhpHits(p[0], p[2], 6.0).length > 0;
+    // (and along its own replaced line where no paving is laid: a ramp's stretch over a bridge kit's deck, which the kit
+    // draws, would leave the compiled record hanging at its flat level)
+    if (mineSet().has(r.segId)) return hhpHits(p[0], p[2], 6.0).length > 0 || (bridgeSet().has(r.segId) && hhpRawNear(p[0], p[2], false) < 1.0);
     const hs = hhpHits(p[0], p[2], 0.5);
     if (!hs.length) return false;
     if (r.rclass === 5 || r.rclass === 6) return false;
@@ -1063,7 +1091,9 @@ function boxGround(tile, ox, oz) {
     }
     if (dropped) { tile.S[nm] = Float32Array.from(keep); par.forEach((q, j) => { tile.S[q] = tile.S[q] instanceof Uint8Array ? Uint8Array.from(keepP[j]) : Float32Array.from(keepP[j]); }); cut += dropped; }
   }
-  for (const name of HA_GROUND.concat(['terrP1'])) {
+  // (the land's backing, terrBack, 0.3 m under the bare earth, out of the open cuts only: there the earth stands over the
+  // road and the backing covered it; in the covered runs it lies inside the deck)
+  for (const name of HA_GROUND.concat(['terrP1', 'terrBack'])) {
     const a = tile.S[name];
     if (!a || a.length < 9) continue;
     const out = [];
@@ -1071,7 +1101,7 @@ function boxGround(tile, ox, oz) {
     for (let i = 0; i + 8 < a.length; i += 9) {
       const P = [[a[i] + ox, a[i + 2] + oz], [a[i + 3] + ox, a[i + 5] + oz], [a[i + 6] + ox, a[i + 8] + oz]];
       const x0 = Math.min(P[0][0], P[1][0], P[2][0]), x1 = Math.max(P[0][0], P[1][0], P[2][0]), z0 = Math.min(P[0][1], P[1][1], P[2][1]), z1 = Math.max(P[0][1], P[1][1], P[2][1]);
-      const C = boxQuads(x0 - 11, z0 - 11, x1 + 11, z1 + 11);
+      const C = boxQuads(x0 - 11, z0 - 11, x1 + 11, z1 + 11).filter((q) => name !== 'terrBack' || q.s.kind === 'cut');
       let pieces = [P], hit = false;
       for (const { s: sq, i: iq, Q: Q0 } of C) { const Q = Q0; const next = []; for (const p of pieces) { const r = subtractConvex(p, Q); if (r.length !== 1 || r[0] !== p) hit = true; for (const q of r) next.push(q); } pieces = next; if (!pieces.length) break; }
       // (past the river wall, 10 m out: the old shore treatment over the river (aprons, kerbs) goes; ground the authority
@@ -1127,6 +1157,7 @@ function boxGround(tile, ox, oz) {
   // the deck's top
   const add = { grass: [], path: [] };
   for (const { s, i } of qs) {
+    if (s.kind === 'cut') continue;   // (an open cut has no deck: its top is the road's level, and a lawn there covered the lanes)
     const k0 = i - s.i0, k1 = k0 + 1, c = s.c;
     const bands = [];
     if (s.kind === 'stack') bands.push(['path', s.lo[k0], s.ro[k0], s.lo[k1], s.ro[k1]]);
@@ -1304,10 +1335,9 @@ function regrowGone(tile, ox, oz) {
     return lo;
   };
   const out = [], outG = [];
-  // (a piece in the open beside a lawn comes back as lawn, the lawn's own sward; else as the base)
-  const GR = new Set();
-  if (tile.S.grass) { const b = tile.S.grass; for (let i = 0; i + 8 < b.length; i += 9) GR.add(Math.floor((b[i] + b[i + 3] + b[i + 6]) / 18) * 100003 + Math.floor((b[i + 2] + b[i + 5] + b[i + 8]) / 18)); }
-  const lawnNear = (x, z) => { const gx = Math.floor(x / 6), gz = Math.floor(z / 6); for (let a = -1; a <= 1; a++) for (let c = -1; c <= 1; c++) if (GR.has((gx + a) * 100003 + gz + c)) return true; return false; };
+  // (a piece in the open comes back as lawn, the lawn's own sward: the land a replaced compiled road leaves beside a
+  // chain is a verge, an interchange's infield or a loop's middle, not bare base (BE02: the George Washington Bridge's
+  // interchange read as a field of base); under a chain's paving or deck, and where the city draws ground already, the base)
   const emit = (P, d) => {
     const e = Math.max(Math.hypot(P[0][0] - P[1][0], P[0][2] - P[1][2]), Math.hypot(P[1][0] - P[2][0], P[1][2] - P[2][2]), Math.hypot(P[2][0] - P[0][0], P[2][2] - P[0][2]));
     if (d < 6 && e > 1.0) {
@@ -1320,7 +1350,7 @@ function regrowGone(tile, ox, oz) {
     const cx = (P[0][0] + P[1][0] + P[2][0]) / 3, cz = (P[0][2] + P[1][2] + P[2][2]) / 3;
     // (under a chain's paving: base 0.15 m under that paving, never a lawn a few cm under it)
     const hs = hhpHits(cx + ox, cz + oz, 0.1);
-    const dst = !hs.length && covered(cx, cz) === null && lawnNear(cx, cz) ? outG : out;
+    const dst = !hs.length && covered(cx, cz) === null ? outG : out;
     for (const p of P) {
       const g0 = haGradeAt(p[0] + ox, p[2] + oz), gc = covered(p[0], p[2]);
       let y = g0 !== null && Number.isFinite(g0) ? g0 : 3.24;

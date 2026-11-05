@@ -714,7 +714,7 @@ export function buildBoathouse(group, W, gE) {
   const mk = (uv) => new LBin(uv).frame(ox, 0, oz, ax, az);
   const WH = mk(), BR = mk(), RF = mk(), GS = mk(), ST = mk(), WD = mk();
   const F = W + 1.05, EAVE = F + 4.0, low = Math.min(W - 0.6, gE - 0.6);
-  const cW = K(0xe9e5dc), cWS = K(0xd2cdc2), cBr = K(0x94483a), cBrD = K(0x7c3c31), cCu = K(0x86b4a0), cCuS = K(0x6f9a88), cSt = K(0x9d968a), cDk = K(0x7a6a58), cAw = K(0x8a7258), cGl = K(0xffffff);
+  const cW = K(0xe9e5dc), cWS = K(0xd2cdc2), cBr = K(0x94483a), cBrD = K(0x7c3c31), cCu = K(0x7a9688), cCuS = K(0x647d72), cSt = K(0x9d968a), cDk = K(0x7a6a58), cAw = K(0x8a7258), cGl = K(0xffffff);
   const E = (e) => -e;                                          // the frame's w is west: w = -e
   // the ranges: [u0, u1, e0, e1, eave, pitch]
   const R = [[0, 19.9, 0, 32.0, EAVE + 0.4, 0.3], [19.9, 60.8, 0, 7.7, EAVE, 0.34], [19.9, 28.7, 14.6, 32.2, EAVE - 0.4, 0.3], [28.7, 57.5, 7.7, 24.6, EAVE - 0.4, 0.3]];   // low copper hips (the Commons photographs)

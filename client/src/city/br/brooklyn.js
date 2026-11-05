@@ -128,8 +128,8 @@ export function buildBrooklyn(rec, bag) {
 
   // ---- anchorages (the cables enter their river faces at the deck) and the masonry approaches
   for (const [sAn, away] of [[anA, -1], [anB, 1]]) anchorage(bag, F, sAn, away, stone, stoneD);
-  approach(bag, F, Math.max(0, anA - 39.3 - 0.1), 0, -1, stone, stoneD, asph, steelD, lw);
-  approach(bag, F, Math.min(F.L, anB + 39.3 + 0.1), F.L, 1, stone, stoneD, asph, steelD, lw);
+  approach(bag, F, Math.max(0, anA - 39.3 - 0.1), 0, -1, stone, stoneD, asph, steelD, lw, { wood, steel });
+  approach(bag, F, Math.min(F.L, anB + 39.3 + 0.1), F.L, 1, stone, stoneD, asph, steelD, lw, { wood, steel });
   // the deck over each anchorage
   for (const [a, b] of [[Math.max(0, anA - 39.3), anA], [anB, Math.min(F.L, anB + 39.3)]]) {
     for (const sg of [-1, 1]) {
@@ -137,6 +137,10 @@ export function buildBrooklyn(rec, bag) {
       slab(bag, F, asph, a, b, o0, o1, y, 0.5, 6);
       railing(bag, F, steelD, a, b, sg * (ROAD[1] + 0.1), y, 1.05, 2.29, 0.08);
     }
+    // (BE01: the promenade goes on over the anchorage at its height over the roadways, between them the anchorage's
+    // stone at the roadways' level: no slot open to the street below)
+    slab(bag, F, stoneD, a, b, -ROAD[0], ROAD[0], (s) => y(s) - 0.1, 0.5, 6);
+    promenade(bag, F, a, b, (s) => y(s) + PROM_UP, wood, steel, steelD);
     slab(bag, F, stoneD, a, b, -ROAD[0], ROAD[0], (s) => y(s) + 0.9, 1.4, 6);
   }
 
@@ -322,12 +326,38 @@ function anchorage(bag, F, sAn, away, stone, stoneD) {
   block(bag, F, stoneD, sc - L1 / 2 - 0.3, sc + L1 / 2 + 0.3, -B1 - 0.3, B1 + 0.3, yTop - 0.4, yTop);
 }
 
+// BE01: the promenade off the span (over the anchorages and the approaches): the walk's planks between the inner girders,
+// its lattice rails, posts down to the roadways' level every 20 ft where it stands a metre or more over them
+function promenade(bag, F, a, b, promY, wood, steel, steelD) {
+  if (b - a < 2) return;
+  slab(bag, F, wood, a, b, -PROM, PROM, promY, 0.18, 4);
+  for (const sg of [-1, 1]) {
+    slab(bag, F, steelD, a, b, sg > 0 ? PROM - 0.45 : -PROM, sg > 0 ? PROM : -PROM + 0.45, (s) => promY(s) - 0.18, 0.75, 6);
+    latticeRail(bag, F, steel, a, b, sg * PROM, promY, 1.25, 2.29, 0.9, sg);
+  }
+  if (bag.lod) return;
+  for (let s = a + 3; s < b - 1; s += 6.1) {
+    const top = promY(s) - 0.9, base = F.yAt(s);
+    if (top - base < 1.0) continue;
+    for (const sg of [-1, 1]) bag.rod(steelD, F.P(s, sg * (PROM - 0.22), base), F.P(s, sg * (PROM - 0.22), top), 0.14, 6, 0.14, true);
+  }
+}
+
 // a masonry approach from station a to b (dir = the side away from the river): arched bays on piers where the deck
 // stands high, retaining walls and fill where it runs low, the roadways and barriers on top
-function approach(bag, F, a, b, dir, stone, stoneD, asph, steelD, lw) {
+function approach(bag, F, a, b, dir, stone, stoneD, asph, steelD, lw, P = {}) {
   const lo = Math.min(a, b), hi = Math.max(a, b);
   if (hi - lo < 4) return;
   const y = (s) => F.yAt(s);
+  // (BE01: the walk between the roadways, raised over them as on the span, coming down to their level over its last 60 m
+  // to the street at the approach's end (Park Row, Tillary St); under it the middle closed at the roadways' level, so the
+  // approach reads as one deck from above, not two roadways with the girders showing between them)
+  if (P.wood) {
+    const sm = (u) => u * u * (3 - 2 * u);
+    const promY = (s) => y(s) + PROM_UP * sm(Math.min(1, Math.abs(s - b) / 60));
+    slab(bag, F, stoneD, lo, hi, -ROAD[0], ROAD[0], (s) => y(s) - 0.1, 0.5, 6);
+    promenade(bag, F, lo, hi, promY, P.wood, P.steel || steelD, steelD);
+  }
   const ground = (s) => { const g = F.groundAt(s); return g === null ? 0 : g; };
   const halfW = W / 2 + 0.4;
   // roadway and parapets

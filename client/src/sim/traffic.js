@@ -3265,7 +3265,9 @@ export class Traffic {
     if (globalThis.__hhpSurf) { const ys = globalThis.__hhpSurf(x, z, y); if (ys !== null) y = ys + 0.002; }
     // VT27: the heading from the dragged rear point (see VT27); a jump of more than three drag lengths (a spawn, a
     // recycled car) starts it again behind the car along the path heading
-    if (VT29 && !car.api) {
+    // (DK04 2026-11-04: an API car on autopilot too; it took the path's heading raw, so every joint between connectors and
+    // the lane snap at the take-over turned its body up to 26 deg in a step; under apply_control the body's own heading stands)
+    if (VT29 && (!car.api || !car.manual)) {
       // VT29: the rear axle towed along its heading; a placement 3 m or more from the last (a spawn, a recycled car) starts
       // it again behind the body along the path's heading; a dt = 0 update (a settle, a redraw) turns nothing
       const lr = car._lr || (car._lr = Math.max(1.25, Math.min(3.4, 0.56 * this.carHalf(car)[1])));
@@ -3303,7 +3305,7 @@ export class Traffic {
         r[0] = x - Math.sin(yN) * lr; r[1] = z - Math.cos(yN) * lr;
       }
       yaw = car._yawL;
-    } else if (VT28 && !car.api) {
+    } else if (VT28 && (!car.api || !car.manual)) {
       // VT28: the heading given (lane chord + lane-change angle, or the connector's tangent), at most v / 4.5 m + 0.2 rad/s
       // of turn; a placement 3 m or more from the last one (a spawn, a recycled car) starts again
       const q = car._pose;
@@ -3314,7 +3316,7 @@ export class Traffic {
         yaw = car._yawL + (dy > m ? m : dy < -m ? -m : dy);
       }
       car._yawL = yaw;
-    } else if (VT27 && !car.api) {
+    } else if (VT27 && (!car.api || !car.manual)) {
       const Lb = car._wb2 || (car._wb2 = Math.max(1.2, Math.min(3.2, this.carHalf(car)[1] * 0.6)));
       let r = car._rear;
       if (!r || Math.hypot(x - r[0], z - r[1]) > Lb * 3) r = car._rear = [x - Math.sin(yaw) * Lb, z - Math.cos(yaw) * Lb];

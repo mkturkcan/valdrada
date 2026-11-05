@@ -162,7 +162,17 @@ def in_engine():
         T['light_s'] = round(time.time() - t, 1)
     t = time.time()
     eal.save_directory(dest, only_if_is_dirty=True, recursive=True)
-    unreal.EditorLoadingAndSavingUtils.save_dirty_packages(True, True)
+    # (2026-11-04: save_dirty_packages(True, True) saved every dirty package of the session, so each take re-saved the
+    # shared city levels it had loaded (17 block maps in a t7ArchTrack take): the take saves its own packages and any
+    # generated master, never the city's levels, far city, library, kit or tree prototypes; what it leaves is counted)
+    SHARED = ('/Game/CC/', '/Game/CCU/', '/Game/CCV/', '/Game/CCB/', '/Game/CF/', '/Game/MatLib/', '/Game/R2BD/', '/Game/Kit/',
+              '/Game/Takes/', '/Game/Lib/', '/Game/City/', '/Game/W/')
+    LS_ = unreal.EditorLoadingAndSavingUtils
+    dirty_ = list(LS_.get_dirty_map_packages()) + list(LS_.get_dirty_content_packages())
+    own_ = [p for p in dirty_ if not p.get_name().startswith(SHARED)]
+    left_ = sorted(p.get_name() for p in dirty_ if p.get_name().startswith(SHARED))
+    if own_: LS_.save_packages(own_, True)
+    T['shared_unsaved'] = {'n': len(left_), 'first': left_[:12]}
     T['save_s'] = round(time.time() - t, 1)
     cfg = dict(run, shot=f'act_{shot}', rawdir=C['out'])
     lo, hi = side['frames']

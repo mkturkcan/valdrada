@@ -59,6 +59,10 @@ client.close()                          # also a context manager: `with valdrada
   - `sensor_tick`: seconds between frames; 0 (the default) means every tick.
   - `amodal`: how many of the largest objects also get an amodal box and an occlusion value. Each costs about 5 ms; default 0.
   - `min_pixels`: the smallest visible area, in pixels, that gets a label; default 30.
+  - `exposure_mode` (`auto` or `manual`) and `exposure_compensation` (EV): the RGB camera's exposure; default `auto`, 0.
+  - `render_mode`: `raster` (the default) or `pathtrace`, the RGB frame from the renderer's path tracer with
+    `samples_per_pixel` samples (default 64), denoised; served by the Unreal Engine 5 client, the three.js build renders
+    every frame by rasterisation.
 
   Cameras with the same parent, transform, `fov` and image size share one capture per tick.
 

@@ -18,10 +18,14 @@
 //             and benches between them on granite runs
 //   piers     wshCoast's solid pier decks (kept by the marina rule: no dock line) stand on piles: a 0.6 m deck edge in
 //             place of the fascia to the river bed, the soffit, a pile grid, fender piles and a pipe rail on the water edges
+//   edges     (2026-10-31) an area part claims the swept segments of its shore (swTakeRule) and restyles stretches of them
+//             by place (swEdgeRule): riprap and shingle beaches swept down past the water plane in place of the wall, a
+//             pier's edge on piles, the face or rail of its choice, or nothing
 // `?seawall=0` / SEAWALL=0 turns the kit off (the walls as before).
 import * as THREE from 'three';
 import { haInfo } from '../world/heightAuthority.js';
 import { marinaSlabHit } from './marinaKit.js';
+import { pbrMaterial } from './mat/pbrLib.js';
 
 const isNode = typeof window === 'undefined';
 export const SEAWALL = isNode ? process.env.SEAWALL !== '0' : new URLSearchParams(location.search).get('seawall') !== '0';
@@ -37,7 +41,7 @@ const TX = new Map();
 function tex(name, srgb) {
   if (!TL) return null;
   let t = TX.get(name);
-  if (!t) { t = TL.load('textures/seawall/' + name + '.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; if (srgb) t.colorSpace = THREE.SRGBColorSpace; TX.set(name, t); }
+  if (!t) { t = TL.load('textures/' + (name.includes('/') ? '' : 'seawall/') + name + '.jpg'); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; if (srgb) t.colorSpace = THREE.SRGBColorSpace; TX.set(name, t); }
   return t;
 }
 let M = null;
@@ -55,6 +59,8 @@ function mats() {
     timber: set('timber', 'timber'), pierdeck: set('pierdeck', 'concretet'), soffit: set('soffit', 'concretet', { side: THREE.DoubleSide }), capc: set('capc', 'concretet'),
     iron: plain('iron', { rough: 0.5, metal: 0.4 }), steel: plain('steel', { rough: 0.42, metal: 0.85 }), dark: plain('dark', { rough: 0.95, side: THREE.DoubleSide }),
     globe: plain('globe', { rough: 0.25 }),
+    // (edges: quarried stone for riprap, the CP33 lichen rock scan at its real 2 m; shingle; a pier's fascia and piles)
+    rock: set('rock', 'cp33/rocks/lichen'), shingle: pbrMaterial('roof_gravel', { mapping: 'world', tint: '#8c8476' }), pdeck: set('pdeck', 'marina/deck'),
   };
   return M;
 }
@@ -295,6 +301,194 @@ export function swSegment(tile, A, B, o) {
   }
 }
 
+// ---- edge rules (2026-10-31) -----------------------------------------------------------------------------------------
+// An area part (city/areas.js) restyles stretches of the swept walls by place: swEdgeRule(fn), fn(x, z, nx, nz) at each
+// segment's middle (the face line, the seaward normal) -> null (the kit's own wall) or { kind, ... }:
+//   granite | concrete  the wall with that face; `rail` ('iron' | 'pipe' | null), `fender`, `esp` as given
+//   riprap              a revetment of quarried stone: from the cap's line down past the water plane at `slope` (run per
+//                       rise, 1.5) to `toe` (-2.2), the stones `size` m (1.1); `rail` on the land's edge
+//   beach               a shingle beach from the cap's line down to `toe` (-1.2) at `slope` (3.2), cobbles scattered on it
+//   pier                a pier's edge (its deck drawn by the part): a fascia `fascia` m deep (0.5) of `mat` ('timber' |
+//                       'concrete'), the shadow under the deck, piles every `pile` m (2.6) and fender piles, a `rail`;
+//                       its top at `deckY` (absolute) or the cap's top plus `lift`; `deck` m of planked promenade inland
+//   skip                nothing: the part draws that edge itself
+// Every profile is computed from the station's own values, so neighbouring segments meet; a slope's first and last section
+// is closed by an end face of its own stone down to its toe.
+const EDGE_RULES = [];
+export function swEdgeRule(fn) { if (typeof fn === 'function' && !EDGE_RULES.includes(fn)) EDGE_RULES.push(fn); }
+function edgeRuleXZ(x, z, nx, nz) {
+  if (!EDGE_RULES.length) return null;
+  for (const f of EDGE_RULES) { try { const r = f(x, z, nx, nz); if (r) return r; } catch (e) { /* a rule that throws is no rule */ } }
+  return null;
+}
+const edgeRuleAt = (A, B) => edgeRuleXZ((A.x + B.x) / 2, (A.z + B.z) / 2, (A.nx + B.nx) / 2, (A.nz + B.nz) / 2);
+// (the compile's loose bulkhead pieces under a restyled stretch: the style draws that edge, the piece goes)
+const ruleDrops = (x, z, nx, nz) => { const r = edgeRuleXZ(x, z, nx, nz); return !!r && r.kind !== 'granite' && r.kind !== 'concrete'; };
+// value noise in [0, 1] (two octaves)
+const vn = (x, y, sd) => {
+  const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+  const h = (a, b) => hsh(a * 7.31 + sd, b * 3.17 - sd);
+  const a = h(i, j), b = h(i + 1, j), c = h(i, j + 1), d = h(i + 1, j + 1);
+  return a + (b - a) * ux + (c - a) * uy + (a - b - c + d) * ux * uy;
+};
+const vn2 = (x, y, sd) => 0.65 * vn(x, y, sd) + 0.35 * vn(x * 2.3 + 5.1, y * 2.3 - 1.7, sd + 13);
+// a stone's colour: grey granite tones, wet and weedy under the high water line, a brown tide band over it
+function stoneCol(y, t, wetTo = 0.95) {
+  let c = [0.62 + 0.2 * t, 0.6 + 0.19 * t, 0.57 + 0.17 * t];
+  if (y < wetTo) { const k = Math.max(0, Math.min(1, (wetTo - y) / 0.6)); c = [c[0] * (1 - 0.55 * k), c[1] * (1 - 0.48 * k), c[2] * (1 - 0.5 * k)]; }
+  if (y < 0.35) { const k = Math.max(0, Math.min(1, (0.35 - y) / 0.5)); c = [c[0] * (1 - 0.35 * k), c[1] * (1 - 0.22 * k), c[2] * (1 - 0.38 * k)]; }
+  else if (y < 1.25 && y > 0.9) c = [c[0] * 0.86, c[1] * 0.8, c[2] * 0.7];
+  return c;
+}
+// riprap and beaches: the slope swept along the segment, its surface broken into stones (riprap) or a shingle's ripples,
+// and loose stones laid on it
+export function swSlope(tile, A, B, o) {
+  const K = kitOf(tile), rip = o.kind !== 'beach', seed = o.seed || 0;
+  const L = Math.hypot(B.x - A.x, B.z - A.z);
+  if (L < 0.05) return;
+  const slope = o.slope ?? (rip ? 1.5 : 2.6), toe = o.toe ?? (rip ? -2.2 : -0.9), size = o.size ?? (rip ? 1.1 : 0.3);
+  K.st[rip ? 'riprap' : 'beach'] = (K.st[rip ? 'riprap' : 'beach'] || 0) + L;
+  const P = (t) => { const nx = lerp(A.nx, B.nx, t), nz = lerp(A.nz, B.nz, t), nl = Math.hypot(nx, nz) || 1; return { x: lerp(A.x, B.x, t), z: lerp(A.z, B.z, t), nx: nx / nl, nz: nz / nl, top: lerp(A.top, B.top, t), s: lerp(A.s, B.s, t), capW: Math.min(4.5, lerp(A.capW || 0.8, B.capW || 0.8, t)) }; };
+  // the cross-section at a station: d (seaward of the face line) -> y. The slope starts at the land behind the cap (its
+  // inner edge, at the land's level 0.45 m under the wall's top; a riprap crest 0.15 m over it) and runs down past the
+  // water plane to the toe
+  const crest = rip ? 0.15 : 0.02;
+  const yAt = (p, d) => Math.max(toe, p.top - 0.45 + crest - Math.max(0, d + p.capW) / slope);
+  const dMax = (p) => (p.top - 0.45 + crest - toe) * slope - p.capW + 0.6;
+  const n = Math.max(1, Math.ceil(L / (rip ? 0.7 : 1.0))), fb = bin(K, rip ? 'rock' : 'shingle');
+  const across = (p) => { const c0 = p.capW + 0.3, D = dMax(p), m = Math.max(4, Math.ceil((D + c0) / (rip ? 0.7 : 1.2))); const out = []; for (let k = 0; k <= m; k++) out.push(-c0 + ((D + c0) * k) / m); return out; };
+  const bump = (s, d, y) => {
+    if (!rip) return 0.05 * (vn2(s / 0.9, d / 0.9, seed) - 0.5) + 0.03 * Math.sin(d * 2.1 + s * 0.13);   // (shingle: small ripples)
+    const v = vn2(s / size, d / size, seed + 3);
+    return size * 0.42 * Math.pow(v, 0.8) - size * 0.12;
+  };
+  const vert = (p, d) => {
+    const y0 = yAt(p, d), edge = d < -p.capW + 0.05, b = edge ? 0 : bump(p.s, d, y0) * Math.min(1, (d + p.capW) / 0.8);
+    const y = edge ? y0 - 0.25 : y0 + b;   // (the strip behind the land's edge tucks under the land)
+    return { pos: [p.x + p.nx * d, y, p.z + p.nz * d], y, t: vn(p.s / 2.3, d / 2.3, seed + 7) };
+  };
+  for (let j = 0; j < n; j++) {
+    const p0 = P(j / n), p1 = P((j + 1) / n), A0 = across(p0), A1 = across(p1), m = Math.min(A0.length, A1.length);
+    for (let k = 0; k + 1 < m; k++) {
+      const a = vert(p0, A0[k]), b = vert(p1, A1[k]), c = vert(p1, A1[k + 1]), d = vert(p0, A0[k + 1]);
+      const col = (q) => (rip ? stoneCol(q.y, q.t) : (() => { const w = q.y < 0.6 ? 0.62 : q.y < 1.0 ? 0.8 : 1; return [0.95 * w, 0.92 * w, 0.86 * w]; })());
+      const sz = rip ? 2.0 : 1.6;
+      fb.quad(a.pos, b.pos, c.pos, d.pos, [0, 1, 0], [col(a), col(b), col(c), col(d)], [p0.s / sz, A0[k] / sz], [p1.s / sz, A1[k] / sz], [p1.s / sz, A1[k + 1] / sz], [p0.s / sz, A0[k + 1] / sz]);
+    }
+  }
+  // the end faces where the style stops (its section down to the toe, back to the face line)
+  for (const [t, cap, sg] of [[0, o.capA, -1], [1, o.capB, 1]]) {
+    if (!cap) continue;
+    const p = P(t), D = across(p), tx = (B.x - A.x) / L * sg, tz = (B.z - A.z) / L * sg;
+    for (let k = 0; k + 1 < D.length; k++) {
+      const a = vert(p, D[k]), b = vert(p, D[k + 1]), fa = [a.pos[0], toe - 0.3, a.pos[2]], fbb = [b.pos[0], toe - 0.3, b.pos[2]];
+      if (Math.min(a.y, b.y) < toe + 0.02) continue;
+      fb.quad(a.pos, b.pos, fbb, fa, [tx, 0, tz], rip ? stoneCol(Math.min(a.y, b.y), a.t) : [0.6, 0.58, 0.54]);
+    }
+  }
+  // loose stones on the slope (riprap: the armour's top stones, every ~1.1 m; beach: cobbles, sparse)
+  const rb = bin(K, 'rock');
+  const stepS = rip ? size * 0.95 : 2.6, stepD = rip ? size * 1.0 : 2.4;
+  for (let k = Math.ceil(Math.min(A.s, B.s) / stepS); k * stepS < Math.max(A.s, B.s); k++) {
+    const s = k * stepS, t = (s - A.s) / (B.s - A.s || 1), p = P(t), D = dMax(p) + p.capW;
+    for (let i = 0; (i + 0.3) * stepD < D; i++) {
+      const h = hsh(k * 1.37 + seed, i * 2.11), h2 = hsh(k * 0.71 - seed, i * 5.3);
+      if (!rip && h > 0.35) continue;
+      const d = (i + 0.2 + 0.6 * h2) * stepD - p.capW, y0 = yAt(p, d);
+      if (y0 <= toe + 0.05) continue;
+      const r = (rip ? size * (0.42 + 0.38 * h) : 0.12 + 0.18 * h), ss = s + (h2 - 0.5) * stepS * 0.6;
+      const q = P((ss - A.s) / (B.s - A.s || 1));
+      rock(rb, [q.x + q.nx * d, y0 + r * 0.25, q.z + q.nz * d], r, hsh(k * 3.3, i * 1.9 + seed), y0);
+      K.st.stones = (K.st.stones || 0) + 1;
+    }
+  }
+  if (o.rail) swRail({ ...A, nx: A.nx, nz: A.nz }, B, o.rail, -Math.min(4.5, Math.max(A.capW || 0.8, B.capW || 0.8)) - 0.35, -0.45, tile);
+}
+// one loose stone: a flattened, faceted lump (an icosahedron's 12 points pushed in and out), its faces flat-shaded
+const ICO = (() => {
+  const t = (1 + Math.sqrt(5)) / 2, v = [[-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t], [0, -1, -t], [0, 1, -t], [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1]].map((p) => { const l = Math.hypot(...p); return p.map((q) => q / l); });
+  const f = [[0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1]];
+  return { v, f };
+})();
+function rock(b, c, r, h, yGround) {
+  const sx = r * (1.0 + 0.35 * h), sy = r * (0.62 + 0.25 * hsh(h, 2)), sz = r * (0.9 + 0.3 * hsh(h, 3)), a = h * 6.283;
+  const ca = Math.cos(a), sa = Math.sin(a);
+  const V = ICO.v.map((p, i) => { const k = 0.78 + 0.4 * hsh(h * 17 + i, 5); const x = p[0] * sx * k, y = p[1] * sy * k, z = p[2] * sz * k; return [c[0] + x * ca - z * sa, Math.max(yGround - 0.2, c[1] + y), c[2] + x * sa + z * ca]; });
+  const tone = hsh(h, 9);
+  for (const [i, j, k] of ICO.f) {
+    const A = V[i], B = V[j], C = V[k], ym = (A[1] + B[1] + C[1]) / 3;
+    const e1 = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], e2 = [C[0] - A[0], C[1] - A[1], C[2] - A[2]];
+    let n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    const l = Math.hypot(...n) || 1; n = n.map((q) => q / l);
+    const ccx = (A[0] + B[0] + C[0]) / 3 - c[0], ccy = ym - c[1], ccz = (A[2] + B[2] + C[2]) / 3 - c[2];
+    const out = n[0] * ccx + n[1] * ccy + n[2] * ccz >= 0;
+    const col = stoneCol(ym, tone);
+    const uv = (p) => [(p[0] + p[2]) / 2.0, p[1] / 2.0];
+    if (out) { b.v(A, n, uv(A), col); b.v(B, n, uv(B), col); b.v(C, n, uv(C), col); }
+    else { const m = n.map((q) => -q); b.v(A, m, uv(A), col); b.v(C, m, uv(C), col); b.v(B, m, uv(B), col); }
+  }
+}
+// a rail along the segment at `off` from the face line (negative: inland), on the station's top + lift
+function swRail(A, B, kind, off, lift = 0, tile) {
+  const K = kitOf(tile), iron = kind === 'iron', rb = bin(K, iron ? 'iron' : 'steel'), col = iron ? [0.035, 0.037, 0.04] : [0.55, 0.57, 0.58];
+  const L = Math.hypot(B.x - A.x, B.z - A.z);
+  if (L < 0.05) return;
+  const tx = (B.x - A.x) / L, tz = (B.z - A.z) / L, n = Math.max(1, Math.ceil(L / 1.0));
+  const P = (t) => ({ x: lerp(A.x, B.x, t) + lerp(A.nx, B.nx, t) * off, z: lerp(A.z, B.z, t) + lerp(A.nz, B.nz, t) * off, y: lerp(A.top, B.top, t) + lift, s: lerp(A.s, B.s, t) });
+  for (let j = 0; j < n; j++) {
+    const p0 = P(j / n), p1 = P((j + 1) / n), l = Math.hypot(p1.x - p0.x, p1.z - p0.z);
+    if (l < 1e-3) continue;
+    const ux = (p1.x - p0.x) / l, uz = (p1.z - p0.z) / l, cx = (p0.x + p1.x) / 2, cz = (p0.z + p1.z) / 2, ty = (p0.y + p1.y) / 2;
+    if (iron) { rb.obox(cx, ty + 1.0, cz, ux, uz, l + 0.004, 0.06, 0.075, col); rb.obox(cx, ty + 0.1, cz, ux, uz, l + 0.004, 0.04, 0.05, col); }
+    else for (const h of [0.53, 1.05]) rb.cyl([p0.x, p0.y + h, p0.z], [p1.x, p1.y + h, p1.z], 0.024, col, 8);
+  }
+  const post = iron ? 2.4 : 1.8, s0 = Math.min(A.s, B.s), s1 = Math.max(A.s, B.s);
+  for (let k = Math.ceil(s0 / post); k * post < s1; k++) { const p = P((k * post - A.s) / (B.s - A.s || 1)); if (iron) rb.obox(p.x, p.y, p.z, tx, tz, 0.08, 1.12, 0.08, col); else rb.cyl([p.x, p.y, p.z], [p.x, p.y + 1.08, p.z], 0.026, col, 8, 1, true); }
+  if (iron) for (let k = Math.ceil(s0 / 0.125); k * 0.125 < s1; k++) { const p = P((k * 0.125 - A.s) / (B.s - A.s || 1)); rb.obox(p.x, p.y + 0.1, p.z, tx, tz, 0.018, 0.92, 0.018, col); }
+}
+// a pier's edge: the fascia under the deck's edge, the dark under the deck, the piles under the edge and the fender piles
+// outside it; the deck itself is the part's
+export function swPierEdge(tile, A, B, o) {
+  const K = kitOf(tile), L = Math.hypot(B.x - A.x, B.z - A.z);
+  if (L < 0.05) return;
+  K.st.pierEdge = (K.st.pierEdge || 0) + L;
+  const conc = o.mat === 'concrete', fas = o.fascia ?? 0.5, n = Math.max(1, Math.ceil(L / 1.0)), seed = o.seed || 0;
+  const fb = bin(K, conc ? 'capc' : 'timber'), db = bin(K, 'dark'), pb = bin(K, conc ? 'concrete' : 'timber');
+  const P = (t) => { const nx = lerp(A.nx, B.nx, t), nz = lerp(A.nz, B.nz, t), nl = Math.hypot(nx, nz) || 1; return { x: lerp(A.x, B.x, t), z: lerp(A.z, B.z, t), nx: nx / nl, nz: nz / nl, top: o.deckY !== undefined ? o.deckY : lerp(A.top, B.top, t) + (o.lift || 0), s: lerp(A.s, B.s, t) }; };
+  const at = (p, off, y) => [p.x + p.nx * off, y, p.z + p.nz * off];
+  const fcol = conc ? [0.66, 0.65, 0.62] : [0.42, 0.36, 0.3];
+  for (let j = 0; j < n; j++) {
+    const p0 = P(j / n), p1 = P((j + 1) / n), nrm = [(p0.nx + p1.nx) / 2, 0, (p0.nz + p1.nz) / 2];
+    const u0 = p0.s / 2.0, u1 = p1.s / 2.0;
+    // the fascia (its top 3 cm over the deck's edge), its soffit; the shadow under the deck set back 0.6 m, to under the water
+    fb.quad(at(p0, 0, p0.top - fas), at(p1, 0, p1.top - fas), at(p1, 0, p1.top + 0.03), at(p0, 0, p0.top + 0.03), nrm, fcol, [u0, 0], [u1, 0], [u1, (fas + 0.03) / 2], [u0, (fas + 0.03) / 2]);
+    fb.quad(at(p0, -0.6, p0.top - fas), at(p1, -0.6, p1.top - fas), at(p1, 0, p1.top - fas), at(p0, 0, p0.top - fas), [0, -1, 0], fcol.map((c) => c * 0.45));
+    db.quad(at(p0, -0.6, -2.4), at(p1, -0.6, -2.4), at(p1, -0.6, p1.top - fas), at(p0, -0.6, p0.top - fas), nrm, [0.03, 0.03, 0.028]);
+  }
+  // a promenade's planked deck along the edge, `deck` m wide, its planks across the edge (the marina kit's weathered planks)
+  if (o.deck) {
+    const pb2 = bin(K, 'pdeck'), w = o.deck;
+    for (let j = 0; j < n; j++) {
+      const p0 = P(j / n), p1 = P((j + 1) / n), col = [0.92, 0.9, 0.86];
+      pb2.quad(at(p0, 0.02, p0.top + 0.03), at(p1, 0.02, p1.top + 0.03), at(p1, -w, p1.top + 0.03), at(p0, -w, p0.top + 0.03), [0, 1, 0], col, [p0.s / 2.4, 0], [p1.s / 2.4, 0], [p1.s / 2.4, w / 2.4], [p0.s / 2.4, w / 2.4]);
+      // its inland edge: a timber kerb down to the ground
+      bin(K, 'timber').quad(at(p0, -w, p0.top - 0.6), at(p1, -w, p1.top - 0.6), at(p1, -w, p1.top + 0.03), at(p0, -w, p0.top + 0.03), [-(p0.nx + p1.nx) / 2, 0, -(p0.nz + p1.nz) / 2], [0.42, 0.36, 0.3]);
+    }
+  }
+  // piles under the edge (every `pile` m, 0.35 m in) and fender piles outside it on timber edges (every 3.0 m), a wale
+  const pile = o.pile ?? 2.6, s0 = Math.min(A.s, B.s), s1 = Math.max(A.s, B.s);
+  for (let k = Math.ceil((s0 + seed) / pile); k * pile - seed < s1; k++) {
+    const p = P((k * pile - seed - A.s) / (B.s - A.s || 1)), q = at(p, -0.3, 0);
+    pb.cyl([q[0], -2.6, q[2]], [q[0], p.top - fas, q[2]], conc ? 0.25 : 0.17, conc ? [0.6, 0.59, 0.56] : [0.3, 0.27, 0.24], 8, conc ? 2.7 : SIZE.timber, true);
+    K.st.piles++;
+  }
+  if (!conc && o.fender !== false) {
+    const tb = bin(K, 'timber');
+    for (let k = Math.ceil(s0 / 3.0); k * 3.0 < s1; k++) { const p = P((k * 3.0 - A.s) / (B.s - A.s || 1)), q = at(p, 0.22, 0); tb.cyl([q[0], -2.6, q[2]], [q[0], p.top - 0.08, q[2]], 0.16, [0.28, 0.25, 0.22], 8, SIZE.timber, true); K.st.fenders++; }
+  }
+  if (o.rail) swRail(o.deckY !== undefined ? { ...A, top: o.deckY } : A, o.deckY !== undefined ? { ...B, top: o.deckY } : B, o.rail, -0.25, o.deckY !== undefined ? 0 : o.lift || 0, tile);
+}
+
 // ---- the swept shore walls: out of the curb soup, kept as runs ----------------------------------------------------
 function index(a) {
   const B = new Map();
@@ -334,6 +528,7 @@ function piecesOut(tile, ox, oz, K, slab) {
     if (l > 1e-6 && Math.abs(n[1]) / l < 0.2 && Math.min(A[1], B[1], C[1]) < 2.0) {
       const nx = n[0] / h, nz = n[2] / h, cx = (A[0] + B[0] + C[0]) / 3 + ox, cz = (A[2] + B[2] + C[2]) / 3 + oz;
       const wf = wat(cx + nx * 2, cz + nz * 2), wb = wat(cx - nx * 2, cz - nz * 2);
+      if ((wf !== wb || (wf && wb)) && !(slab && slab(cx, cz)) && ruleDrops(cx, cz, nx, nz)) { moved++; continue; }   // (a restyled stretch's piece)
       if ((wf !== wb || (wf && wb)) && !(slab && slab(cx, cz))) {   // (water on one side, or a land strip's wall standing in the water)
         const sg = wf && wb ? 1 : wf ? 1 : -1, tx = -nz * sg, tz = nx * sg, want = [nx * sg, 0, nz * sg];
         const uv = (p) => fuv('concrete', (p[0] + ox) * tx + (p[2] + oz) * tz, p[1]), w = (p) => [p[0] + ox, p[1], p[2] + oz];
@@ -345,6 +540,7 @@ function piecesOut(tile, ox, oz, K, slab) {
     }
     if (!mv && l > 1e-6 && n[1] / l > 0.8) {   // (a strip's flat top over the water: the concrete cap)
       const cx = (A[0] + B[0] + C[0]) / 3 + ox, cz = (A[2] + B[2] + C[2]) / 3 + oz;
+      if (wat(cx, cz) && !(slab && slab(cx, cz)) && ruleDrops(cx, cz, 0, 0)) { moved++; continue; }
       if (wat(cx, cz) && !(slab && slab(cx, cz))) {
         const cb = bin(K, 'capc'), col = [0.6, 0.59, 0.57], w = (p) => [p[0] + ox, p[1], p[2] + oz], uv = (p) => [(p[0] + ox) / SIZE.capc, (p[2] + oz) / SIZE.capc];
         cb.v(w(A), [0, 1, 0], uv(A), col); cb.v(w(B), [0, 1, 0], uv(B), col); cb.v(w(C), [0, 1, 0], uv(C), col);
@@ -358,17 +554,32 @@ function piecesOut(tile, ox, oz, K, slab) {
 }
 // after haClampGround (the walls' last raise): the swept walls' triangles leave the curb soup; each segment (54 vertices:
 // face, cap, skirt) becomes a kit segment, the run's kind from the land behind it
+// (2026-10-31) A swept segment is 18 vertices of the curb soup (heightAuthority.js shoreSplines: the face, the cap and the
+// skirt, two triangles each); the extract read them in strides of 54 from the start, so its test failed in every tile and
+// the swept walls stayed in the soup, drawn by piecesOut in the concrete face. The kit takes the segments an area claims
+// (swTakeRule: fn(x, z) at the face's middle, world metres); with none claimed a tile is drawn exactly as before.
+const SEG_V = 18;
+const TAKE_RULES = [];
+export function swTakeRule(fn) { if (typeof fn === 'function' && !TAKE_RULES.includes(fn)) TAKE_RULES.push(fn); }
 export function seawallExtract(tile, ox, oz) {
   const P = tile.p1Shore, c = tile.S.curb;
   if (!SEAWALL) return null;
-  if (!P || !c || c.length < (P.off + P.n) * 3 || c[P.off * 3] !== Math.fround(P.x0) || c[P.off * 3 + 1] !== Math.fround(P.y0) || P.n % 54) { piecesOut(tile, ox, oz, kitOf(tile), marinaSlabHit(ox, oz)); return null; }
-  const segs = [];
-  for (let v = 0; v + 53 < P.n; v += 54) {
-    const b = (P.off + v) * 3, g = (k) => [c[b + 3 * k], c[b + 3 * k + 1], c[b + 3 * k + 2]];
-    segs.push({ f0: g(0), f1: g(1), b1: g(2), b0: g(5), c0: g(18), c1: g(19), u: P.vst[v], w: P.vst[v + 1] });
+  if (!TAKE_RULES.length || !P || !c || c.length < (P.off + P.n) * 3 || c[P.off * 3] !== Math.fround(P.x0) || c[P.off * 3 + 1] !== Math.fround(P.y0) || P.n % SEG_V) { piecesOut(tile, ox, oz, kitOf(tile), marinaSlabHit(ox, oz)); return null; }
+  const segs = [], taken = new Uint8Array(P.n / SEG_V);
+  for (let v = 0, k = 0; v + SEG_V - 1 < P.n; v += SEG_V, k++) {
+    const b = (P.off + v) * 3, g = (q) => [c[b + 3 * q], c[b + 3 * q + 1], c[b + 3 * q + 2]];
+    const sg = { f0: g(0), f1: g(1), b1: g(2), b0: g(5), c0: g(6), c1: g(7), u: P.vst[v], w: P.vst[v + 1] };
+    const mx = (sg.f0[0] + sg.f1[0]) / 2 + ox, mz = (sg.f0[2] + sg.f1[2]) / 2 + oz;
+    if (!TAKE_RULES.some((f) => { try { return f(mx, mz); } catch (e) { return false; } })) continue;
+    taken[k] = 1; segs.push(sg);
   }
-  const m = new Float32Array(c.length - P.n * 3);
-  m.set(c.subarray(0, P.off * 3)); m.set(c.subarray((P.off + P.n) * 3), P.off * 3);
+  if (!segs.length) { piecesOut(tile, ox, oz, kitOf(tile), marinaSlabHit(ox, oz)); return null; }
+  // the soup less the taken segments (the rest of the swept walls stay in it, as before)
+  const m = new Float32Array(c.length - segs.length * SEG_V * 3);
+  m.set(c.subarray(0, P.off * 3));
+  let w = P.off * 3;
+  for (let k = 0; k < taken.length; k++) if (!taken[k]) { m.set(c.subarray((P.off + k * SEG_V) * 3, (P.off + (k + 1) * SEG_V) * 3), w); w += SEG_V * 3; }
+  m.set(c.subarray((P.off + P.n) * 3), w);
   tile.S.curb = m;
   tile.p1Shore = null;
   // the land 2.5 m behind the cap: walks, lawns or neither
@@ -459,10 +670,19 @@ export function buildSeawall(group, tile) {
   if (K.shore) {
     for (const r of K.shore) {
       const esp = r.kind === 'granite' && r.wide >= 0.5;
-      for (const [A, B, drop] of r.pts) {
-        if (drop) continue;
-        swSegment(tile, A, B, { kind: r.kind, rail: r.rail, cope: Math.min(0.75, Math.max(0.5, Math.min(A.capW, B.capW))), capW: [A.capW, B.capW], capY: [A.capY, B.capY], esp, fender: true, seed: 0 });
-      }
+      // (an area part's style for each stretch, if any: city/areas.js parts through swEdgeRule)
+      const rules = r.pts.map(([A, B, drop]) => (drop ? null : edgeRuleAt(A, B)));
+      const slopeKind = (i) => (i >= 0 && i < rules.length && rules[i] && (rules[i].kind === 'riprap' || rules[i].kind === 'beach') && !r.pts[i][2] ? rules[i].kind : null);
+      r.pts.forEach(([A, B, drop], i) => {
+        if (drop) return;
+        const o = { kind: r.kind, rail: r.rail, cope: Math.min(0.75, Math.max(0.5, Math.min(A.capW, B.capW))), capW: [A.capW, B.capW], capY: [A.capY, B.capY], esp, fender: true, seed: 0 };
+        const rule = rules[i];
+        if (!rule) { swSegment(tile, A, B, o); return; }
+        if (rule.kind === 'skip') return;
+        if (rule.kind === 'riprap' || rule.kind === 'beach') { swSlope(tile, A, B, { ...rule, capA: slopeKind(i - 1) !== rule.kind, capB: slopeKind(i + 1) !== rule.kind }); return; }
+        if (rule.kind === 'pier') { swPierEdge(tile, A, B, rule); return; }
+        swSegment(tile, A, B, { ...o, kind: rule.kind === 'concrete' ? 'concrete' : 'granite', rail: rule.rail !== undefined ? rule.rail : o.rail, fender: rule.fender ?? o.fender, esp: rule.esp ?? o.esp });
+      });
     }
     K.shore = null;
   }

@@ -229,6 +229,20 @@ export class Acc {
     if (!flip) { this.tri(a, b, c, n, ua, ub, uc); this.tri(a, c, d, n, ua, uc, ud); }
     else { this.tri(a, c, b, n, ua, uc, ub); this.tri(a, d, c, n, ua, ud, uc); }
   }
+  // both faces of a thin sheet (glazed crown facets, cloaks), each 1 cm out along its own normal: two coplanar faces wound
+  // opposite ways are both met by a path tracer, which shades whichever it hits first (the inward one black)
+  tri2(a, b, c, n, ua, ub, uc) {
+    const o = (p, s) => [p[0] + n[0] * s, p[1] + n[1] * s, p[2] + n[2] * s], m = [-n[0], -n[1], -n[2]];
+    const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    if ((e1[1] * e2[2] - e1[2] * e2[1]) * n[0] + (e1[2] * e2[0] - e1[0] * e2[2]) * n[1] + (e1[0] * e2[1] - e1[1] * e2[0]) * n[2] < 0) { [b, c] = [c, b]; [ub, uc] = [uc, ub]; }
+    this.tri(o(a, 0.01), o(b, 0.01), o(c, 0.01), n, ua, ub, uc);       // wound to face n
+    this.tri(o(a, -0.01), o(c, -0.01), o(b, -0.01), m, ua, uc, ub);    // wound to face -n
+  }
+  quad2(a, b, c, d, n, ua, ub, uc, ud) {
+    const o = (p, s) => [p[0] + n[0] * s, p[1] + n[1] * s, p[2] + n[2] * s];
+    this.quad(o(a, 0.01), o(b, 0.01), o(c, 0.01), o(d, 0.01), n, ua, ub, uc, ud);
+    this.quad(o(a, -0.01), o(b, -0.01), o(c, -0.01), o(d, -0.01), [-n[0], -n[1], -n[2]], ua, ub, uc, ud);
+  }
   // a quad with per-vertex normals (smooth round a lathe); the winding follows the mean normal
   quadN(a, b, c, d, na, nb, nc, nd, ua, ub, uc, ud) {
     const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];

@@ -11,6 +11,9 @@ import * as THREE from 'three';
 import { Frame } from './frame.js';
 import * as M from './mats.js';
 import { slab, laneLines, truss, crossBeams, lateralX, railing, cableY, cablePts, suspenders, block, taper, memberSO } from './parts.js';
+import { buildBrooklynEnd } from './manhattanBK.js';
+// MB65 (2026-10-31): the Brooklyn end as it stands (br/manhattanBK.js); `?mb65=0` draws the old block and plate-girder approach
+const MB65 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('mb65') === '0');
 
 // (BR06: a deeper blue-grey, photographs: the paler paint read brown under the golden grade)
 const C = { steel: 0x8197a8, steelD: 0x6c8292, stone: 0x9f998d, stoneD: 0x878175, lamp: 0xffe2b0, conc: 0xa29e95 };
@@ -85,10 +88,12 @@ export function buildManhattan(rec, bag) {
   }
 
   // ---- anchorages and the steel approaches
-  for (const [sAn, away] of [[anA, -1], [anB, 1]]) anchorage(bag, F, sAn, away, stone, stoneD);
-  for (const [a, b] of [[0, Math.max(0, anA - 72.2)], [Math.min(F.L, anB + 72.2), F.L]]) approach(bag, F, a, b, rec, steel, steelD, asph, conc, lw);
+  for (const [sAn, away] of [[anA, -1], [anB, 1]]) if (!(MB65 && away > 0)) anchorage(bag, F, sAn, away, stone, stoneD);
+  for (const [a, b] of [[0, Math.max(0, anA - 72.2)], [Math.min(F.L, anB + 72.2), F.L]]) if (!(MB65 && a > anB)) approach(bag, F, a, b, rec, steel, steelD, asph, conc, lw);
+  if (MB65 && anB < F.L - 10) buildBrooklynEnd(bag, F, rec, anB, { steel, steelD, asph, conc, lw, ly, lamp });
   // the decks over the anchorages
   for (const [a, b] of [[Math.max(0, anA - 72.2), anA], [anB, Math.min(F.L, anB + 72.2)]]) {
+    if (MB65 && a >= anB) continue;
     for (const sg of [-1, 1]) {
       const o0 = sg > 0 ? O_IN + 0.3 : -O_OUT + 0.3, o1 = sg > 0 ? O_OUT - 0.3 : -O_IN - 0.3;
       slab(bag, F, asph, a, b, o0, o1, y, 0.4, 6);

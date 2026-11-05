@@ -62,6 +62,20 @@ export function st38Inside(x, z, pad = 0.3) {
   }
   return false;
 }
+// DK04 (2026-11-04): the nearest point outside a stair head's or the elevator's footprint (grown by pad), or null when
+// (x, z) is outside all of them; an API walker on a route is held to it (api/bridge.js placeWalker), since the sidewalk
+// graph it follows runs through the footprints and the walkers crossed the stair heads or walked on their plinths
+export function st38PushOut(x, z, pad = 0.35) {
+  if (!ST38) return null;
+  for (const e of ENT38) {
+    const W = (e.kind === 'elev' ? 2.46 : e.W) / 2 + pad, L = (e.kind === 'elev' ? 2.76 : e.L) / 2 + pad;
+    const [lx, lz] = toLocal(e, x, z);
+    if (Math.abs(lx) >= W || Math.abs(lz) >= L) continue;
+    const across = W - Math.abs(lx) < L - Math.abs(lz);   // out through the nearer side
+    return toWorld(e, across ? Math.sign(lx || 1) * W : lx, across ? lz : Math.sign(lz || 1) * L);
+  }
+  return null;
+}
 // the old stair heads (pk rows of kind 'subway' / the elevator kiosk) within 9 m of one of these entrances' MTA points
 const LAT0 = 40.7831, LON0 = -73.9712, M_LAT = 111132.0, M_LON = 111320.0 * Math.cos((LAT0 * Math.PI) / 180);
 const MTA_XZ = ENT38.map((e) => [(e.mta[1] - LON0) * M_LON, -(e.mta[0] - LAT0) * M_LAT]);

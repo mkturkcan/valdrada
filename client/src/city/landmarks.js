@@ -19,6 +19,8 @@ import { buildMetMuseum } from './lmMetMuseum.js';   // LM16: the Met drawn whol
 const MET16 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('met16') === '0');
 import { buildMetRoof, metFront } from './lmMet.js';   // CP33: the Met's roofscape (deck over the green slab, skylights, copper hips, plant)   // CP33: the Plaza's mansard, dormers, pavilions and chimneys on the compiled ring
 import { buildEssexSign } from './lmCps.js';   // CP33: the Essex House's red rooftop letters (and the Plaza's mansard)
+import { buildCityHall, buildMunicipal, build8Spruce } from './lmCivic.js';   // LM63: City Hall, the Municipal Building, 8 Spruce Street on their rings
+import { buildEmpireState, buildChrysler } from './lmESB.js';   // LM64: the Empire State and Chrysler Buildings on their rings
 import { buildSanRemo } from './lmSanRemo.js';   // CP33: the San Remo on its footprint ring (facade tiles, mouldings, the temples)
 import { buildMajestic, buildCentury, buildEldorado, buildBeresford } from './lmCPW.js';   // CW38: Central Park West's tower houses on their rings
 // CP33 (landmarks round): `?cp33lm=0` puts the old box builders back (the read-time overrides in shared/landmarkSpec.js follow the same flag)
@@ -30,6 +32,23 @@ import { buildAmnh, buildAmnhNorth } from './lmAmnh.js';
 import { buildGuggenheim } from './lmGuggenheim.js';
 import { buildHighbridgeTower } from './lmHighbridgeTower.js';   // HB25: the Highbridge Water Tower
 const LM16 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('lm16') === '0');
+// LM63 (2026-10-30): the civic centre round City Hall Park modelled on its rings (city/lmCivic.js); `?lm63=0` keeps the boxes
+const LM63 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('lm63') === '0');
+// LM66 (2026-10-31): Hudson Yards (city/lmHY.js) and the Midtown landmarks modelled on their rings; `?lm66=0` keeps the old builders
+import { buildHY30, buildHY10, buildHY35, buildHY15, buildHY50, buildHY55, buildHYSpiral, buildHYVessel, buildHYNone } from './lmHY.js';
+import { buildFlatiron, buildUNSecretariat, buildStPatricks, buildStJohnDivine, buildUNCampus } from './lmMid2.js';   // LM66: the Flatiron and the UN Secretariat on their rings; UN67: the General Assembly and Conference Buildings
+const LM66 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('lm66') === '0');
+const lm66 = (name, f, ctx) => { if (!LM66) return null; try { return f(ctx); } catch (e) { console.warn(name + ' build failed', e); return null; } };
+// LM64 (2026-10-30): the Empire State and Chrysler Buildings (city/lmESB.js), Grand Central, the MetLife Building, the
+// Helmsley Building and One Vanderbilt (city/lmGCT.js) modelled on their rings; `?lm64=0` keeps the old builders
+import { buildGrandCentral, buildMetLife, buildHelmsley, buildOneVanderbilt } from './lmGCT.js';
+const LM64 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('lm64') === '0');
+// LM65 (2026-10-31): lower Manhattan's landmarks modelled on their rings from the city's 3D building model (city/lmDowntown.js);
+// `?lm65=0` keeps the old builders
+import { buildWoolworth, build40Wall, build70Pine, build28Liberty, buildNYSE, buildFederalHall, buildTrinity, buildWFC, build14Wall, buildWinterGarden, buildBatteryMaritime, buildWhitehall, buildStPaulsBroadway, buildCastleClinton, buildPierA } from './lmDowntown.js';
+import { buildOneWTC, build56Leonard, buildOculus } from './lmWTC.js';
+const LM65 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('lm65') === '0');
+const lm65Try = (name, f) => { try { return f(); } catch (e) { console.warn(name + ' build failed', e); return null; } };
 const TWLM = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('twlm') === '0');   // TW
 
 const {
@@ -620,6 +639,11 @@ function thermalWindow(trimB, glsB, off, yaw, y0, rad) {
 export const BUILDERS = {
   // HB25: the Highbridge Water Tower on its ring (city/lmHighbridgeTower.js)
   highbridgeTower(ctx) { return buildHighbridgeTower(ctx); },
+  // LM63: City Hall (a generic extrusion of its plan until now); a failure returns null and the plain extrusion draws
+  cityHallNY(ctx) {
+    if (!LM63) return null;
+    try { return buildCityHall(ctx); } catch (e) { console.warn('city hall build failed', e); return null; }
+  },
 
   // ==================== the Statue of Liberty (id 67) ====================
   // drawn by city/liberty.js (the statue, the pedestal, Fort Wood), resident with its own level chain like the bridges; the
@@ -857,7 +881,8 @@ export const BUILDERS = {
       dmesh.position.y = SPR;
       dm.add(dmesh);
       dm.add(cyl(3.5, 3.9, 0.55, 0, { y: APEX - 0.30, seg: 16 }));              // oculus curb
-      gls.add(cyl(3.1, 3.4, 0.35, 0, { y: APEX + 0.22, seg: 16 }));             // its glazing
+      dm.add(cyl(3.1, 3.4, 0.35, 0, { y: APEX + 0.22, seg: 16 }));              // its cap (2026-11-03: dark glass there drew a black ring on
+      // the crown from the air; the dome is stone to its finial)
       dm.add(cyl(0.9, 1.25, 0.30, 0, { y: APEX + 0.57, seg: 10 }));
       dm.add(sphere(0.55, 0, { y: APEX + 1.05 }));                              // finial
     }
@@ -1275,6 +1300,7 @@ export const BUILDERS = {
 
   // Unfinished gothic colossus: long high nave, stubby twin west towers, rose window.
   stJohnDivine(ctx) {
+    if (LM66 && ctx.footprint && ctx.footprint.length >= 6) { const m = lm66('stJohnDivine', buildStJohnDivine, ctx); if (m) return m; }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     const nd = D * 0.58;
     r.add(box(W * 0.97, H * 0.55, nd, GRAY));
@@ -1480,6 +1506,9 @@ export const BUILDERS = {
      the 86th-floor observatory band, its parapet rail and the mast's ribs are
      modelled. Mast and antenna take skyMetal via MET. */
   empireState(ctx) {
+    if (LM64 && ctx.footprint && ctx.footprint.length >= 4) {
+      try { const m = buildEmpireState(ctx); if (m) return m; } catch (e) { console.warn('empire state build failed', e); }
+    }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     const ESB_LIME = 0xdccfa6, NIC = 0xcfd2ce;   // warm Indiana limestone / nickel-chrome
     const eb = { bay: 2.1, floor: 3.25, vert: 1, pier: ESB_LIME, glass: 0x2e343c, sill: NIC };
@@ -1542,6 +1571,9 @@ export const BUILDERS = {
      real one legible at 600 m: the SUNBURST triangular windows radiating from
      each tier's centre, and the ribbed arch chevrons between them. */
   chrysler(ctx) {
+    if (LM64 && ctx.footprint && ctx.footprint.length >= 4) {
+      try { const m = buildChrysler(ctx); if (m) return m; } catch (e) { console.warn('chrysler build failed', e); }
+    }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     // the shaft is PALE grey-white brick with grey trim, not the dark brown it
     // rendered as: 0xa08d7a put it 25 sRGB below the limestone next door
@@ -1595,6 +1627,9 @@ export const BUILDERS = {
 
   // Square podium; tapered octagonal shaft (square->rotated-square); parapet + mast.
   oneWTC(ctx) {
+    if (LM65 && ctx.footprint && ctx.footprint.length >= 4) {
+      try { const m = buildOneWTC(ctx); if (m) return m; } catch (e) { console.warn('one wtc build failed', e); }
+    }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     const S = Math.min(W, D, 62);
     const gm = GLS;
@@ -1629,6 +1664,7 @@ export const BUILDERS = {
 
   // Extrudes the real triangular footprint; base + 2 bands + crown cornice.
   flatiron(ctx) {
+    if (LM66 && ctx.footprint && ctx.footprint.length >= 3) { const m = lm66('flatiron', buildFlatiron, ctx); if (m) return m; }
     const g = new THREE.Group(); const { W, D, H } = dims(ctx);
     const fp = (ctx.footprint && ctx.footprint.length >= 3)
       ? ctx.footprint
@@ -1648,8 +1684,37 @@ export const BUILDERS = {
     return fin(g, ctx, [{ w: ctx.obb.w, h: H, d: ctx.obb.h, y: H / 2 }]);
   },
 
+  // LM65: Brookfield Place's towers, the Winter Garden and 14 Wall Street from the city's 3D building model (city/lmDowntown.js);
+  // with ?lm65=0 the compiled extrusions draw
+  wfc1(ctx) { return LM65 ? lm65Try('wfc1', () => buildWFC(ctx, 'wfc1')) : null; },
+  wfc2(ctx) { return LM65 ? lm65Try('wfc2', () => buildWFC(ctx, 'wfc2')) : null; },
+  wfc3(ctx) { return LM65 ? lm65Try('wfc3', () => buildWFC(ctx, 'wfc3')) : null; },
+  wfc4(ctx) { return LM65 ? lm65Try('wfc4', () => buildWFC(ctx, 'wfc4')) : null; },
+  winterGarden(ctx) { return LM65 ? lm65Try('winter garden', () => buildWinterGarden(ctx)) : null; },
+  wall14(ctx) { return LM65 ? lm65Try('14 wall', () => build14Wall(ctx)) : null; },
+  batteryMaritime(ctx) { return LM65 ? lm65Try('battery maritime', () => buildBatteryMaritime(ctx)) : null; },
+  whitehallTerminal(ctx) { return LM65 ? lm65Try('whitehall', () => buildWhitehall(ctx)) : null; },
+  stPaulsBroadway(ctx) { return LM65 ? lm65Try('st pauls broadway', () => buildStPaulsBroadway(ctx)) : null; },
+  castleClinton(ctx) { return LM65 ? lm65Try('castle clinton', () => buildCastleClinton(ctx)) : null; },
+  pierA(ctx) { return LM65 ? lm65Try('pier a', () => buildPierA(ctx)) : null; },
+
+  // LM65: the World Trade Center Transportation Hub (city/lmWTC.js); with ?lm65=0 the compiled extrusion draws
+  oculus(ctx) {
+    if (!LM65) return null;
+    try { return buildOculus(ctx); } catch (e) { console.warn('oculus build failed', e); return null; }
+  },
+
+  // LM64: the Helmsley Building (230 Park Avenue) on its ring; with ?lm64=0 the plain extrusion draws
+  helmsley(ctx) {
+    if (!LM64) return null;
+    try { return buildHelmsley(ctx); } catch (e) { console.warn('helmsley build failed', e); return null; }
+  },
+
   // Wide octagonal-ish precast slab; flat top with sign block.
   metLife(ctx) {
+    if (LM64 && ctx.footprint && ctx.footprint.length >= 4) {
+      try { const m = buildMetLife(ctx); if (m) return m; } catch (e) { console.warn('metlife build failed', e); }
+    }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     r.add(box(W, H * 0.04, D, CONC));
     r.add(box(W * 0.96, H * 0.955, D * 0.7, CONC));
@@ -1661,6 +1726,9 @@ export const BUILDERS = {
 
   // Neo-gothic: terra cotta tower on broad base, green pyramid roof + tourelles.
   woolworth(ctx) {
+    if (LM65 && ctx.footprint && ctx.footprint.length >= 4) {
+      try { const m = buildWoolworth(ctx); if (m) return m; } catch (e) { console.warn('woolworth build failed', e); }
+    }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     r.add(box(W, H * 0.3, D, TERRA));
     r.add(box(W * 0.9, H * 0.05, D * 0.9, TERRA, { y: H * 0.3 }));
@@ -1774,6 +1842,7 @@ export const BUILDERS = {
 
   // Thin wide slab: green glass broad faces, white marble end walls.
   unSecretariat(ctx) {
+    if (LM66 && ctx.footprint && ctx.footprint.length >= 4) { const m = lm66('un secretariat', buildUNSecretariat, ctx); if (m) return m; }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     const d = Math.min(D, W * 0.32);
     r.add(box(W * 0.9, H, d, GREENGL, { m: GLS }));
@@ -1782,8 +1851,18 @@ export const BUILDERS = {
     return fin(g, ctx, [{ w: W, h: H, d, y: H / 2 }]);
   },
 
+  // UN67: the General Assembly and the Conference Building from the city's 3D building model (no box fallback: the compiled
+  // prism stands if the builder declines)
+  unCampus(ctx) {
+    if (ctx.footprint && ctx.footprint.length >= 4) { const m = lm66('un campus', buildUNCampus, ctx); if (m) return m; }
+    return null;
+  },
+
   // Low beaux-arts hall: 3 huge arched windows, clock block, copper roof behind.
   grandCentral(ctx) {
+    if (LM64 && ctx.footprint && ctx.footprint.length >= 4) {
+      try { const m = buildGrandCentral(ctx); if (m) return m; } catch (e) { console.warn('grand central build failed', e); }
+    }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     const GC = 0xc9c0ac;
     r.add(box(W * 0.95, H * 0.55, D * 0.9, GC));
@@ -2106,6 +2185,7 @@ export const BUILDERS = {
 
   // White marble gothic: twin ~100m spires, rose window, pitched nave, pinnacles.
   stPatricks(ctx) {
+    if (LM66 && ctx.footprint && ctx.footprint.length >= 6) { const m = lm66('st patricks', buildStPatricks, ctx); if (m) return m; }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     const M = 0xdcd8cc, nd = D * 0.6;
     r.add(box(W * 0.92, H * 0.32, nd, M));
@@ -2130,6 +2210,9 @@ export const BUILDERS = {
 
   // Brownstone gothic: single square tower + tall spire fronting a low nave.
   trinityChurch(ctx) {
+    if (LM65 && ctx.footprint && ctx.footprint.length >= 4) {
+      try { const m = buildTrinity(ctx); if (m) return m; } catch (e) { console.warn('trinity build failed', e); }
+    }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     const tw = Math.min(D * 0.7, 11), tx = -W / 2 + tw * 0.6;
     r.add(box(tw, H * 0.45, tw, BROWNST, { x: tx }));
@@ -2147,6 +2230,9 @@ export const BUILDERS = {
 
   // Greek revival: 8 Doric columns, pediment, high steps, low dome behind.
   federalHall(ctx) {
+    if (LM65 && ctx.footprint && ctx.footprint.length >= 4) {
+      try { const m = buildFederalHall(ctx); if (m) return m; } catch (e) { console.warn('federal hall build failed', e); }
+    }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     r.add(steps({ w: W * 0.6, d: 8, n: 6, rise: 0.42, inset: 0.7, hex: MARBLE, z: D * 0.42 }));
     r.add(box(W * 0.9, H * 0.62, D * 0.75, MARBLE));
@@ -2159,6 +2245,9 @@ export const BUILDERS = {
 
   // Temple front: 6 giant Corinthian columns + big pediment on a marble block.
   nyse(ctx) {
+    if (LM65 && ctx.footprint && ctx.footprint.length >= 4) {
+      try { const m = buildNYSE(ctx); if (m) return m; } catch (e) { console.warn('nyse build failed', e); }
+    }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     r.add(box(W, H * 0.9, D, MARBLE));
     r.add(box(W * 1.02, H * 0.06, D * 1.02, MARBLE, { y: H * 0.9 }));
@@ -2171,6 +2260,9 @@ export const BUILDERS = {
 
   // U-shaped limestone colossus, colonnade base, circular wedding-cake top + gold statue.
   municipalBldg(ctx) {
+    if (LM63 && ctx.footprint && ctx.footprint.length >= 4) {
+      try { return buildMunicipal(ctx); } catch (e) { console.warn('municipal build failed', e); }
+    }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     const LM = 0xcac2b0;
     r.add(box(W, H * 0.5, D * 0.55, LM, { z: -D * 0.2 }));
@@ -2191,6 +2283,9 @@ export const BUILDERS = {
 
   // 'Jenga': ~16 shifted glass slabs, deterministic cantilevers growing with height.
   p56leonard(ctx) {
+    if (LM65 && ctx.footprint && ctx.footprint.length >= 4) {
+      try { const m = build56Leonard(ctx); if (m) return m; } catch (e) { console.warn('56 leonard build failed', e); }
+    }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     const gm = GLS;
     const n = 16, fh = H / n;
@@ -2210,6 +2305,9 @@ export const BUILDERS = {
 
   // Gehry ripple: stainless tower, wavy vertical fin strips, tan school podium.
   p8spruce(ctx) {
+    if (LM63 && ctx.footprint && ctx.footprint.length >= 4) {
+      try { return build8Spruce(ctx); } catch (e) { console.warn('8 spruce build failed', e); }
+    }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     const S = Math.min(W, D);
     r.add(box(W * 0.98, H * 0.075, D * 0.98, 0xc9a37a));
@@ -2406,6 +2504,9 @@ export const BUILDERS = {
 
   // Slender limestone tower, setbacks, steep green copper pyramid + spire.
   p40wall(ctx) {
+    if (LM65 && ctx.footprint && ctx.footprint.length >= 4) {
+      try { const m = build40Wall(ctx); if (m) return m; } catch (e) { console.warn('40 wall build failed', e); }
+    }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     r.add(box(W, H * 0.12, D, LIME2));
     const tw = Math.min(W * 0.6, D * 0.8);
@@ -2424,6 +2525,9 @@ export const BUILDERS = {
 
   // Slender deco tower, gothic setbacks, glowing glass lantern crown + spire.
   p70pine(ctx) {
+    if (LM65 && ctx.footprint && ctx.footprint.length >= 4) {
+      try { const m = build70Pine(ctx); if (m) return m; } catch (e) { console.warn('70 pine build failed', e); }
+    }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     const AG = 0xc4c2bc;
     r.add(box(W, H * 0.08, D, AG));
@@ -2444,6 +2548,9 @@ export const BUILDERS = {
 
   // Plain black steel international slab on a plaza plinth, light piers.
   p28liberty(ctx) {
+    if (LM65 && ctx.footprint && ctx.footprint.length >= 4) {
+      try { const m = build28Liberty(ctx); if (m) return m; } catch (e) { console.warn('28 liberty build failed', e); }
+    }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     r.add(box(W * 1.15, 1, D * 1.15, 0xb5b0a6));
     r.add(box(W * 0.95, H, D * 0.95, DKGLASS, { y: 1, m: { metal: 0.45, rough: 0.35 } }));
@@ -2574,6 +2681,7 @@ export const BUILDERS = {
 
   // Angular glass supertall; cantilevered triangular observation deck at ~86%.
   p30hudson(ctx) {
+    if (LM66 && ctx.footprint && ctx.footprint.length >= 4) { const m = lm66('30 hudson yards', buildHY30, ctx); if (m) return m; }
     const [g, r] = shell(ctx); const { W, D, H } = dims(ctx);
     const HB = 0x7f98a8, gm = GLS;
     r.add(box(W, H * 0.18, D, HB, { m: gm }));
@@ -2589,6 +2697,15 @@ export const BUILDERS = {
       { w: W * 0.62, h: H * 0.27, d: D * 0.7, y: H * 0.865 }
     ]);
   },
+  // LM66: the rest of Hudson Yards on their rings (city/lmHY.js); with ?lm66=0 the compiled extrusions draw
+  hy10: (ctx) => lm66('10 hudson yards', buildHY10, ctx),
+  hy35: (ctx) => lm66('35 hudson yards', buildHY35, ctx),
+  hy15: (ctx) => lm66('15 hudson yards', buildHY15, ctx),
+  hy50: (ctx) => lm66('50 hudson yards', buildHY50, ctx),
+  hy55: (ctx) => lm66('55 hudson yards', buildHY55, ctx),
+  hySpiral: (ctx) => lm66('the spiral', buildHYSpiral, ctx),
+  hyVessel: (ctx) => lm66('the vessel', buildHYVessel, ctx),
+  hyNone: (ctx) => lm66('hudson yards', buildHYNone, ctx),
 
   // Blue glass tower, two-tone stripes, curved 'waterfall' quarter-round top.
   one57(ctx) {
@@ -2662,8 +2779,12 @@ function realMassing(key, ctx) {
 export function buildLandmark(key, ctx) {
   const real = realMassing(key, ctx);
   if (real) return real;
+  // LM64: One Vanderbilt modelled whole (city/lmGCT.js) ahead of the tower kit's tiers; `?lm64=0` keeps the kit's
+  if (LM64 && key === 'oneVanderbilt' && ctx.footprint && ctx.footprint.length >= 4) {
+    try { const m = buildOneVanderbilt(ctx); if (m) return m; } catch (e) { console.warn('one vanderbilt build failed', e); }
+  }
   // TW (towers lane): the tower kit's landmarks first (city/tk/tkLandmarks.js); `?twlm=0` keeps the builders below
-  if (TWLM && TW_BUILDERS[key]) {
+  if (TWLM && TW_BUILDERS[key] && !(LM64 && key === 'empireState')) {   // LM64 draws the Empire State Building first
     try { const g = TW_BUILDERS[key](ctx); if (g) return g; } catch (e) { console.warn('[tw] landmark', key, e); }
   }
   const b = BUILDERS[key];

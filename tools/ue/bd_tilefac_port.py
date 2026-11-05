@@ -149,7 +149,10 @@ def main():
     # the glass's own mask for Unreal's reflections, where the page adds its painted mirror
     a = 'glassW *= 0.55 + 0.9 * hash12(vec2(cellUS * 5.3, cellV * 8.9 + cvar * 17.0));'
     assert col.count(a) == 1, 'windows glassW anchor'
-    col = col.replace(a, a + '\n              UE_glass = max(UE_glass, glassW); UE_f0 = fGlass ? FAC_glassF.x : 0.075;')
+    # (v126, 2026-10-31: the windows hand out the plate's roughness too, not only its F0: at the wall's 0.9 every punched and
+    # ribbon window reflected the sky as a blur and the city's glass towers read near-black from the air)
+    col = col.replace(a, a + '\n              UE_glass = max(UE_glass, glassW); UE_f0 = fGlass ? FAC_glassF.x : 0.075;'
+                      '\n              FAC_rough = min(FAC_rough, mix(FAC_rough, fGlass ? FAC_glassF.y : 0.08, clamp(glassW, 0.0, 1.0)));')
     b = 'FAC_rough = min(FAC_rough, mix(0.9, FAC_glassF.y, kR));'
     assert col.count(b) == 1, 'curtain wall anchor'
     col = col.replace(b, b + '\n              UE_glass = max(UE_glass, kR); UE_f0 = FAC_glassF.x;')

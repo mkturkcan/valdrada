@@ -66,6 +66,15 @@ if (TILES_DIR !== 'tiles') {
 // GB43 KIT (docs/notes/ue-city-architecture.md): --kitrec bakes the dresser's parts and boxes as kit instances (the
 // page's ?kitrec=1), part of OPTS so its cells hash apart from the merged bake's
 if (has('kitrec') || process.env.BAKE_KITREC === '1') OPTS.flags += '&kitrec=1';   // (BAKE_KITREC=1 through valdrada's cells step)
+// M64 (client/src/world/massing64.js): --m64 bakes the measured roof levels of the city's 3D building model (the page's
+// ?m64=1); the product (client/public/data/m64, one file per tile) is hashed by content into OPTS, so a new product rebakes
+if (has('m64')) {
+  const md = path.join(CLIENT, 'public', 'data', 'm64');
+  if (!fs.existsSync(md)) { console.error('--m64: no client/public/data/m64'); process.exit(2); }
+  const x = crypto.createHash('sha256');
+  for (const f of fs.readdirSync(md).sort()) x.update(f).update(fs.readFileSync(path.join(md, f)));
+  OPTS.flags += '&m64=1'; OPTS.m64 = x.digest('hex').slice(0, 16);
+}
 // P1 TERRAIN (client/src/world/heightAuthority.js): --terrain p1 bakes with the proving
 // region's ground (the page's ?terrain=p1); the region's data (client/public/data/terrain_p1: manifest and chunks) is hashed
 // into OPTS, so these cells hash apart from the flat city's and again whenever the ground product changes
@@ -534,5 +543,8 @@ try {
   if (errs.length) console.log(`[bake] ${errs.length} page errors, first:`, errs.slice(0, 3).join('\n'));
   server.kill();
   sink.close();
+  // (2026-11-04: the pages' raw dumps (textures as RGBA, buffers, manifests) go once the run is over: the packages and
+  // textures are in the cell cache by then, and 3,075 runs had left 3.6 TB here and filled /data0; page.log stays)
+  for (const d of await fsp.readdir(runRoot).catch(() => [])) if (/^p\d+$/.test(d)) await fsp.rm(path.join(runRoot, d), { recursive: true, force: true }).catch(() => {});
 }
 process.exit(code);

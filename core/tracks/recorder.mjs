@@ -130,12 +130,14 @@ export class TrackRecorder {
         if (!this.pathPts.some(([a, b]) => (a - c.x) ** 2 + (b - c.z) ** 2 <= R2)) continue;
         const key = `${c.sv}:${c.k}:${c.i}`;
         let id = this.trainIds.get(key);
-        if (!id) {
-          id = this.nextId++;
-          this.trainIds.set(key, id);
-          this.actors.set(id, { id, type: 'train', key, service: c.sv, run: c.k, car: c.i, kind: c.kind, num: c.num, dest: c.dest, f0: this.frames.length, f1: this.frames.length });
+        if (!id) { id = this.nextId++; this.trainIds.set(key, id); }
+        // (a car keeps its id when it comes back in range; the API drops the records of actors out of range, render.mjs)
+        let a = this.actors.get(id);
+        if (!a) {
+          a = { id, type: 'train', key, service: c.sv, run: c.k, car: c.i, kind: c.kind, num: c.num, dest: c.dest, f0: this.frames.length, f1: this.frames.length };
+          this.actors.set(id, a);
         }
-        this.actors.get(id).f1 = this.frames.length;
+        a.f1 = this.frames.length;
         const L = c.lamps || [0, 0, 0, 0];
         train.push({ id, x: c.x, y: c.y, z: c.z, yaw: c.yaw, ta: c.trucks[0], tb: c.trucks[1], roll: c.roll % (Math.PI * 2), doors: +c.doors || 0, v: c.v || 0,
           lamps: (L[0] ? 1 : 0) | (L[1] ? 2 : 0) | (L[2] ? 4 : 0) | (L[3] ? 8 : 0), kind: Math.max(0, TRAIN_KINDS.indexOf(c.kind)),

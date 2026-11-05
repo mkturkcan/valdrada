@@ -52,7 +52,9 @@ const VH36_BASE = VH36 ? { cargovan: 'van', stepvan: 'van', nypd: 'police' } : {
 const VH36_OUT = new Set(VH36 ? ['uspsllv', 'uspsngdv', 'dsny', 'schoolbus', 'foodtruck', 'icecream', 'impala', 'model3', 'auditt', 'mustang'] : []);
 // kind table. w: share of the MOVING spawn bag (of ~100), pw: parked share, cap: moving storage slots
 export const KIND24 = {
-  taxi: { w: 3, pw: 1, cap: 30, palette: 'taxi' },        // the Crown Victoria cab (retired from NYC ~2018): a rare sight
+  // the Crown Victoria cab (retired from NYC ~2018): out of the moving and parked bags since 2026-11-04 (its body carries
+  // its source asset's trunk lettering, legible behind it); the API's vehicle.taxi still spawns it
+  taxi: { w: 0, pw: 0, cap: 30, palette: 'taxi' },
   // TODAY'S CAB: most NYC yellow cabs are Toyota Camry / RAV4 / Sienna hybrids in the TLC "T" livery
   // (refs/pv2/c_New_York_City_yellow_taxicabs*.jpg). No CC-BY Toyota exists; the 2024 Lincoln MKZ body is a Camry-sized
   // sedan (4.89 m, 2.87 m wheelbase vs 4.88 / 2.83), so taxi2 = that body + taxi yellow + TLC livery + a roof light.

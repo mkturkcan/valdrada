@@ -10,6 +10,7 @@
 #include "Components/VolumetricCloudComponent.h"
 #include "Engine/DirectionalLight.h"
 #include "Engine/PostProcessVolume.h"
+#include "PipelineStateCache.h"
 #include "Engine/SkyLight.h"
 #include "Engine/ExponentialHeightFog.h"
 #include "Components/ExponentialHeightFogComponent.h"
@@ -64,6 +65,9 @@ AValdradaClient::AValdradaClient()
 void AValdradaClient::BeginPlay()
 {
 	Super::BeginPlay();
+	// the pipeline precache at its highest throughput: a renderer for a simulation, not a game holding its frame rate (the
+	// loads wait for the precache: PendingCount)
+	PipelineStateCache::PrecachePSOsBoostToHighestPriority(true);
 	FString S;
 	if (FParse::Value(FCommandLine::Get(), TEXT("ValdradaHost="), S)) Host = S;
 	int32 P = 0;
@@ -93,6 +97,11 @@ void AValdradaClient::BeginPlay()
 	SetupEnvironment();
 	SemanticMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Client/Materials/M_client_semantic.M_client_semantic"));
 	if (!SemanticMat) { UE_LOG(LogValdrada, Warning, TEXT("no /Game/Client/Materials/M_client_semantic (Tools/make_materials.py): no semantic output")); }
+	IdMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Client/Materials/M_client_id.M_client_id"));
+	GlassMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Client/Materials/M_client_glass.M_client_glass"));
+	LampMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Client/Materials/M_client_lamp.M_client_lamp"), nullptr, LOAD_NoWarn | LOAD_Quiet);
+	if (!FParse::Param(FCommandLine::Get(), TEXT("ValdradaCapsules"))) LoadCrowd();
+	if (!IdMat) Note(TEXT("no /Game/Client/Materials/M_client_id (Tools/make_materials.py): no instance segmentation or labels"));
 	else
 	{
 		// its shaders before the first capture: a post-process material without them falls back to the engine's
@@ -147,6 +156,12 @@ void AValdradaClient::ApplyTier()
 		if (KV.Value->TryGetNumber(D)) S = FString::SanitizeFloat(D, 0);
 		else if (!KV.Value->TryGetString(S)) continue;
 		if (S.EndsWith(TEXT(".0"))) S.LeftChopInline(2);
+		// (under 1024 MB the city's street trees stay on their coarse Nanite pages, flat green shards from the street)
+		if (Key == TEXT("r.Nanite.Streaming.StreamingPoolSize") && FCString::Atof(*S) < 1024.f)
+		{
+			Note(FString::Printf(TEXT("tier %s: the Nanite streaming pool raised from %s to 1024 MB"), *Tier, *S));
+			S = TEXT("1024");
+		}
 		V->Set(*S, ECVF_SetByCode);
 		++N;
 	}
@@ -194,15 +209,16 @@ void AValdradaClient::SendHello()
 	TSharedRef<FJsonObject> P = MakeShared<FJsonObject>();
 	P->SetStringField(TEXT("protocol"), TEXT("valdrada.render/0"));
 	P->SetStringField(TEXT("renderer"), TEXT("unreal"));
-	P->SetStringField(TEXT("version"), FString::Printf(TEXT("ValdradaRender 0.1, Unreal Engine %d.%d"), ENGINE_MAJOR_VERSION, ENGINE_MINOR_VERSION));
+	P->SetStringField(TEXT("version"), FString::Printf(TEXT("ValdradaRender 0.2, Unreal Engine %d.%d"), ENGINE_MAJOR_VERSION, ENGINE_MINOR_VERSION));
 	TArray<TSharedPtr<FJsonValue>> Outs;
 	for (const TCHAR* O : { TEXT("rgb"), TEXT("depth") }) Outs.Add(MakeShared<FJsonValueString>(O));
 	if (SemanticMat) Outs.Add(MakeShared<FJsonValueString>(TEXT("semantic")));
+	if (IdMat) for (const TCHAR* O : { TEXT("instance"), TEXT("labels") }) Outs.Add(MakeShared<FJsonValueString>(O));
 	P->SetArrayField(TEXT("outputs"), Outs);
 	TArray<TSharedPtr<FJsonValue>> Max = { MakeShared<FJsonValueNumber>(3840), MakeShared<FJsonValueNumber>(2160) };
 	P->SetArrayField(TEXT("max_size"), Max);
 	P->SetStringField(TEXT("tier"), Tier);
-	P->SetBoolField(TEXT("amodal"), false);
+	P->SetBoolField(TEXT("amodal"), IdMat != nullptr);
 	SendRequest(TEXT("render.hello"), P);
 	bHelloSent = true;
 	// a new session: what the last one loaded stays; the hello's load set decides what goes
@@ -255,6 +271,21 @@ void AValdradaClient::Dispatch(FValdradaMessage& M)
 		const TSharedPtr<FJsonObject>& R = *Res;
 		const TArray<TSharedPtr<FJsonValue>>* Kinds = nullptr;
 		if (R->TryGetArrayField(TEXT("vehicle_kinds"), Kinds)) SetupKinds(*Kinds);
+		const TArray<TSharedPtr<FJsonValue>>* Trains = nullptr;
+		if (R->TryGetArrayField(TEXT("train_kinds"), Trains)) SetupTrains(*Trains);
+		const TArray<TSharedPtr<FJsonValue>>* Cls = nullptr;
+		if (R->TryGetArrayField(TEXT("classes"), Cls))
+		{
+			HelloClasses = *Cls;
+			ClassNames.Reset();
+			for (const TSharedPtr<FJsonValue>& V : *Cls)
+			{
+				const TSharedPtr<FJsonObject>* C = nullptr;
+				double Id = 0;
+				FString Name;
+				if (V->TryGetObject(C) && (*C)->TryGetNumberField(TEXT("id"), Id) && (*C)->TryGetStringField(TEXT("name"), Name)) ClassNames.Add(int32(Id), Name);
+			}
+		}
 		const TSharedPtr<FJsonObject>* O = nullptr;
 		if (R->TryGetObjectField(TEXT("env"), O)) ApplyEnv(*O);
 		if (R->TryGetObjectField(TEXT("view"), O)) ApplyView(*O);

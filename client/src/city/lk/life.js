@@ -15,6 +15,7 @@ import * as K from './lkKit.js';
 import { lkMat, lkEnvSync, lkTick, lkMatsReady } from './lkMats.js';
 import { LK_ITEMS } from './lkData.js';
 import { COLLIDERS } from '../colliders.js';
+import { DK04, dkSetBack, dkShed } from '../pk/props.js';   // DK04: kerb setback and sheds cut to their frontage
 
 const Q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
 export const LK = !(Q && Q.get('lk') === '0');
@@ -70,6 +71,11 @@ function tick(renderer, scene) {
 // SPACE r2: in a scene (its parents reach a Scene): the stats list keeps only these
 const inScene = (o) => { let p = o; while (p.parent) p = p.parent; return !!p.isScene; };
 const CELL = 96, LOD_R = 110, SIDEWALK_Y = 3.52;
+// DK04 (2026-11-04): the bases the kerb setback keeps on the flags (pk/props.js dkSetBack); the pieces left out here stand
+// in the roadway by design (motorcycles and mopeds in the parking lane, the barriers) or carry `road`
+const DK_R = { table: 0.55, umbrella: 0.2, ebike: 0.45, aframe: 0.4, boxes: 0.45, chair: 0.32, cageCart: 0.6, tent: 1.1, clothesRack: 0.55,
+  bags: 0.4, tote: 0.35, gridPanel: 0.35, foodCart: 0.85, handTruck: 0.4, tub: 0.35, monobloc: 0.32, tarpWall: 0.3, produceStall: 0.9,
+  pallet: 0.6, tarpHeap: 0.6, airDancer: 0.3, boards: 0.35 };
 const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _p = new THREE.Vector3(), _one = new THREE.Vector3(1, 1, 1), _Y = new THREE.Vector3(0, 1, 0);
 let _bins = null;
 function bins() {
@@ -94,9 +100,14 @@ export function build(group, ctx) {
   const list = bins().get(`${Math.floor(ctx.ox / 512)}_${Math.floor(ctx.oz / 512)}`);
   if (!list || !list.length) return;
   const cells = new Map();
+  // DK04: the pieces as placed, by tile, for placement audits (window.__LK_PLACED)
+  const dkPlaced = typeof window !== 'undefined' ? ((window.__LK_PLACED = window.__LK_PLACED || {})[ctx.key] = []) : null;
   for (const r of list) {
-    const [kind, x, z, yaw, p] = r;
+    let [kind, x, z, yaw, p] = r;
+    if (DK04 && DK_R[kind] && !(p && p.road)) { const at = dkSetBack(ctx, x, z, DK_R[kind]); if (!at) continue; [x, z] = at; }
+    if (DK04 && kind === 'shed' && p && p.len) { const sh = dkShed(ctx, x, z, yaw, p, p.dep || 4.6); if (!sh) continue; [x, z, p] = sh; }
     const y = p && p.road ? (ctx.padYNear(x, z) ?? SIDEWALK_Y - 0.15) : groundY(ctx, x, z);
+    if (dkPlaced) dkPlaced.push([kind, x, z, yaw, p && p.len ? p.len : 0, p && p.road ? 1 : 0]);
     const ck = `${Math.floor(x / CELL)}_${Math.floor(z / CELL)}`;
     let C = cells.get(ck);
     if (!C) cells.set(ck, (C = { items: [], box: new THREE.Box3(), near: null }));

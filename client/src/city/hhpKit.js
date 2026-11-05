@@ -143,6 +143,10 @@ export async function build(group, ctx) {
       const m = r.length ? r[r.length >> 1] : NaN;
       for (let i = i0; i <= i1; i++) deckRel[i] = m;
     });
+    // the triple cantilever (kind 'cantilever'): its inner side, toward the bluff, is the frame's riser or back wall, not
+    // an edge treatment (the eastbound's right, the westbound's left: the chain with the promenade data is the one under it)
+    const cantSide = c.prom ? 1 : -1;
+    const cantUpper = c.prom ? null : HHP_CH.find((q) => q.prom && q.structs.some((t) => t.kind === 'cantilever'));
     const edgePt = (i, sg, extra = 0) => {
       const w = (sg < 0 ? c.WL[i] : c.WR[i]) + extra;
       return [c.X[i] + c.NX[i] * sg * w, c.Y[i] + c.E[i] * sg * (sg < 0 ? c.WL[i] : c.WR[i]), c.Z[i] + c.NZ[i] * sg * w];
@@ -154,6 +158,7 @@ export async function build(group, ctx) {
       for (const sg of [-1, 1]) {
         const code = (sg < 0 ? c.edgeL : c.edgeR)[i];
         if (code === 'o' || code === 'b') continue;
+        if (st && st.kind === 'cantilever' && sg === cantSide) { cantileverInner(PB, c, i, sg, cantUpper); stats.walls++; continue; }
         const out = [c.NX[i] * sg, c.NZ[i] * sg];
         const A = edgePt(i, sg), Bq = edgePt(i + 1, sg);
         const path = [{ p: A, n: [c.NX[i] * sg, c.NZ[i] * sg] }, { p: Bq, n: [c.NX[i + 1] * sg, c.NZ[i + 1] * sg] }];
@@ -282,6 +287,8 @@ export async function build(group, ctx) {
           stats.walls++;
         }
       }
+      // the cantilever's promenade over this carriageway (its own slab, fascia and railing)
+      if (c.prom && c.prom[i] && c.prom[i + 1]) { promenade(PB, B, M, c, i); stats.decks++; }
       // an arch's barrel: the vault's intrados across the deck within the span
       if (st && st.kind === 'arch') {
         const arch = archAt(c, st, ground);
@@ -314,8 +321,8 @@ export async function build(group, ctx) {
           }
           stats.decks++;
           // a bent where the filed span's multiple falls in this station
-          const span = Math.max(12, Math.min(30, structSpan(st) || 22));
-          if (Math.floor((c.S[i + 1] - c.S[st.i0]) / span) !== Math.floor((c.S[i] - c.S[st.i0]) / span) && i > st.i0 + 2 && i < st.i1 - 2) {
+          const span = Math.max(12, Math.min(30, spanFor(st) || 22));
+          if (!(st.kind === 'cantilever' && c.prom) && Math.floor((c.S[i + 1] - c.S[st.i0]) / span) !== Math.floor((c.S[i] - c.S[st.i0]) / span) && i > st.i0 + 2 && i < st.i1 - 2) {
             bent(PB, c, i, ground, onRoad, steel);
             stats.bents++;
           }
@@ -329,7 +336,50 @@ export async function build(group, ctx) {
   if (r.meshes) console.log(`[hhp kit] tile ${ctx.key}: ${Object.entries(stats).filter(([, v]) => v).map(([k, v]) => `${k} ${v}`).join(', ')}; ${r.meshes} meshes, ${r.tris | 0} triangles`);
 }
 const conc = (st) => st && st.mat !== 'stone';
-const structSpan = (st) => { const r = hhpStructure(st.id); return r ? (r.nbi && r.nbi.max_span) || r.span || null : null; };
+
+// THE TRIPLE CANTILEVER (Brooklyn Heights, 1948-54): three levels stepped back up the bluff along Furman St, the
+// westbound carriageway at the bottom, the eastbound over and behind it, the Brooklyn Heights Promenade on top, cantilevered
+// over the eastbound's inner half from the frame behind (hhp.json: the eastbound's 'prom' per station, [west edge, east
+// edge, top NAVD] measured on the LiDAR's class 17; the data tool's cantilever())
+// the promenade: a concrete slab from its west edge to the bluff, the paved walk on it, a concrete fascia (the edge beam,
+// 1.1 m) and the iron railing at its west edge
+function promenade(PB, B, M, c, i) {
+  const P = (k, o, y) => [c.X[k] + c.NX[k] * o, y, c.Z[k] + c.NZ[k] * o];
+  const yw = (k) => c.prom[k][2] + (c.Y[k] - c.H[k]);   // (NAVD to world, as this station's own paving)
+  const [w0, e0] = c.prom[i], [w1, e1] = c.prom[i + 1], y0 = yw(i), y1 = yw(i + 1);
+  PB.face('coping', [P(i, w0, y0), P(i, e0, y0), P(i + 1, e1, y1), P(i + 1, w1, y1)], [0, 1, 0]);
+  PB.face('conc', [P(i, w0, y0 - 0.6), P(i, e0, y0 - 0.6), P(i + 1, e1, y1 - 0.6), P(i + 1, w1, y1 - 0.6)], [0, -1, 0]);
+  const out = [-c.NX[i], -c.NZ[i]];
+  wallFace(PB, 'conc', [P(i, w0, y0 + 0.15), P(i + 1, w1, y1 + 0.15)], [P(i, w0, y0 - 1.1), P(i + 1, w1, y1 - 1.1)], out, COL.conc);
+  const path = [{ p: P(i, w0 + 0.25, y0), n: out }, { p: P(i + 1, w1 + 0.25, y1), n: [-c.NX[i + 1], -c.NZ[i + 1]] }];
+  for (const h of [0.45, 1.05]) sweep(B, M.steel, path, [[-0.03, h - 0.03], [-0.03, h + 0.03], [0.03, h + 0.03], [0.03, h - 0.03], [-0.03, h - 0.03]], COL.steelD);
+  if (Math.floor(c.S[i + 1] / 2.0) !== Math.floor(c.S[i] / 2.0)) { const p = path[0].p; B.ext(M.steel, [[p[0] - 0.03, p[2] - 0.03], [p[0] + 0.03, p[2] - 0.03], [p[0] + 0.03, p[2] + 0.03], [p[0] - 0.03, p[2] + 0.03]], p[1], p[1] + 1.08, COL.steelD, { bot: false }); }
+}
+// the inner side of a cantilever level: the upper level's back wall (from its paving up to the promenade's soffit), or the
+// lower level's riser (from its paving up to the upper level's paving beside it), concrete, with the frame's pilasters
+// every 6.1 m (20 ft)
+function cantileverInner(PB, c, i, sg, upper) {
+  const w0 = (sg < 0 ? c.WL[i] : c.WR[i]) + 0.3, w1 = (sg < 0 ? c.WL[i + 1] : c.WR[i + 1]) + 0.3;
+  const A = [c.X[i] + c.NX[i] * sg * w0, c.Z[i] + c.NZ[i] * sg * w0], Bq = [c.X[i + 1] + c.NX[i + 1] * sg * w1, c.Z[i + 1] + c.NZ[i + 1] * sg * w1];
+  const yA = c.Y[i] + c.E[i] * sg * (w0 - 0.3) - 0.3, yB = c.Y[i + 1] + c.E[i + 1] * sg * (w1 - 0.3) - 0.3;
+  let tA, tB;
+  if (c.prom && c.prom[i] && c.prom[i + 1]) {
+    tA = c.prom[i][2] + (c.Y[i] - c.H[i]) - 0.6; tB = c.prom[i + 1][2] + (c.Y[i + 1] - c.H[i + 1]) - 0.6;
+  } else if (upper) {
+    const near = (p) => { let j = 0, bd = Infinity; for (let k = 0; k < upper.n; k++) { const d = (upper.X[k] - p[0]) ** 2 + (upper.Z[k] - p[1]) ** 2; if (d < bd) { bd = d; j = k; } } return bd < 30 * 30 ? j : -1; };
+    const jA = near(A), jB = near(Bq);
+    if (jA < 0 || jB < 0) return;
+    tA = upper.Y[jA] + 0.2; tB = upper.Y[jB] + 0.2;
+  } else return;
+  if (tA - yA < 1.0 || tB - yB < 1.0) return;
+  const nrm = [-c.NX[i] * sg, -c.NZ[i] * sg];   // (the wall faces the carriageway)
+  wallFace(PB, 'conc', [[A[0], tA, A[1]], [Bq[0], tB, Bq[1]]], [[A[0], yA, A[1]], [Bq[0], yB, Bq[1]]], nrm, COL.conc);
+  if (Math.floor(c.S[i + 1] / 6.1) !== Math.floor(c.S[i] / 6.1)) {
+    const tx = c.TX[i], tz = c.TZ[i], nx = nrm[0], nz = nrm[1], o = 0.45;
+    PB.ext('conc', [[A[0] - tx * 0.35, A[1] - tz * 0.35], [A[0] + tx * 0.35, A[1] + tz * 0.35], [A[0] + tx * 0.35 + nx * o, A[1] + tz * 0.35 + nz * o], [A[0] - tx * 0.35 + nx * o, A[1] - tz * 0.35 + nz * o]], yA, tA, COL.conc, { top: false, bot: false });
+  }
+}
+const spanFor = (st) => { const r = hhpStructure(st.id); return r ? (r.nbi && r.nbi.max_span) || r.span || null : null; };
 
 // a bent under station i: a cap beam across the deck under the girders, columns down to the ground (moved off a road under
 // them by up to 3 m across, else left out: the cap spans)
@@ -361,7 +411,7 @@ function archAt(c, st, ground) {
   let best = -Infinity, k = -1, lo = 0;
   for (let i = st.i0; i <= st.i1; i++) { const g = ground(c.X[i], c.Z[i]); if (c.Y[i] - g > best) { best = c.Y[i] - g; k = i; lo = g; } }
   if (k < 0) return (st._arch = null);
-  const span = Math.max(6, Math.min(16, structSpan(st) || 8)), crown = c.Y[k] - 1.0, spring = lo + 0.3;
+  const span = Math.max(6, Math.min(16, spanFor(st) || 8)), crown = c.Y[k] - 1.0, spring = lo + 0.3;
   if (crown - spring < 2.0) return (st._arch = null);
   const half = span / 2, rise = crown - spring;
   st._arch = { s: c.S[k], yAt: (ds) => (Math.abs(ds) >= half ? null : spring + rise * Math.sqrt(Math.max(0, 1 - (ds / half) ** 2))) };
@@ -414,10 +464,18 @@ function drawBox(PB, B, M, s, ox, oz, stats, tile) {
         const g0 = g(i, e0) ?? t0, g1 = g(i + 1, e1) ?? t1;
         const lowY = (j) => Math.min(...drives(k0, i).map(([d, a, b]) => d.Y[j === i ? a : b]));
         const b0 = Math.min(lowY(i) - 0.3, g0 - 0.5), b1 = Math.min(lowY(i + 1) - 0.3, g1 - 0.5);
-        const w0 = s.wallTop ? s.wallTop[k0] : Math.max(t0 + 0.2, g0 + 0.1), w1 = s.wallTop ? s.wallTop[k1] : Math.max(t1 + 0.2, g1 + 0.1);
+        // (a cut's two walls: each its own top, the grade behind it; concrete, as the underpass's approach walls)
+        const WT = s.kind === 'cut' ? (sg < 0 ? s.wallTopLo : s.wallTopRo) : s.wallTop, wm = s.kind === 'cut' ? 'conc' : 'rubble', wc = s.kind === 'cut' ? COL.conc : COL.stone;
+        const w0 = WT ? WT[k0] : Math.max(t0 + 0.2, g0 + 0.1), w1 = WT ? WT[k1] : Math.max(t1 + 0.2, g1 + 0.1);
         const A = C(i, e0, 0), Bq = C(i + 1, e1, 0), Ai = C(i, e0 - sg * 0.6, 0), Bi = C(i + 1, e1 - sg * 0.6, 0);
-        wallFace(PB, 'rubble', [[A[0], w0, A[2]], [Bq[0], w1, Bq[2]]], [[A[0], b0, A[2]], [Bq[0], b1, Bq[2]]], nrm, COL.stone);
-        wallFace(PB, 'rubble', [[Ai[0], w0, Ai[2]], [Bi[0], w1, Bi[2]]], [[Ai[0], b0, Ai[2]], [Bi[0], b1, Bi[2]]], inn, COL.stone);
+        wallFace(PB, wm, [[A[0], w0, A[2]], [Bq[0], w1, Bq[2]]], [[A[0], b0, A[2]], [Bq[0], b1, Bq[2]]], nrm, wc);
+        wallFace(PB, wm, [[Ai[0], w0, Ai[2]], [Bi[0], w1, Bi[2]]], [[Ai[0], b0, Ai[2]], [Bi[0], b1, Bi[2]]], inn, wc);
+        if (s.kind === 'cut') {
+          // the floor between the paving's edge and the wall, at the edge's level less 3 cm
+          const r0 = sg < 0 ? -c.WL[i] : c.WR[i], r1 = sg < 0 ? -c.WL[i + 1] : c.WR[i + 1];
+          const y0 = c.Y[i] + c.E[i] * r0 - 0.03, y1 = c.Y[i + 1] + c.E[i + 1] * r1 - 0.03;
+          PB.face('conc', [C(i, r0, y0), C(i + 1, r1, y1), C(i + 1, e1 - sg * 0.6, y1), C(i, e0 - sg * 0.6, y0)], [0, 1, 0]);
+        }
         const cp0 = C(i, e0 + sg * 0.05, w0 + 0.12), cp1 = C(i + 1, e1 + sg * 0.05, w1 + 0.12), ci0 = C(i, e0 - sg * 0.65, w0 + 0.12), ci1 = C(i + 1, e1 - sg * 0.65, w1 + 0.12);
         PB.face('coping', [cp0, cp1, ci1, ci0], [0, 1, 0]);
         wallFace(PB, 'coping', [cp0, cp1], [[cp0[0], w0, cp0[2]], [cp1[0], w1, cp1[2]]], nrm, COL.stone);
@@ -427,7 +485,7 @@ function drawBox(PB, B, M, s, ox, oz, stats, tile) {
     }
     if (s.kind === 'park') PB.face('conc', [C(i, s.ro[k0], f0), C(i + 1, s.ro[k1], f1), C(i + 1, s.lo[k1], f1), C(i, s.lo[k0], f0)], [0, -1, 0]);
     // the bores: each drive's side walls, from its edge's level to the soffit
-    if (s.kind !== 'shore') for (const [d, a, b] of drives(k0, i)) {
+    if (s.kind !== 'shore' && s.kind !== 'cut') for (const [d, a, b] of drives(k0, i)) {
       for (const sg of [-1, 1]) {
         const oa = sg < 0 ? -(d.WL[a] + 0.35) : d.WR[a] + 0.35, ob = sg < 0 ? -(d.WL[b] + 0.35) : d.WR[b] + 0.35;
         const pa = [d.X[a] + d.NX[a] * oa, d.Y[a] + d.E[a] * oa - 0.3, d.Z[a] + d.NZ[a] * oa], pb = [d.X[b] + d.NX[b] * ob, d.Y[b] + d.E[b] * ob - 0.3, d.Z[b] + d.NZ[b] * ob];

@@ -6,12 +6,21 @@
 //              (the LiDAR's deck top), at least 4.9 m over every drive beneath; lawn and a promenade path on top
 //   stack      a run under another carriageway (E 61st St): the upper carriageway is its deck; a walk at that level
 //              out to the bulkhead
+//   cut        an open run under the bare earth (outside the covered runs, the measured ground over the road: the
+//              Battery Park Underpass's east approach, FN 1.2 to 2.2 m under it by the Battery Maritime Building): the
+//              ground cut out over the carriageway and a margin, a retaining wall each side from under the road to the
+//              grade behind it (wallTopLo, wallTopRo), coped, the margin's floor at the road's level
 // No ground inside a footprint (hhp.js cuts it out exactly); the kit draws the river wall, the inner retaining wall,
 // the tunnel side walls, the slab's soffit and the portals (hhpKit.js).
 import { HA_P1, haInfo, haGradeAt } from '../world/heightAuthority.js';
 import { haPreload } from '../world/haAnchor.js';
 
 export const BOXES = [];          // strips: { id, c, i0, i1, kind, lo, ro, sr (river side +-1, 0 none), top, soffit, pair, upper }
+const CUT_DEPTH = 0.6, CUT_MARGIN = 1.2;   // (a cut: the road this far under the bare earth; its strip this far past the paving, the wall 0.6 m thick)
+// (the open cuts only at the Battery Park Underpass's approaches: elsewhere the FDR under the bare earth's samples runs under
+// buildings and platforms, the United Nations at E 42nd St, Sutton Place, the River Campus at E 63rd, and a cut there took
+// the buildings standing over it away)
+const CUT_AREAS = [[-3700, 8800, -3000, 9300]];   // x0, z0, x1, z1
 const QG = new Map(), QC = 16;    // quad grid: cell -> [[strip, i], ...]
 const gauss = (A, s) => {
   const n = A.length, out = new Float64Array(n), r = Math.ceil(3 * s);
@@ -98,6 +107,42 @@ export async function buildBoxes(CH, hits) {
       if (boxAt(c.X[i], c.Z[i])) { i++; continue; }
       let j = i; while (j + 1 <= r.i1 && !boxAt(c.X[j + 1], c.Z[j + 1])) j++;
       if (j - i >= 10) { addStrip(c, i, j, others, hits); regStrip(BOXES.length - 1); }
+      i = j + 1;
+    }
+  }
+  // the open cuts: stations whose road lies CUT_DEPTH or more under the chain's bare-earth samples (hhp.json dem), away
+  // from every structure of the chain (2 stations), gaps up to 10 m bridged, runs of 20 m at least
+  for (const c of mains) {
+    if (!c.dem) continue;
+    const n = c.n, m = new Uint8Array(n);
+    for (let i = 0; i < n; i++) {
+      const d = c.dem[i];
+      if (d === null || d === undefined || !(d - c.H[i] >= CUT_DEPTH)) continue;
+      if (!CUT_AREAS.some(([x0, z0, x1, z1]) => c.X[i] >= x0 && c.X[i] <= x1 && c.Z[i] >= z0 && c.Z[i] <= z1)) continue;
+      if (boxAt(c.X[i], c.Z[i]) || c.structs.some((q) => i >= q.i0 - 2 && i <= q.i1 + 2)) continue;
+      m[i] = 1;
+    }
+    let last = -1;
+    for (let i = 0; i < n; i++) if (m[i]) { if (last >= 0 && i - last > 1 && i - last <= 5) for (let k = last + 1; k < i; k++) m[k] = 1; last = i; }
+    for (let i = 0; i < n - 1;) {
+      if (!m[i]) { i++; continue; }
+      let j = i; while (j + 1 < n - 1 && m[j + 1]) j++;
+      if (j - i >= 10) {
+        let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+        for (let q = i; q <= j + 1; q++) { x0 = Math.min(x0, c.X[q]); x1 = Math.max(x1, c.X[q]); z0 = Math.min(z0, c.Z[q]); z1 = Math.max(z1, c.Z[q]); }
+        await haPreload(x0 - 40, z0 - 40, x1 + 40, z1 + 40);
+        const k1 = j - i + 2, lo = new Float64Array(k1), ro = new Float64Array(k1), top = new Float64Array(k1);
+        const wlo = new Float64Array(k1), wro = new Float64Array(k1);
+        for (let k = 0; k < k1; k++) {
+          const q = i + k;
+          lo[k] = -(c.WL[q] + CUT_MARGIN); ro[k] = c.WR[q] + CUT_MARGIN; top[k] = c.Y[q];
+          // (each wall's top: the grade 1.5 m behind it, 0.1 m over; at least 0.2 m over the road where the cut runs out)
+          for (const [o, W] of [[lo[k] - 1.5, wlo], [ro[k] + 1.5, wro]]) { const g = haGradeAt(c.X[q] + c.NX[q] * o, c.Z[q] + c.NZ[q] * o); W[k] = Math.max(top[k] + 0.2, g === null ? -Infinity : g + 0.1); }
+        }
+        BOXES.push({ id: `${c.id}:cut:${i}`, c, i0: i, i1: j, kind: 'cut', lo, ro, sr: 0, top, soffit: top.map((v) => v - 1), pair: null, pairJ: new Int32Array(k1).fill(-1),
+          samples: [], floor: -Infinity, wallTopLo: gauss(wlo, 2), wallTopRo: gauss(wro, 2) });
+        regStrip(BOXES.length - 1);
+      }
       i = j + 1;
     }
   }
@@ -188,6 +233,7 @@ export async function buildBoxes(CH, hits) {
   // (the inner wall's top: the deck's coping or the street's ground behind it, whichever is higher, with no step taller
   // than the wall's own course: a running max over 6 m then a 6 m Gaussian, so a bluff's wall eases down to the coping)
   for (const s of BOXES) {
+    if (s.kind === 'cut') continue;   // (a cut's two walls keep their own tops)
     const n = s.lo.length, c = s.c, sg = s.sr > 0 ? -1 : 1, W = new Float64Array(n);
     for (let k = 0; k < n; k++) {
       const i = s.i0 + k, e = sg > 0 ? s.ro[k] : s.lo[k], x = c.X[i] + c.NX[i] * (e + sg * 1.5), z = c.Z[i] + c.NZ[i] * (e + sg * 1.5), g = haGradeAt(x, z);

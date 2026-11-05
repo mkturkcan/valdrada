@@ -360,8 +360,10 @@ int32 AValdradaClient::PendingCount(int32* OutLevels, int32* OutCells, int32* Ou
 		if (S && S->GetLevelStreamingState() != ELevelStreamingState::LoadedVisible && S->GetLevelStreamingState() != ELevelStreamingState::FailedToLoad) ++Lv;
 	}
 	// the pipeline states being compiled for what just came in (a cooked build compiles them on this machine the first
-	// time a material is drawn: a frame waiting on them can take minutes on a cold cache)
-	int32 Sh = PipelineStateCache::GetNumActivePipelinePrecompileTasks();
+	// time a material is drawn: a frame waiting on them can take minutes on a cold cache), and the precache requests still
+	// queued: a component is not drawn until its own are done, so a load reported while the city's thousands queued (the
+	// file cache's precompile tasks alone counted) left every car, walker and id copy undrawn for minutes
+	int32 Sh = PipelineStateCache::GetNumActivePipelinePrecompileTasks() + int32(PipelineStateCache::NumActivePrecacheRequests());
 #if WITH_EDITOR
 	// an editor build compiles the materials' shaders and builds the meshes it has not cached yet; a frame drawn before they
 	// are in shows the default material

@@ -1,0 +1,3205 @@
+{
+ "about": "the client's photoreal walkers (Tools/make_crowd.py): per variant its body's skeletal mesh, animations (clip seconds, natural speed m/s, the body's and the skeleton's reference hips) and each material slot's instance",
+ "variants": [
+  {
+   "name": "BP_WalkerEuBoy02_v1",
+   "body": "SK_EuBoy02_GEN2_v2",
+   "scale": 1,
+   "age": "child",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_EuBoy02_GEN2_v2/SK_EuBoy02_GEN2_v2/SkeletalMeshes/SK_EuBoy02_GEN2_v2",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_EuBoy02_GEN2_v2/SK_EuBoy02_GEN2_v2/SkeletalMeshes/SK_EuBoy02_GEN2_v2idle",
+     "clip": "idle_b",
+     "frames": 589,
+     "fps": 30.0508,
+     "seconds": 19.6001,
+     "speed": 0,
+     "clip_hips": 0.6125
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_EuBoy02_GEN2_v2/SK_EuBoy02_GEN2_v2/SkeletalMeshes/SK_EuBoy02_GEN2_v2run",
+     "clip": "run_g",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 0.99,
+     "clip_hips": 0.5706
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_EuBoy02_GEN2_v2/SK_EuBoy02_GEN2_v2/SkeletalMeshes/SK_EuBoy02_GEN2_v2walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L006_c1",
+    "p_opaque_1_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L007_c0",
+    "p_opaque_3_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L008_c1",
+    "p_opaque_4_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L008_c1",
+    "p_opaque_5_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L006_c1",
+    "p_opaque_6_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L009_c2",
+    "p_opaque_9_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L010_c0",
+    "p_hair_2_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L000_c3",
+    "p_hair_7_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L001_c3"
+   },
+   "hips": 0.6227508366915294,
+   "height": 1.126,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_WalkerEuGirl02_v1",
+   "body": "SK_EuGirl02_GEN2_CO",
+   "scale": 1,
+   "age": "child",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_EuGirl02_GEN2_CO/SK_EuGirl02_GEN2_CO/SkeletalMeshes/SK_EuGirl02_GEN2_CO",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_EuGirl02_GEN2_CO/SK_EuGirl02_GEN2_CO/SkeletalMeshes/SK_EuGirl02_GEN2_COidle",
+     "clip": "idle_b",
+     "frames": 589,
+     "fps": 30.0508,
+     "seconds": 19.6001,
+     "speed": 0,
+     "clip_hips": 0.6125
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_EuGirl02_GEN2_CO/SK_EuGirl02_GEN2_CO/SkeletalMeshes/SK_EuGirl02_GEN2_COrun",
+     "clip": "run_g",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 0.99,
+     "clip_hips": 0.5706
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_EuGirl02_GEN2_CO/SK_EuGirl02_GEN2_CO/SkeletalMeshes/SK_EuGirl02_GEN2_COwalk",
+     "clip": "walk_f",
+     "frames": 70,
+     "fps": 30.4225,
+     "seconds": 2.3009,
+     "speed": 1.18,
+     "clip_hips": 0.5826
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L011_c0",
+    "p_opaque_1_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L012_c0",
+    "p_opaque_2_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L006_c1",
+    "p_opaque_3_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L013_c1",
+    "p_opaque_4_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L014_c1",
+    "p_opaque_9_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L015_c2",
+    "p_hair_6_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L002_c3",
+    "p_hair_10_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L003_c3"
+   },
+   "hips": 0.6227508366915294,
+   "height": 1.119,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_AB001_G3",
+   "body": "SK_AfroKid01_G3",
+   "scale": 0.65,
+   "age": "child",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_AfroKid01_G3/SK_AfroKid01_G3/SkeletalMeshes/SK_AfroKid01_G3",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AfroKid01_G3/SK_AfroKid01_G3/SkeletalMeshes/SK_AfroKid01_G3idle",
+     "clip": "idle_c",
+     "frames": 789,
+     "fps": 30.038,
+     "seconds": 26.2667,
+     "speed": 0,
+     "clip_hips": 1.0444
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AfroKid01_G3/SK_AfroKid01_G3/SkeletalMeshes/SK_AfroKid01_G3walk",
+     "clip": "walk_c",
+     "frames": 71,
+     "fps": 30.4286,
+     "seconds": 2.3333,
+     "speed": 0.415,
+     "clip_hips": 1.0491
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L016_c1",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L017_c1",
+    "p_opaque_2_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L018_c1",
+    "p_opaque_3_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L019_c0",
+    "p_opaque_3_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L020_c0",
+    "p_opaque_6_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L021_c2",
+    "p_hair_4_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L003_c3"
+   },
+   "hips": 1.057728304339068,
+   "height": 1.842,
+   "ref_hips": 1.057728304339068
+  },
+  {
+   "name": "BP_Walker_AG001_G3",
+   "body": "SK_AfroGirl01_G3",
+   "scale": 0.65,
+   "age": "child",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_AfroGirl01_G3/SK_AfroGirl01_G3/SkeletalMeshes/SK_AfroGirl01_G3",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AfroGirl01_G3/SK_AfroGirl01_G3/SkeletalMeshes/SK_AfroGirl01_G3idle",
+     "clip": "idle_c",
+     "frames": 789,
+     "fps": 30.038,
+     "seconds": 26.2667,
+     "speed": 0,
+     "clip_hips": 1.0444
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AfroGirl01_G3/SK_AfroGirl01_G3/SkeletalMeshes/SK_AfroGirl01_G3walk",
+     "clip": "walk_c",
+     "frames": 71,
+     "fps": 30.4286,
+     "seconds": 2.3333,
+     "speed": 0.415,
+     "clip_hips": 1.0491
+    }
+   },
+   "slots": {
+    "p_opaque_2_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L015_c2",
+    "p_opaque_3_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L022_c1",
+    "p_opaque_4_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L023_c0",
+    "p_opaque_4_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L024_c0",
+    "p_opaque_5_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L016_c1",
+    "p_hair_0_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L003_c3"
+   },
+   "hips": 1.057728304339068,
+   "height": 1.863,
+   "ref_hips": 1.057728304339068
+  },
+  {
+   "name": "BP_Walker_FemaleAfro",
+   "body": "SK_femaleAfro_",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_femaleAfro_/SK_femaleAfro_/SkeletalMeshes/SK_femaleAfro_",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_femaleAfro_/SK_femaleAfro_/SkeletalMeshes/SK_femaleAfro_idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_femaleAfro_/SK_femaleAfro_/SkeletalMeshes/SK_femaleAfro_run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_femaleAfro_/SK_femaleAfro_/SkeletalMeshes/SK_femaleAfro_walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L025_c1",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L025_c1",
+    "p_opaque_2_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L026_c1",
+    "p_opaque_4_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L027_c0",
+    "p_opaque_5_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L028_c0",
+    "p_opaque_9_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L015_c2",
+    "p_opaque_10_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L027_c0",
+    "p_hair_6_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L004_c3",
+    "p_hair_7_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L005_c3",
+    "p_hair_8_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L005_c3"
+   },
+   "hips": 1.050083883315995,
+   "height": 1.823,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_FemaleAfro02",
+   "body": "SK_Afro02W_v2",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_Afro02W_v2/SK_Afro02W_v2/SkeletalMeshes/SK_Afro02W_v2",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_v2/SK_Afro02W_v2/SkeletalMeshes/SK_Afro02W_v2idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_v2/SK_Afro02W_v2/SkeletalMeshes/SK_Afro02W_v2run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_v2/SK_Afro02W_v2/SkeletalMeshes/SK_Afro02W_v2walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L029_c1",
+    "p_opaque_2_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L015_c2",
+    "p_opaque_3_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L008_c1",
+    "p_opaque_4_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L029_c1",
+    "p_opaque_6_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L031_c0",
+    "p_opaque_6_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L030_c0",
+    "p_hair_0_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L006_c3",
+    "p_hair_7_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L006_c3"
+   },
+   "hips": 1.0501604467889658,
+   "height": 1.837,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_FemaleAfro02B",
+   "body": "SK_Afro02W_B_MHv3",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_Afro02W_B_MHv3/SK_Afro02W_B_MHv3/SkeletalMeshes/SK_Afro02W_B_MHv3",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_B_MHv3/SK_Afro02W_B_MHv3/SkeletalMeshes/SK_Afro02W_B_MHv3idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_B_MHv3/SK_Afro02W_B_MHv3/SkeletalMeshes/SK_Afro02W_B_MHv3run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_B_MHv3/SK_Afro02W_B_MHv3/SkeletalMeshes/SK_Afro02W_B_MHv3walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L032_c1",
+    "p_opaque_4_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L031_c0",
+    "p_opaque_4_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L030_c0",
+    "p_opaque_5_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L015_c2",
+    "p_hair_2_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L006_c3",
+    "p_hair_3_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L006_c3"
+   },
+   "hips": 1.0501604467889658,
+   "height": 1.863,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_FemaleAfro02C",
+   "body": "SK_Afro02W_MH",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_Afro02W_MH/SK_Afro02W_MH/SkeletalMeshes/SK_Afro02W_MH",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_MH/SK_Afro02W_MH/SkeletalMeshes/SK_Afro02W_MHidle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_MH/SK_Afro02W_MH/SkeletalMeshes/SK_Afro02W_MHrun",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_MH/SK_Afro02W_MH/SkeletalMeshes/SK_Afro02W_MHwalk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L033_c1",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L033_c1",
+    "p_opaque_3_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L031_c0",
+    "p_opaque_3_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L030_c0",
+    "p_opaque_5_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L015_c2",
+    "p_opaque_6_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L033_c1",
+    "p_hair_2_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L006_c3",
+    "p_hair_8_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L006_c3"
+   },
+   "hips": 1.0501604467889658,
+   "height": 1.837,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_FemaleAfro02D",
+   "body": "SK_Afro02W_v2",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_Afro02W_v2/SK_Afro02W_v2/SkeletalMeshes/SK_Afro02W_v2",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_v2/SK_Afro02W_v2/SkeletalMeshes/SK_Afro02W_v2idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_v2/SK_Afro02W_v2/SkeletalMeshes/SK_Afro02W_v2run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_v2/SK_Afro02W_v2/SkeletalMeshes/SK_Afro02W_v2walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L008_c1",
+    "p_opaque_2_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L015_c2",
+    "p_opaque_3_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L008_c1",
+    "p_opaque_4_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L008_c1",
+    "p_opaque_6_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L031_c0",
+    "p_opaque_6_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L030_c0",
+    "p_hair_0_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L006_c3",
+    "p_hair_7_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L000_c3"
+   },
+   "hips": 1.0501604467889658,
+   "height": 1.837,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_FemaleAfro02_Cop",
+   "body": "SK_Afro02W_Cop_MH",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_Afro02W_Cop_MH/SK_Afro02W_Cop_MH/SkeletalMeshes/SK_Afro02W_Cop_MH",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_Cop_MH/SK_Afro02W_Cop_MH/SkeletalMeshes/SK_Afro02W_Cop_MHidle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_Cop_MH/SK_Afro02W_Cop_MH/SkeletalMeshes/SK_Afro02W_Cop_MHrun",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_Cop_MH/SK_Afro02W_Cop_MH/SkeletalMeshes/SK_Afro02W_Cop_MHwalk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L034_c1",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L034_c1",
+    "p_opaque_2_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L035_c1",
+    "p_opaque_3_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L036_c1",
+    "p_opaque_4_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L036_c1",
+    "p_opaque_5_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L037_c2",
+    "p_opaque_7_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L036_c1",
+    "p_opaque_8_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L031_c0",
+    "p_opaque_8_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L030_c0",
+    "p_hair_6_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L006_c3",
+    "p_hair_10_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L006_c3"
+   },
+   "hips": 1.0501604467889658,
+   "height": 1.844,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_FemaleAfro03_v1",
+   "body": "SK_AfroW_03_GEN23",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L038_c1",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L038_c1",
+    "p_opaque_2_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L038_c1",
+    "p_opaque_3_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L039_c0",
+    "p_opaque_3_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L040_c0",
+    "p_opaque_5_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L021_c2",
+    "p_hair_6_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L007_c3",
+    "p_hair_7_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L003_c3"
+   },
+   "hips": 1.050133493418813,
+   "height": 1.835,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_FemaleAfro03_v2",
+   "body": "SK_AfroW_03_GEN23",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L041_c1",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L041_c1",
+    "p_opaque_2_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L041_c1",
+    "p_opaque_3_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L042_c0",
+    "p_opaque_3_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L043_c0",
+    "p_opaque_5_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L021_c2",
+    "p_hair_6_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L007_c3",
+    "p_hair_7_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L003_c3"
+   },
+   "hips": 1.050133493418813,
+   "height": 1.835,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_FemaleAfro03_v3",
+   "body": "SK_AfroW_03_GEN23",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L044_c1",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L044_c1",
+    "p_opaque_2_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L044_c1",
+    "p_opaque_3_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L042_c0",
+    "p_opaque_3_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L043_c0",
+    "p_opaque_5_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L021_c2",
+    "p_hair_6_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L007_c3",
+    "p_hair_7_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L003_c3"
+   },
+   "hips": 1.050133493418813,
+   "height": 1.835,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_FemaleAfro_v2",
+   "body": "SK_femaleAfro_",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_femaleAfro_/SK_femaleAfro_/SkeletalMeshes/SK_femaleAfro_",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_femaleAfro_/SK_femaleAfro_/SkeletalMeshes/SK_femaleAfro_idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_femaleAfro_/SK_femaleAfro_/SkeletalMeshes/SK_femaleAfro_run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_femaleAfro_/SK_femaleAfro_/SkeletalMeshes/SK_femaleAfro_walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L045_c1",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L046_c1",
+    "p_opaque_2_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L047_c1",
+    "p_opaque_4_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L027_c0",
+    "p_opaque_5_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L028_c0",
+    "p_opaque_9_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L015_c2",
+    "p_opaque_10_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L027_c0",
+    "p_hair_6_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L004_c3",
+    "p_hair_7_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L005_c3",
+    "p_hair_8_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L005_c3"
+   },
+   "hips": 1.050083883315995,
+   "height": 1.823,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_FemaleAsia_v1",
+   "body": "SK_AsiaW_",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_AsiaW_/SK_AsiaW_/SkeletalMeshes/SK_AsiaW_",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AsiaW_/SK_AsiaW_/SkeletalMeshes/SK_AsiaW_idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AsiaW_/SK_AsiaW_/SkeletalMeshes/SK_AsiaW_run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AsiaW_/SK_AsiaW_/SkeletalMeshes/SK_AsiaW_walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L046_c1",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L048_c1",
+    "p_opaque_3_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L049_c0",
+    "p_opaque_4_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L050_c1",
+    "p_opaque_5_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L051_c0",
+    "p_opaque_6_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L051_c0",
+    "p_opaque_8_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L015_c2",
+    "p_hair_2_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L005_c3"
+   },
+   "hips": 1.0501604467889658,
+   "height": 1.826,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_FemaleAsia_v2",
+   "body": "SK_AsiaW_",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_AsiaW_/SK_AsiaW_/SkeletalMeshes/SK_AsiaW_",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AsiaW_/SK_AsiaW_/SkeletalMeshes/SK_AsiaW_idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AsiaW_/SK_AsiaW_/SkeletalMeshes/SK_AsiaW_run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AsiaW_/SK_AsiaW_/SkeletalMeshes/SK_AsiaW_walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L048_c1",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L052_c1",
+    "p_opaque_3_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L049_c0",
+    "p_opaque_4_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L053_c1",
+    "p_opaque_5_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L051_c0",
+    "p_opaque_6_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L051_c0",
+    "p_opaque_8_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L015_c2",
+    "p_hair_2_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L005_c3"
+   },
+   "hips": 1.0501604467889658,
+   "height": 1.826,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_FemaleEuro",
+   "body": "SK_EuroW_",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_EuroW_/SK_EuroW_/SkeletalMeshes/SK_EuroW_",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_EuroW_/SK_EuroW_/SkeletalMeshes/SK_EuroW_idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_EuroW_/SK_EuroW_/SkeletalMeshes/SK_EuroW_run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_EuroW_/SK_EuroW_/SkeletalMeshes/SK_EuroW_walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L025_c1",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L048_c1",
+    "p_opaque_2_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L047_c1",
+    "p_opaque_4_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L054_c0",
+    "p_opaque_4_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L055_c0",
+    "p_opaque_5_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L037_c2",
+    "p_hair_3_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L008_c3"
+   },
+   "hips": 1.050083883315995,
+   "height": 1.823,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_FemaleEuro_v2",
+   "body": "SK_EuroW_v2",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_EuroW_v2/SK_EuroW_v2/SkeletalMeshes/SK_EuroW_v2",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_EuroW_v2/SK_EuroW_v2/SkeletalMeshes/SK_EuroW_v2idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_EuroW_v2/SK_EuroW_v2/SkeletalMeshes/SK_EuroW_v2run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_EuroW_v2/SK_EuroW_v2/SkeletalMeshes/SK_EuroW_v2walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L045_c1",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L045_c1",
+    "p_opaque_2_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L056_c1",
+    "p_opaque_4_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L054_c0",
+    "p_opaque_4_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L055_c0",
+    "p_opaque_6_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L037_c2",
+    "p_hair_3_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L008_c3"
+   },
+   "hips": 1.050083883315995,
+   "height": 1.823,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_Female_Euro_Owv_v1",
+   "body": "SK_EuroW02_Ovw_MH_GEN2_UDIM",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIM",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIMidle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIMrun",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIMwalk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L057_c1",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L057_c1",
+    "p_opaque_2_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L037_c2",
+    "p_opaque_4_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L058_c0",
+    "p_opaque_4_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L059_c0",
+    "p_hair_3_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L009_c3",
+    "p_hair_6_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L009_c3",
+    "p_hair_7_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L010_c3"
+   },
+   "hips": 1.0501604467889658,
+   "height": 1.823,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_Female_Euro_Owv_v2",
+   "body": "SK_EuroW02_Ovw_MH_GEN2_UDIM",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIM",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIMidle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIMrun",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIMwalk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L060_c1",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L057_c1",
+    "p_opaque_2_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L037_c2",
+    "p_opaque_4_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L058_c0",
+    "p_opaque_4_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L059_c0",
+    "p_hair_3_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L009_c3",
+    "p_hair_6_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L009_c3",
+    "p_hair_7_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L010_c3"
+   },
+   "hips": 1.0501604467889658,
+   "height": 1.823,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_Female_Euro_Owv_v3",
+   "body": "SK_EuroW02_Ovw_MH_GEN2_UDIM",
+   "scale": 1,
+   "age": "adult",
+   "gender": "f",
+   "mesh": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIM",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIMidle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIMrun",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIMwalk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L061_c1",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L057_c1",
+    "p_opaque_2_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L037_c2",
+    "p_opaque_4_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L058_c0",
+    "p_opaque_4_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L059_c0",
+    "p_hair_3_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L009_c3",
+    "p_hair_6_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L009_c3",
+    "p_hair_7_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L010_c3"
+   },
+   "hips": 1.0501604467889658,
+   "height": 1.823,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_MaleAfro_v1",
+   "body": "SK_AfroM_",
+   "scale": 1,
+   "age": "adult",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_AfroM_/SK_AfroM_/SkeletalMeshes/SK_AfroM_",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AfroM_/SK_AfroM_/SkeletalMeshes/SK_AfroM_idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AfroM_/SK_AfroM_/SkeletalMeshes/SK_AfroM_run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AfroM_/SK_AfroM_/SkeletalMeshes/SK_AfroM_walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L015_c2",
+    "p_opaque_1_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L062_c0",
+    "p_opaque_3_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L063_c0",
+    "p_opaque_5_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L064_c1",
+    "p_opaque_6_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L065_c0",
+    "p_opaque_8_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L064_c1",
+    "p_opaque_9_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L064_c1",
+    "p_hair_4_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L011_c3",
+    "p_hair_10_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L011_c3"
+   },
+   "hips": 1.050133493418813,
+   "height": 1.812,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_MaleAfro_v2",
+   "body": "SK_AfroM_v2",
+   "scale": 1,
+   "age": "adult",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_AfroM_v2/SK_AfroM_v2/SkeletalMeshes/SK_AfroM_v2",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AfroM_v2/SK_AfroM_v2/SkeletalMeshes/SK_AfroM_v2idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AfroM_v2/SK_AfroM_v2/SkeletalMeshes/SK_AfroM_v2run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AfroM_v2/SK_AfroM_v2/SkeletalMeshes/SK_AfroM_v2walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L015_c2",
+    "p_opaque_3_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L063_c0",
+    "p_opaque_5_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L066_c1",
+    "p_opaque_6_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L062_c0",
+    "p_opaque_7_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L065_c0",
+    "p_opaque_9_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L066_c1",
+    "p_opaque_10_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L066_c1",
+    "p_hair_1_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L011_c3",
+    "p_hair_4_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L011_c3"
+   },
+   "hips": 1.050133493418813,
+   "height": 1.812,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_MaleAmer_Cop",
+   "body": "SK_AmerCOP_M_01",
+   "scale": 1,
+   "age": "adult",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_AmerCOP_M_01/SK_AmerCOP_M_01/SkeletalMeshes/SK_AmerCOP_M_01",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AmerCOP_M_01/SK_AmerCOP_M_01/SkeletalMeshes/SK_AmerCOP_M_01idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AmerCOP_M_01/SK_AmerCOP_M_01/SkeletalMeshes/SK_AmerCOP_M_01run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AmerCOP_M_01/SK_AmerCOP_M_01/SkeletalMeshes/SK_AmerCOP_M_01walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L034_c1",
+    "p_opaque_2_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L034_c1",
+    "p_opaque_3_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L035_c1",
+    "p_opaque_4_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L036_c1",
+    "p_opaque_5_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L036_c1",
+    "p_opaque_6_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L036_c1",
+    "p_opaque_7_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L067_c0",
+    "p_opaque_8_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L068_c0",
+    "p_opaque_9_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L067_c0",
+    "p_opaque_12_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L015_c2",
+    "p_hair_10_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L012_c3"
+   },
+   "hips": 1.050133493418813,
+   "height": 1.833,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_MaleAmer_v1",
+   "body": "SK_AmerM_001_MH",
+   "scale": 1,
+   "age": "adult",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MH",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MHidle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MHrun",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MHwalk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L069_c1",
+    "p_opaque_2_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L053_c1",
+    "p_opaque_3_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L070_c0",
+    "p_opaque_4_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L069_c1",
+    "p_opaque_5_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L070_c0",
+    "p_opaque_7_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L071_c0",
+    "p_opaque_9_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L009_c2",
+    "p_opaque_10_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L071_c0",
+    "p_hair_6_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L012_c3"
+   },
+   "hips": 1.050133493418813,
+   "height": 1.828,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_MaleAmer_v2",
+   "body": "SK_AmerM_001_MH",
+   "scale": 1,
+   "age": "adult",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MH",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MHidle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MHrun",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MHwalk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L072_c1",
+    "p_opaque_2_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L072_c1",
+    "p_opaque_3_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L070_c0",
+    "p_opaque_4_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L072_c1",
+    "p_opaque_5_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L070_c0",
+    "p_opaque_7_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L071_c0",
+    "p_opaque_9_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L009_c2",
+    "p_opaque_10_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L071_c0",
+    "p_hair_6_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L012_c3"
+   },
+   "hips": 1.050133493418813,
+   "height": 1.828,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_MaleAmer_v3",
+   "body": "SK_AmerM_001_MH",
+   "scale": 1,
+   "age": "adult",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MH",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MHidle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MHrun",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MHwalk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L073_c1",
+    "p_opaque_2_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L073_c1",
+    "p_opaque_3_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L070_c0",
+    "p_opaque_4_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L074_c1",
+    "p_opaque_5_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L070_c0",
+    "p_opaque_7_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L071_c0",
+    "p_opaque_9_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L009_c2",
+    "p_opaque_10_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L071_c0",
+    "p_hair_6_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L012_c3"
+   },
+   "hips": 1.050133493418813,
+   "height": 1.828,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_MaleAsia_v1",
+   "body": "SK_AsiaM",
+   "scale": 1,
+   "age": "adult",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_AsiaM/SK_AsiaM/SkeletalMeshes/SK_AsiaM",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AsiaM/SK_AsiaM/SkeletalMeshes/SK_AsiaMidle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AsiaM/SK_AsiaM/SkeletalMeshes/SK_AsiaMrun",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AsiaM/SK_AsiaM/SkeletalMeshes/SK_AsiaMwalk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L066_c1",
+    "p_opaque_3_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L075_c0",
+    "p_opaque_4_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L015_c2",
+    "p_opaque_5_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L076_c0",
+    "p_opaque_6_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L066_c1",
+    "p_opaque_7_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L066_c1",
+    "p_opaque_9_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L075_c0",
+    "p_opaque_10_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L076_c0",
+    "p_hair_2_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L005_c3"
+   },
+   "hips": 1.050133493418813,
+   "height": 1.848,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_MaleAsia_v2",
+   "body": "SK_AsiaM_v2",
+   "scale": 1,
+   "age": "adult",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_AsiaM_v2/SK_AsiaM_v2/SkeletalMeshes/SK_AsiaM_v2",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AsiaM_v2/SK_AsiaM_v2/SkeletalMeshes/SK_AsiaM_v2idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AsiaM_v2/SK_AsiaM_v2/SkeletalMeshes/SK_AsiaM_v2run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AsiaM_v2/SK_AsiaM_v2/SkeletalMeshes/SK_AsiaM_v2walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L077_c1",
+    "p_opaque_3_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L075_c0",
+    "p_opaque_4_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L015_c2",
+    "p_opaque_5_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L076_c0",
+    "p_opaque_7_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L078_c1",
+    "p_opaque_8_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L078_c1",
+    "p_opaque_10_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L075_c0",
+    "p_hair_2_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L005_c3"
+   },
+   "hips": 1.050133493418813,
+   "height": 1.848,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_MaleEuro",
+   "body": "SK_euroM_",
+   "scale": 1,
+   "age": "adult",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_euroM_/SK_euroM_/SkeletalMeshes/SK_euroM_",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_euroM_/SK_euroM_/SkeletalMeshes/SK_euroM_idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_euroM_/SK_euroM_/SkeletalMeshes/SK_euroM_run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_euroM_/SK_euroM_/SkeletalMeshes/SK_euroM_walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L029_c1",
+    "p_opaque_1_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L079_c0",
+    "p_opaque_2_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L080_c0",
+    "p_opaque_4_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L029_c1",
+    "p_opaque_5_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L081_c0",
+    "p_opaque_6_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L009_c2",
+    "p_opaque_8_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L064_c1",
+    "p_opaque_9_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L081_c0",
+    "p_hair_10_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L005_c3",
+    "p_hair_11_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L013_c3"
+   },
+   "hips": 1.050133493418813,
+   "height": 1.824,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_MaleEuro_v2",
+   "body": "SK_euroM_v2_",
+   "scale": 1,
+   "age": "adult",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_euroM_v2_/SK_euroM_v2_/SkeletalMeshes/SK_euroM_v2_",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_euroM_v2_/SK_euroM_v2_/SkeletalMeshes/SK_euroM_v2_idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_euroM_v2_/SK_euroM_v2_/SkeletalMeshes/SK_euroM_v2_run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_euroM_v2_/SK_euroM_v2_/SkeletalMeshes/SK_euroM_v2_walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L079_c0",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L064_c1",
+    "p_opaque_2_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L080_c0",
+    "p_opaque_3_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L064_c1",
+    "p_opaque_4_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L064_c1",
+    "p_opaque_6_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L081_c0",
+    "p_opaque_7_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L009_c2",
+    "p_opaque_9_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L081_c0",
+    "p_hair_10_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L005_c3",
+    "p_hair_11_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L013_c3"
+   },
+   "hips": 1.050133493418813,
+   "height": 1.824,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_Male_Afro02_S_Ov",
+   "body": "SK_AfroM02_StrOvw_GEN2_CO",
+   "scale": 1,
+   "age": "adult",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_AfroM02_StrOvw_GEN2_CO/SK_AfroM02_StrOvw_GEN2_CO/SkeletalMeshes/SK_AfroM02_StrOvw_GEN2_CO",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AfroM02_StrOvw_GEN2_CO/SK_AfroM02_StrOvw_GEN2_CO/SkeletalMeshes/SK_AfroM02_StrOvw_GEN2_COidle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AfroM02_StrOvw_GEN2_CO/SK_AfroM02_StrOvw_GEN2_CO/SkeletalMeshes/SK_AfroM02_StrOvw_GEN2_COrun",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AfroM02_StrOvw_GEN2_CO/SK_AfroM02_StrOvw_GEN2_CO/SkeletalMeshes/SK_AfroM02_StrOvw_GEN2_COwalk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L082_c1",
+    "p_opaque_1_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L082_c1",
+    "p_opaque_2_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L083_c0",
+    "p_opaque_5_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L009_c2",
+    "p_opaque_7_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L084_c0",
+    "p_opaque_10_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L085_c1",
+    "p_opaque_11_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L085_c1",
+    "p_opaque_12_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L086_c0",
+    "p_hair_6_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L014_c3",
+    "p_hair_8_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L006_c3",
+    "p_hair_9_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L006_c3"
+   },
+   "hips": 1.050133493418813,
+   "height": 1.842,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_Male_Asia02_v1",
+   "body": "SK_AsianM02_GEN23",
+   "scale": 1,
+   "age": "adult",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_1_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L009_c2",
+    "p_opaque_6_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L087_c1",
+    "p_opaque_7_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L018_c1",
+    "p_opaque_8_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L088_c1",
+    "p_opaque_9_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L089_c0",
+    "p_opaque_9_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L090_c0",
+    "p_hair_3_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L003_c3",
+    "p_hair_4_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L002_c3",
+    "p_hair_5_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L003_c3"
+   },
+   "hips": 1.0501604467889658,
+   "height": 1.833,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_Male_Asia02_v2",
+   "body": "SK_AsianM02_GEN23",
+   "scale": 1,
+   "age": "adult",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_1_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L009_c2",
+    "p_opaque_6_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L087_c1",
+    "p_opaque_7_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L091_c1",
+    "p_opaque_8_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L091_c1",
+    "p_opaque_9_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L089_c0",
+    "p_opaque_9_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L090_c0",
+    "p_hair_3_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L003_c3",
+    "p_hair_4_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L002_c3",
+    "p_hair_5_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L003_c3"
+   },
+   "hips": 1.0501604467889658,
+   "height": 1.833,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_Male_Asia02_v3",
+   "body": "SK_AsianM02_GEN23",
+   "scale": 1,
+   "age": "adult",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_1_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L009_c2",
+    "p_opaque_6_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L087_c1",
+    "p_opaque_7_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L092_c1",
+    "p_opaque_8_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L092_c1",
+    "p_opaque_9_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L089_c0",
+    "p_opaque_9_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L090_c0",
+    "p_hair_3_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L003_c3",
+    "p_hair_4_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L002_c3",
+    "p_hair_5_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L003_c3"
+   },
+   "hips": 1.0501604467889658,
+   "height": 1.833,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_Male_EuroW_Owv",
+   "body": "SK_EuroM_Owv_MH_GEN23",
+   "scale": 1,
+   "age": "adult",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_EuroM_Owv_MH_GEN23/SK_EuroM_Owv_MH_GEN23/SkeletalMeshes/SK_EuroM_Owv_MH_GEN23",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_EuroM_Owv_MH_GEN23/SK_EuroM_Owv_MH_GEN23/SkeletalMeshes/SK_EuroM_Owv_MH_GEN23idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_EuroM_Owv_MH_GEN23/SK_EuroM_Owv_MH_GEN23/SkeletalMeshes/SK_EuroM_Owv_MH_GEN23run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_EuroM_Owv_MH_GEN23/SK_EuroM_Owv_MH_GEN23/SkeletalMeshes/SK_EuroM_Owv_MH_GEN23walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L093_c0",
+    "p_opaque_0_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L094_c0",
+    "p_opaque_2_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L013_c1",
+    "p_opaque_3_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L013_c1",
+    "p_opaque_5_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L013_c1",
+    "p_opaque_8_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L037_c2",
+    "p_hair_1_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L012_c3",
+    "p_hair_4_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L006_c3"
+   },
+   "hips": 1.050133493418813,
+   "height": 1.796,
+   "ref_hips": 1.050083883315995
+  },
+  {
+   "name": "BP_Walker_Male_EuroW_Owv_v2",
+   "body": "SK_EuroM_Owv_MH_GEN23",
+   "scale": 1,
+   "age": "adult",
+   "gender": "m",
+   "mesh": "/Game/Client/Crowd/SK_EuroM_Owv_MH_GEN23/SK_EuroM_Owv_MH_GEN23/SkeletalMeshes/SK_EuroM_Owv_MH_GEN23",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_EuroM_Owv_MH_GEN23/SK_EuroM_Owv_MH_GEN23/SkeletalMeshes/SK_EuroM_Owv_MH_GEN23idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_EuroM_Owv_MH_GEN23/SK_EuroM_Owv_MH_GEN23/SkeletalMeshes/SK_EuroM_Owv_MH_GEN23run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_EuroM_Owv_MH_GEN23/SK_EuroM_Owv_MH_GEN23/SkeletalMeshes/SK_EuroM_Owv_MH_GEN23walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "slots": {
+    "p_opaque_0_0_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L093_c0",
+    "p_opaque_0_1_c0": "/Game/Client/Crowd/M/MI_ped_opaque_L094_c0",
+    "p_opaque_2_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L006_c1",
+    "p_opaque_3_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L006_c1",
+    "p_opaque_5_0_c1": "/Game/Client/Crowd/M/MI_ped_opaque_L006_c1",
+    "p_opaque_8_0_c2": "/Game/Client/Crowd/M/MI_ped_opaque_L015_c2",
+    "p_hair_1_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L012_c3",
+    "p_hair_4_0_c3": "/Game/Client/Crowd/M/MI_ped_hair_L006_c3"
+   },
+   "hips": 1.050133493418813,
+   "height": 1.796,
+   "ref_hips": 1.050083883315995
+  }
+ ],
+ "bodies": {
+  "SK_Afro02W_B_MHv3": {
+   "mesh": "/Game/Client/Crowd/SK_Afro02W_B_MHv3/SK_Afro02W_B_MHv3/SkeletalMeshes/SK_Afro02W_B_MHv3",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_B_MHv3/SK_Afro02W_B_MHv3/SkeletalMeshes/SK_Afro02W_B_MHv3idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_B_MHv3/SK_Afro02W_B_MHv3/SkeletalMeshes/SK_Afro02W_B_MHv3run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_B_MHv3/SK_Afro02W_B_MHv3/SkeletalMeshes/SK_Afro02W_B_MHv3walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_Afro02W_B_MHv3/SK_Afro02W_B_MHv3/SkeletalMeshes/SK_Afro02W_B_MHv3_Skeleton",
+   "bounds_cm": [
+    -84.4,
+    -12.2,
+    -0.8,
+    83.8,
+    19.8,
+    186.3
+   ],
+   "slots": [
+    "p_opaque_0_0_c1",
+    "p_opaque_4_1_c0",
+    "p_opaque_4_0_c0",
+    "p_opaque_5_0_c2",
+    "p_hair_2_0_c3",
+    "p_hair_3_0_c3"
+   ],
+   "height": 1.863,
+   "hips": 1.0501604467889658,
+   "skeleton_name": "gen2"
+  },
+  "SK_Afro02W_Cop_MH": {
+   "mesh": "/Game/Client/Crowd/SK_Afro02W_Cop_MH/SK_Afro02W_Cop_MH/SkeletalMeshes/SK_Afro02W_Cop_MH",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_Cop_MH/SK_Afro02W_Cop_MH/SkeletalMeshes/SK_Afro02W_Cop_MHidle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_Cop_MH/SK_Afro02W_Cop_MH/SkeletalMeshes/SK_Afro02W_Cop_MHrun",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_Cop_MH/SK_Afro02W_Cop_MH/SkeletalMeshes/SK_Afro02W_Cop_MHwalk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_Afro02W_Cop_MH/SK_Afro02W_Cop_MH/SkeletalMeshes/SK_Afro02W_Cop_MH_Skeleton",
+   "bounds_cm": [
+    -84.4,
+    -13.2,
+    -0.8,
+    83.8,
+    19.8,
+    184.4
+   ],
+   "slots": [
+    "p_opaque_0_0_c1",
+    "p_opaque_1_0_c1",
+    "p_opaque_2_0_c1",
+    "p_opaque_3_0_c1",
+    "p_opaque_4_0_c1",
+    "p_opaque_5_0_c2",
+    "p_opaque_7_0_c1",
+    "p_opaque_8_1_c0",
+    "p_opaque_8_0_c0",
+    "p_hair_6_0_c3",
+    "p_hair_10_0_c3"
+   ],
+   "height": 1.844,
+   "hips": 1.0501604467889658,
+   "skeleton_name": "gen2"
+  },
+  "SK_Afro02W_MH": {
+   "mesh": "/Game/Client/Crowd/SK_Afro02W_MH/SK_Afro02W_MH/SkeletalMeshes/SK_Afro02W_MH",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_MH/SK_Afro02W_MH/SkeletalMeshes/SK_Afro02W_MHidle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_MH/SK_Afro02W_MH/SkeletalMeshes/SK_Afro02W_MHrun",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_MH/SK_Afro02W_MH/SkeletalMeshes/SK_Afro02W_MHwalk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_Afro02W_MH/SK_Afro02W_MH/SkeletalMeshes/SK_Afro02W_MH_Skeleton",
+   "bounds_cm": [
+    -84.4,
+    -12.2,
+    -0.8,
+    83.8,
+    19.7,
+    183.7
+   ],
+   "slots": [
+    "p_opaque_0_0_c1",
+    "p_opaque_1_0_c1",
+    "p_opaque_3_1_c0",
+    "p_opaque_3_0_c0",
+    "p_opaque_5_0_c2",
+    "p_opaque_6_0_c1",
+    "p_hair_2_0_c3",
+    "p_hair_8_0_c3"
+   ],
+   "height": 1.837,
+   "hips": 1.0501604467889658,
+   "skeleton_name": "gen2"
+  },
+  "SK_Afro02W_v2": {
+   "mesh": "/Game/Client/Crowd/SK_Afro02W_v2/SK_Afro02W_v2/SkeletalMeshes/SK_Afro02W_v2",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_v2/SK_Afro02W_v2/SkeletalMeshes/SK_Afro02W_v2idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_v2/SK_Afro02W_v2/SkeletalMeshes/SK_Afro02W_v2run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_Afro02W_v2/SK_Afro02W_v2/SkeletalMeshes/SK_Afro02W_v2walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_Afro02W_v2/SK_Afro02W_v2/SkeletalMeshes/SK_Afro02W_v2_Skeleton",
+   "bounds_cm": [
+    -84.4,
+    -12.2,
+    -0.8,
+    83.8,
+    19.7,
+    183.7
+   ],
+   "slots": [
+    "p_opaque_1_0_c1",
+    "p_opaque_2_0_c2",
+    "p_opaque_3_0_c1",
+    "p_opaque_4_0_c1",
+    "p_opaque_6_1_c0",
+    "p_opaque_6_0_c0",
+    "p_hair_0_0_c3",
+    "p_hair_7_0_c3"
+   ],
+   "height": 1.837,
+   "hips": 1.0501604467889658,
+   "skeleton_name": "gen2"
+  },
+  "SK_AfroGirl01_G3": {
+   "mesh": "/Game/Client/Crowd/SK_AfroGirl01_G3/SK_AfroGirl01_G3/SkeletalMeshes/SK_AfroGirl01_G3",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AfroGirl01_G3/SK_AfroGirl01_G3/SkeletalMeshes/SK_AfroGirl01_G3idle",
+     "clip": "idle_c",
+     "frames": 789,
+     "fps": 30.038,
+     "seconds": 26.2667,
+     "speed": 0,
+     "clip_hips": 1.0444
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AfroGirl01_G3/SK_AfroGirl01_G3/SkeletalMeshes/SK_AfroGirl01_G3walk",
+     "clip": "walk_c",
+     "frames": 71,
+     "fps": 30.4286,
+     "seconds": 2.3333,
+     "speed": 0.415,
+     "clip_hips": 1.0491
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_AfroGirl01_G3/SK_AfroGirl01_G3/SkeletalMeshes/SK_AfroGirl01_G3_Skeleton",
+   "bounds_cm": [
+    -91.5,
+    -10.6,
+    -0.0,
+    91.2,
+    23.1,
+    186.3
+   ],
+   "slots": [
+    "p_opaque_2_0_c2",
+    "p_opaque_3_0_c1",
+    "p_opaque_4_0_c0",
+    "p_opaque_4_1_c0",
+    "p_opaque_5_0_c1",
+    "p_hair_0_0_c3"
+   ],
+   "height": 1.863,
+   "hips": 1.057728304339068,
+   "skeleton_name": "gen3"
+  },
+  "SK_AfroKid01_G3": {
+   "mesh": "/Game/Client/Crowd/SK_AfroKid01_G3/SK_AfroKid01_G3/SkeletalMeshes/SK_AfroKid01_G3",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AfroKid01_G3/SK_AfroKid01_G3/SkeletalMeshes/SK_AfroKid01_G3idle",
+     "clip": "idle_c",
+     "frames": 789,
+     "fps": 30.038,
+     "seconds": 26.2667,
+     "speed": 0,
+     "clip_hips": 1.0444
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AfroKid01_G3/SK_AfroKid01_G3/SkeletalMeshes/SK_AfroKid01_G3walk",
+     "clip": "walk_c",
+     "frames": 71,
+     "fps": 30.4286,
+     "seconds": 2.3333,
+     "speed": 0.415,
+     "clip_hips": 1.0491
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_AfroKid01_G3/SK_AfroKid01_G3/SkeletalMeshes/SK_AfroKid01_G3_Skeleton",
+   "bounds_cm": [
+    -91.4,
+    -12.9,
+    -0.0,
+    91.3,
+    22.8,
+    184.2
+   ],
+   "slots": [
+    "p_opaque_0_0_c1",
+    "p_opaque_1_0_c1",
+    "p_opaque_2_0_c1",
+    "p_opaque_3_0_c0",
+    "p_opaque_3_1_c0",
+    "p_opaque_6_0_c2",
+    "p_hair_4_0_c3"
+   ],
+   "height": 1.842,
+   "hips": 1.057728304339068,
+   "skeleton_name": "gen3"
+  },
+  "SK_AfroM02_StrOvw_GEN2_CO": {
+   "mesh": "/Game/Client/Crowd/SK_AfroM02_StrOvw_GEN2_CO/SK_AfroM02_StrOvw_GEN2_CO/SkeletalMeshes/SK_AfroM02_StrOvw_GEN2_CO",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AfroM02_StrOvw_GEN2_CO/SK_AfroM02_StrOvw_GEN2_CO/SkeletalMeshes/SK_AfroM02_StrOvw_GEN2_COidle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AfroM02_StrOvw_GEN2_CO/SK_AfroM02_StrOvw_GEN2_CO/SkeletalMeshes/SK_AfroM02_StrOvw_GEN2_COrun",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AfroM02_StrOvw_GEN2_CO/SK_AfroM02_StrOvw_GEN2_CO/SkeletalMeshes/SK_AfroM02_StrOvw_GEN2_COwalk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_AfroM02_StrOvw_GEN2_CO/SK_AfroM02_StrOvw_GEN2_CO/SkeletalMeshes/SK_AfroM02_StrOvw_GEN2_CO_Skeleton",
+   "bounds_cm": [
+    -89.0,
+    -16.5,
+    -1.5,
+    88.7,
+    26.4,
+    184.2
+   ],
+   "slots": [
+    "p_opaque_0_0_c1",
+    "p_opaque_1_0_c1",
+    "p_opaque_2_0_c0",
+    "p_opaque_5_0_c2",
+    "p_opaque_7_0_c0",
+    "p_opaque_10_0_c1",
+    "p_opaque_11_0_c1",
+    "p_opaque_12_0_c0",
+    "p_hair_6_0_c3",
+    "p_hair_8_0_c3",
+    "p_hair_9_0_c3"
+   ],
+   "height": 1.842,
+   "hips": 1.050133493418813,
+   "skeleton_name": "gen2"
+  },
+  "SK_AfroM_": {
+   "mesh": "/Game/Client/Crowd/SK_AfroM_/SK_AfroM_/SkeletalMeshes/SK_AfroM_",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AfroM_/SK_AfroM_/SkeletalMeshes/SK_AfroM_idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AfroM_/SK_AfroM_/SkeletalMeshes/SK_AfroM_run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AfroM_/SK_AfroM_/SkeletalMeshes/SK_AfroM_walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_AfroM_/SK_AfroM_/SkeletalMeshes/SK_AfroM__Skeleton",
+   "bounds_cm": [
+    -88.1,
+    -13.4,
+    -1.1,
+    88.7,
+    20.8,
+    181.2
+   ],
+   "slots": [
+    "p_opaque_0_0_c2",
+    "p_opaque_1_0_c0",
+    "p_opaque_3_0_c0",
+    "p_opaque_5_0_c1",
+    "p_opaque_6_0_c0",
+    "p_opaque_8_0_c1",
+    "p_opaque_9_0_c1",
+    "p_hair_4_0_c3",
+    "p_hair_10_0_c3"
+   ],
+   "height": 1.812,
+   "hips": 1.050133493418813,
+   "skeleton_name": "gen2"
+  },
+  "SK_AfroM_v2": {
+   "mesh": "/Game/Client/Crowd/SK_AfroM_v2/SK_AfroM_v2/SkeletalMeshes/SK_AfroM_v2",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AfroM_v2/SK_AfroM_v2/SkeletalMeshes/SK_AfroM_v2idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AfroM_v2/SK_AfroM_v2/SkeletalMeshes/SK_AfroM_v2run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AfroM_v2/SK_AfroM_v2/SkeletalMeshes/SK_AfroM_v2walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_AfroM_v2/SK_AfroM_v2/SkeletalMeshes/SK_AfroM_v2_Skeleton",
+   "bounds_cm": [
+    -88.1,
+    -12.9,
+    -1.1,
+    88.7,
+    20.8,
+    181.2
+   ],
+   "slots": [
+    "p_opaque_0_0_c2",
+    "p_opaque_3_0_c0",
+    "p_opaque_5_0_c1",
+    "p_opaque_6_0_c0",
+    "p_opaque_7_0_c0",
+    "p_opaque_9_0_c1",
+    "p_opaque_10_0_c1",
+    "p_hair_1_0_c3",
+    "p_hair_4_0_c3"
+   ],
+   "height": 1.812,
+   "hips": 1.050133493418813,
+   "skeleton_name": "gen2"
+  },
+  "SK_AfroW_03_GEN23": {
+   "mesh": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_AfroW_03_GEN23/SK_AfroW_03_GEN23/SkeletalMeshes/SK_AfroW_03_GEN23_Skeleton",
+   "bounds_cm": [
+    -88.9,
+    -22.1,
+    -2.7,
+    88.6,
+    35.3,
+    183.5
+   ],
+   "slots": [
+    "p_opaque_0_0_c1",
+    "p_opaque_1_0_c1",
+    "p_opaque_2_0_c1",
+    "p_opaque_3_0_c0",
+    "p_opaque_3_1_c0",
+    "p_opaque_5_0_c2",
+    "p_hair_6_0_c3",
+    "p_hair_7_0_c3"
+   ],
+   "height": 1.835,
+   "hips": 1.050133493418813,
+   "skeleton_name": "gen2"
+  },
+  "SK_AmerCOP_M_01": {
+   "mesh": "/Game/Client/Crowd/SK_AmerCOP_M_01/SK_AmerCOP_M_01/SkeletalMeshes/SK_AmerCOP_M_01",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AmerCOP_M_01/SK_AmerCOP_M_01/SkeletalMeshes/SK_AmerCOP_M_01idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AmerCOP_M_01/SK_AmerCOP_M_01/SkeletalMeshes/SK_AmerCOP_M_01run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AmerCOP_M_01/SK_AmerCOP_M_01/SkeletalMeshes/SK_AmerCOP_M_01walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_AmerCOP_M_01/SK_AmerCOP_M_01/SkeletalMeshes/SK_AmerCOP_M_01_Skeleton",
+   "bounds_cm": [
+    -88.1,
+    -12.1,
+    -1.1,
+    88.7,
+    21.0,
+    183.3
+   ],
+   "slots": [
+    "p_opaque_1_0_c1",
+    "p_opaque_2_0_c1",
+    "p_opaque_3_0_c1",
+    "p_opaque_4_0_c1",
+    "p_opaque_5_0_c1",
+    "p_opaque_6_0_c1",
+    "p_opaque_7_0_c0",
+    "p_opaque_8_0_c0",
+    "p_opaque_9_0_c0",
+    "p_opaque_12_0_c2",
+    "p_hair_10_0_c3"
+   ],
+   "height": 1.833,
+   "hips": 1.050133493418813,
+   "skeleton_name": "gen2"
+  },
+  "SK_AmerM_001_MH": {
+   "mesh": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MH",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MHidle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MHrun",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MHwalk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_AmerM_001_MH/SK_AmerM_001_MH/SkeletalMeshes/SK_AmerM_001_MH_Skeleton",
+   "bounds_cm": [
+    -88.1,
+    -13.4,
+    -1.1,
+    88.7,
+    20.8,
+    182.8
+   ],
+   "slots": [
+    "p_opaque_0_0_c1",
+    "p_opaque_2_0_c1",
+    "p_opaque_3_0_c0",
+    "p_opaque_4_0_c1",
+    "p_opaque_5_0_c0",
+    "p_opaque_7_0_c0",
+    "p_opaque_9_0_c2",
+    "p_opaque_10_0_c0",
+    "p_hair_6_0_c3"
+   ],
+   "height": 1.828,
+   "hips": 1.050133493418813,
+   "skeleton_name": "gen2"
+  },
+  "SK_AsiaM": {
+   "mesh": "/Game/Client/Crowd/SK_AsiaM/SK_AsiaM/SkeletalMeshes/SK_AsiaM",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AsiaM/SK_AsiaM/SkeletalMeshes/SK_AsiaMidle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AsiaM/SK_AsiaM/SkeletalMeshes/SK_AsiaMrun",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AsiaM/SK_AsiaM/SkeletalMeshes/SK_AsiaMwalk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_AsiaM/SK_AsiaM/SkeletalMeshes/SK_AsiaM_Skeleton",
+   "bounds_cm": [
+    -88.1,
+    -12.9,
+    -1.1,
+    88.7,
+    20.8,
+    184.8
+   ],
+   "slots": [
+    "p_opaque_0_0_c1",
+    "p_opaque_3_0_c0",
+    "p_opaque_4_0_c2",
+    "p_opaque_5_0_c0",
+    "p_opaque_6_0_c1",
+    "p_opaque_7_0_c1",
+    "p_opaque_9_0_c0",
+    "p_opaque_10_0_c0",
+    "p_hair_2_0_c3"
+   ],
+   "height": 1.848,
+   "hips": 1.050133493418813,
+   "skeleton_name": "gen2"
+  },
+  "SK_AsiaM_v2": {
+   "mesh": "/Game/Client/Crowd/SK_AsiaM_v2/SK_AsiaM_v2/SkeletalMeshes/SK_AsiaM_v2",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AsiaM_v2/SK_AsiaM_v2/SkeletalMeshes/SK_AsiaM_v2idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AsiaM_v2/SK_AsiaM_v2/SkeletalMeshes/SK_AsiaM_v2run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AsiaM_v2/SK_AsiaM_v2/SkeletalMeshes/SK_AsiaM_v2walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_AsiaM_v2/SK_AsiaM_v2/SkeletalMeshes/SK_AsiaM_v2_Skeleton",
+   "bounds_cm": [
+    -88.1,
+    -12.4,
+    -1.1,
+    88.7,
+    20.8,
+    184.8
+   ],
+   "slots": [
+    "p_opaque_0_0_c1",
+    "p_opaque_3_0_c0",
+    "p_opaque_4_0_c2",
+    "p_opaque_5_0_c0",
+    "p_opaque_7_0_c1",
+    "p_opaque_8_0_c1",
+    "p_opaque_10_0_c0",
+    "p_hair_2_0_c3"
+   ],
+   "height": 1.848,
+   "hips": 1.050133493418813,
+   "skeleton_name": "gen2"
+  },
+  "SK_AsiaW_": {
+   "mesh": "/Game/Client/Crowd/SK_AsiaW_/SK_AsiaW_/SkeletalMeshes/SK_AsiaW_",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AsiaW_/SK_AsiaW_/SkeletalMeshes/SK_AsiaW_idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AsiaW_/SK_AsiaW_/SkeletalMeshes/SK_AsiaW_run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AsiaW_/SK_AsiaW_/SkeletalMeshes/SK_AsiaW_walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_AsiaW_/SK_AsiaW_/SkeletalMeshes/SK_AsiaW__Skeleton",
+   "bounds_cm": [
+    -84.5,
+    -12.2,
+    -1.0,
+    83.8,
+    19.6,
+    182.6
+   ],
+   "slots": [
+    "p_opaque_0_0_c1",
+    "p_opaque_1_0_c1",
+    "p_opaque_3_0_c0",
+    "p_opaque_4_0_c1",
+    "p_opaque_5_0_c0",
+    "p_opaque_6_0_c0",
+    "p_opaque_8_0_c2",
+    "p_hair_2_0_c3"
+   ],
+   "height": 1.826,
+   "hips": 1.0501604467889658,
+   "skeleton_name": "gen2"
+  },
+  "SK_AsianM02_GEN23": {
+   "mesh": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_AsianM02_GEN23/SK_AsianM02_GEN23/SkeletalMeshes/SK_AsianM02_GEN23_Skeleton",
+   "bounds_cm": [
+    -88.9,
+    -12.9,
+    -1.6,
+    88.2,
+    27.5,
+    183.3
+   ],
+   "slots": [
+    "p_opaque_1_0_c2",
+    "p_opaque_6_0_c1",
+    "p_opaque_7_0_c1",
+    "p_opaque_8_0_c1",
+    "p_opaque_9_0_c0",
+    "p_opaque_9_1_c0",
+    "p_hair_3_0_c3",
+    "p_hair_4_0_c3",
+    "p_hair_5_0_c3"
+   ],
+   "height": 1.833,
+   "hips": 1.0501604467889658,
+   "skeleton_name": "gen2"
+  },
+  "SK_EuBoy02_GEN2_v2": {
+   "mesh": "/Game/Client/Crowd/SK_EuBoy02_GEN2_v2/SK_EuBoy02_GEN2_v2/SkeletalMeshes/SK_EuBoy02_GEN2_v2",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_EuBoy02_GEN2_v2/SK_EuBoy02_GEN2_v2/SkeletalMeshes/SK_EuBoy02_GEN2_v2idle",
+     "clip": "idle_b",
+     "frames": 589,
+     "fps": 30.0508,
+     "seconds": 19.6001,
+     "speed": 0,
+     "clip_hips": 0.6125
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_EuBoy02_GEN2_v2/SK_EuBoy02_GEN2_v2/SkeletalMeshes/SK_EuBoy02_GEN2_v2run",
+     "clip": "run_g",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 0.99,
+     "clip_hips": 0.5706
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_EuBoy02_GEN2_v2/SK_EuBoy02_GEN2_v2/SkeletalMeshes/SK_EuBoy02_GEN2_v2walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_EuBoy02_GEN2_v2/SK_EuBoy02_GEN2_v2/SkeletalMeshes/SK_EuBoy02_GEN2_v2_Skeleton",
+   "bounds_cm": [
+    -52.8,
+    -12.4,
+    -1.2,
+    52.6,
+    11.7,
+    112.6
+   ],
+   "slots": [
+    "p_opaque_0_0_c1",
+    "p_opaque_1_0_c0",
+    "p_opaque_3_0_c1",
+    "p_opaque_4_0_c1",
+    "p_opaque_5_0_c1",
+    "p_opaque_6_0_c2",
+    "p_opaque_9_0_c0",
+    "p_hair_2_0_c3",
+    "p_hair_7_0_c3"
+   ],
+   "height": 1.126,
+   "hips": 0.6227508366915294,
+   "skeleton_name": "gen2"
+  },
+  "SK_EuGirl02_GEN2_CO": {
+   "mesh": "/Game/Client/Crowd/SK_EuGirl02_GEN2_CO/SK_EuGirl02_GEN2_CO/SkeletalMeshes/SK_EuGirl02_GEN2_CO",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_EuGirl02_GEN2_CO/SK_EuGirl02_GEN2_CO/SkeletalMeshes/SK_EuGirl02_GEN2_COidle",
+     "clip": "idle_b",
+     "frames": 589,
+     "fps": 30.0508,
+     "seconds": 19.6001,
+     "speed": 0,
+     "clip_hips": 0.6125
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_EuGirl02_GEN2_CO/SK_EuGirl02_GEN2_CO/SkeletalMeshes/SK_EuGirl02_GEN2_COrun",
+     "clip": "run_g",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 0.99,
+     "clip_hips": 0.5706
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_EuGirl02_GEN2_CO/SK_EuGirl02_GEN2_CO/SkeletalMeshes/SK_EuGirl02_GEN2_COwalk",
+     "clip": "walk_f",
+     "frames": 70,
+     "fps": 30.4225,
+     "seconds": 2.3009,
+     "speed": 1.18,
+     "clip_hips": 0.5826
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_EuGirl02_GEN2_CO/SK_EuGirl02_GEN2_CO/SkeletalMeshes/SK_EuGirl02_GEN2_CO_Skeleton",
+   "bounds_cm": [
+    -54.3,
+    -10.9,
+    -1.0,
+    54.2,
+    10.3,
+    111.9
+   ],
+   "slots": [
+    "p_opaque_0_0_c0",
+    "p_opaque_1_0_c0",
+    "p_opaque_2_0_c1",
+    "p_opaque_3_0_c1",
+    "p_opaque_4_0_c1",
+    "p_opaque_9_0_c2",
+    "p_hair_6_0_c3",
+    "p_hair_10_0_c3"
+   ],
+   "height": 1.119,
+   "hips": 0.6227508366915294,
+   "skeleton_name": "gen2"
+  },
+  "SK_EuroM_Owv_MH_GEN23": {
+   "mesh": "/Game/Client/Crowd/SK_EuroM_Owv_MH_GEN23/SK_EuroM_Owv_MH_GEN23/SkeletalMeshes/SK_EuroM_Owv_MH_GEN23",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_EuroM_Owv_MH_GEN23/SK_EuroM_Owv_MH_GEN23/SkeletalMeshes/SK_EuroM_Owv_MH_GEN23idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_EuroM_Owv_MH_GEN23/SK_EuroM_Owv_MH_GEN23/SkeletalMeshes/SK_EuroM_Owv_MH_GEN23run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_EuroM_Owv_MH_GEN23/SK_EuroM_Owv_MH_GEN23/SkeletalMeshes/SK_EuroM_Owv_MH_GEN23walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_EuroM_Owv_MH_GEN23/SK_EuroM_Owv_MH_GEN23/SkeletalMeshes/SK_EuroM_Owv_MH_GEN23_Skeleton",
+   "bounds_cm": [
+    -88.8,
+    -19.2,
+    -2.1,
+    88.2,
+    32.9,
+    179.6
+   ],
+   "slots": [
+    "p_opaque_0_0_c0",
+    "p_opaque_0_1_c0",
+    "p_opaque_2_0_c1",
+    "p_opaque_3_0_c1",
+    "p_opaque_5_0_c1",
+    "p_opaque_8_0_c2",
+    "p_hair_1_0_c3",
+    "p_hair_4_0_c3"
+   ],
+   "height": 1.796,
+   "hips": 1.050133493418813,
+   "skeleton_name": "gen2"
+  },
+  "SK_EuroW02_Ovw_MH_GEN2_UDIM": {
+   "mesh": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIM",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIMidle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIMrun",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIMwalk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_EuroW02_Ovw_MH_GEN2_UDIM/SK_EuroW02_Ovw_MH_GEN2_UDIM/SkeletalMeshes/SK_EuroW02_Ovw_MH_GEN2_UDIM_Skeleton",
+   "bounds_cm": [
+    -88.9,
+    -15.5,
+    -4.7,
+    88.6,
+    30.0,
+    182.3
+   ],
+   "slots": [
+    "p_opaque_0_0_c1",
+    "p_opaque_1_0_c1",
+    "p_opaque_2_0_c2",
+    "p_opaque_4_0_c0",
+    "p_opaque_4_1_c0",
+    "p_hair_3_0_c3",
+    "p_hair_6_0_c3",
+    "p_hair_7_0_c3"
+   ],
+   "height": 1.823,
+   "hips": 1.0501604467889658,
+   "skeleton_name": "gen2"
+  },
+  "SK_EuroW_": {
+   "mesh": "/Game/Client/Crowd/SK_EuroW_/SK_EuroW_/SkeletalMeshes/SK_EuroW_",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_EuroW_/SK_EuroW_/SkeletalMeshes/SK_EuroW_idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_EuroW_/SK_EuroW_/SkeletalMeshes/SK_EuroW_run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_EuroW_/SK_EuroW_/SkeletalMeshes/SK_EuroW_walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_EuroW_/SK_EuroW_/SkeletalMeshes/SK_EuroW__Skeleton",
+   "bounds_cm": [
+    -84.5,
+    -10.9,
+    -1.0,
+    83.8,
+    19.6,
+    182.3
+   ],
+   "slots": [
+    "p_opaque_0_0_c1",
+    "p_opaque_1_0_c1",
+    "p_opaque_2_0_c1",
+    "p_opaque_4_0_c0",
+    "p_opaque_4_1_c0",
+    "p_opaque_5_0_c2",
+    "p_hair_3_0_c3"
+   ],
+   "height": 1.823,
+   "hips": 1.050083883315995,
+   "skeleton_name": "gen2"
+  },
+  "SK_EuroW_v2": {
+   "mesh": "/Game/Client/Crowd/SK_EuroW_v2/SK_EuroW_v2/SkeletalMeshes/SK_EuroW_v2",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_EuroW_v2/SK_EuroW_v2/SkeletalMeshes/SK_EuroW_v2idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_EuroW_v2/SK_EuroW_v2/SkeletalMeshes/SK_EuroW_v2run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_EuroW_v2/SK_EuroW_v2/SkeletalMeshes/SK_EuroW_v2walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_EuroW_v2/SK_EuroW_v2/SkeletalMeshes/SK_EuroW_v2_Skeleton",
+   "bounds_cm": [
+    -84.5,
+    -10.7,
+    -1.0,
+    83.8,
+    19.6,
+    182.3
+   ],
+   "slots": [
+    "p_opaque_0_0_c1",
+    "p_opaque_1_0_c1",
+    "p_opaque_2_0_c1",
+    "p_opaque_4_0_c0",
+    "p_opaque_4_1_c0",
+    "p_opaque_6_0_c2",
+    "p_hair_3_0_c3"
+   ],
+   "height": 1.823,
+   "hips": 1.050083883315995,
+   "skeleton_name": "gen2"
+  },
+  "SK_euroM_": {
+   "mesh": "/Game/Client/Crowd/SK_euroM_/SK_euroM_/SkeletalMeshes/SK_euroM_",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_euroM_/SK_euroM_/SkeletalMeshes/SK_euroM_idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_euroM_/SK_euroM_/SkeletalMeshes/SK_euroM_run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_euroM_/SK_euroM_/SkeletalMeshes/SK_euroM_walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_euroM_/SK_euroM_/SkeletalMeshes/SK_euroM__Skeleton",
+   "bounds_cm": [
+    -88.1,
+    -12.1,
+    -1.1,
+    88.7,
+    21.0,
+    182.4
+   ],
+   "slots": [
+    "p_opaque_0_0_c1",
+    "p_opaque_1_0_c0",
+    "p_opaque_2_0_c0",
+    "p_opaque_4_0_c1",
+    "p_opaque_5_0_c0",
+    "p_opaque_6_0_c2",
+    "p_opaque_8_0_c1",
+    "p_opaque_9_0_c0",
+    "p_hair_10_0_c3",
+    "p_hair_11_0_c3"
+   ],
+   "height": 1.824,
+   "hips": 1.050133493418813,
+   "skeleton_name": "gen2"
+  },
+  "SK_euroM_v2_": {
+   "mesh": "/Game/Client/Crowd/SK_euroM_v2_/SK_euroM_v2_/SkeletalMeshes/SK_euroM_v2_",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_euroM_v2_/SK_euroM_v2_/SkeletalMeshes/SK_euroM_v2_idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_euroM_v2_/SK_euroM_v2_/SkeletalMeshes/SK_euroM_v2_run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_euroM_v2_/SK_euroM_v2_/SkeletalMeshes/SK_euroM_v2_walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_euroM_v2_/SK_euroM_v2_/SkeletalMeshes/SK_euroM_v2__Skeleton",
+   "bounds_cm": [
+    -88.1,
+    -12.3,
+    -1.1,
+    88.7,
+    20.8,
+    182.4
+   ],
+   "slots": [
+    "p_opaque_0_0_c0",
+    "p_opaque_1_0_c1",
+    "p_opaque_2_0_c0",
+    "p_opaque_3_0_c1",
+    "p_opaque_4_0_c1",
+    "p_opaque_6_0_c0",
+    "p_opaque_7_0_c2",
+    "p_opaque_9_0_c0",
+    "p_hair_10_0_c3",
+    "p_hair_11_0_c3"
+   ],
+   "height": 1.824,
+   "hips": 1.050133493418813,
+   "skeleton_name": "gen2"
+  },
+  "SK_femaleAfro_": {
+   "mesh": "/Game/Client/Crowd/SK_femaleAfro_/SK_femaleAfro_/SkeletalMeshes/SK_femaleAfro_",
+   "anims": {
+    "idle": {
+     "path": "/Game/Client/Crowd/SK_femaleAfro_/SK_femaleAfro_/SkeletalMeshes/SK_femaleAfro_idle",
+     "clip": "s_neutral_idle",
+     "frames": 238,
+     "fps": 30,
+     "seconds": 7.9333,
+     "speed": 0,
+     "clip_hips": 1.052
+    },
+    "run": {
+     "path": "/Game/Client/Crowd/SK_femaleAfro_/SK_femaleAfro_/SkeletalMeshes/SK_femaleAfro_run",
+     "clip": "run_f",
+     "frames": 67,
+     "fps": 30.4412,
+     "seconds": 2.201,
+     "speed": 1.241,
+     "clip_hips": 0.9747
+    },
+    "walk": {
+     "path": "/Game/Client/Crowd/SK_femaleAfro_/SK_femaleAfro_/SkeletalMeshes/SK_femaleAfro_walk",
+     "clip": "s_neutral_walk",
+     "frames": 41,
+     "fps": 30,
+     "seconds": 1.3667,
+     "speed": 0.89,
+     "clip_hips": 1.0235
+    }
+   },
+   "skeleton": "/Game/Client/Crowd/SK_femaleAfro_/SK_femaleAfro_/SkeletalMeshes/SK_femaleAfro__Skeleton",
+   "bounds_cm": [
+    -84.5,
+    -10.8,
+    -1.0,
+    83.8,
+    19.5,
+    182.3
+   ],
+   "slots": [
+    "p_opaque_0_0_c1",
+    "p_opaque_1_0_c1",
+    "p_opaque_2_0_c1",
+    "p_opaque_4_0_c0",
+    "p_opaque_5_0_c0",
+    "p_opaque_9_0_c2",
+    "p_opaque_10_0_c0",
+    "p_hair_6_0_c3",
+    "p_hair_7_0_c3",
+    "p_hair_8_0_c3"
+   ],
+   "height": 1.823,
+   "hips": 1.050083883315995,
+   "skeleton_name": "gen2"
+  }
+ }
+}

@@ -28,7 +28,10 @@ export const LANDMARKS = [
   { id: 22, key: 'oneWTC',          name: 'One World Trade Center',      lat: 40.71274, lon: -74.01339, mode: 'replace' },
   { id: 23, key: 'thirtyRock',      name: '30 Rockefeller Plaza',        lat: 40.75874, lon: -73.97870, mode: 'replace' },
   { id: 24, key: 'flatiron',        name: 'Flatiron Building',           lat: 40.74106, lon: -73.98964, mode: 'replace' },
-  { id: 25, key: 'metLife',         name: 'MetLife Building',            lat: 40.75410, lon: -73.97640, mode: 'replace' },
+  // LM64: the old point (40.75410, -73.97640) fell on the Helmsley Building north of 45th Street, so the MetLife box stood on
+  // 230 Park Avenue and the real tower drew as its 47.9 m base; this point is the vertex mean of the MetLife footprint
+  // (tile -1_6 #18, BIN 1085630)
+  { id: 25, key: 'metLife',         name: 'MetLife Building',            lat: 40.753556, lon: -73.976626, mode: 'replace' },
   { id: 26, key: 'woolworth',       name: 'Woolworth Building',          lat: 40.71240, lon: -74.00834, mode: 'replace' },
   { id: 27, key: 'oneVanderbilt',   name: 'One Vanderbilt',              lat: 40.75290, lon: -73.97869, mode: 'replace' },
   { id: 28, key: 'p432park',        name: '432 Park Avenue',             lat: 40.76160, lon: -73.97190, mode: 'replace' },
@@ -49,7 +52,9 @@ export const LANDMARKS = [
   { id: 38, key: 'federalHall',     name: 'Federal Hall',                lat: 40.70740, lon: -74.01020, mode: 'replace' },
   { id: 39, key: 'nyse',            name: 'NY Stock Exchange',           lat: 40.70690, lon: -74.01130, mode: 'replace' },
   { id: 40, key: 'municipalBldg',   name: 'Municipal Building',          lat: 40.71270, lon: -74.00410, mode: 'replace' },
-  { id: 41, key: 'p56leonard',      name: '56 Leonard',                  lat: 40.71790, lon: -74.00480, mode: 'replace' },
+  // LM65: the old point (40.71790, -74.00480) fell on a 10.8 m shop row (tile -6_14 #100) 120 m east of the tower; this one is the
+  // vertex mean of the tower's footprint (tile -6_14 #135, BIN 1088646)
+  { id: 41, key: 'p56leonard',      name: '56 Leonard',                  lat: 40.717663, lon: -74.006322, mode: 'replace' },
   { id: 42, key: 'p8spruce',        name: '8 Spruce Street',             lat: 40.71100, lon: -74.00550, mode: 'replace' },
   { id: 43, key: 'msg',             name: 'Madison Square Garden',       lat: 40.75050, lon: -73.99340, mode: 'replace' },
   // LM16 (2026-10-16): the Met draws all its walls (city/lmMetMuseum.js), so 'replace' (the tiles already compiled carry -44:
@@ -68,7 +73,9 @@ export const LANDMARKS = [
   { id: 48, key: 'sanRemo',         name: 'The San Remo',                lat: 40.777914, lon: -73.975386, mode: 'replace' },
   { id: 49, key: 'plaza',           name: 'The Plaza',                   lat: 40.76450, lon: -73.97440, mode: 'decorate' },
   { id: 50, key: 'waldorf',         name: 'Waldorf Astoria',             lat: 40.75640, lon: -73.97430, mode: 'decorate' },
-  { id: 51, key: 'p40wall',         name: '40 Wall Street',              lat: 40.70740, lon: -74.00890, mode: 'replace' },
+  // LM65: the old point (40.70740, -74.00890) fell on a 22 m building at Pine and William Streets (tile -7_16 #23); this one is
+  // the tower's axis inside 40 Wall Street's footprint (tile -7_16 #47, BIN 1001018)
+  { id: 51, key: 'p40wall',         name: '40 Wall Street',              lat: 40.706963, lon: -74.009672, mode: 'replace' },
   { id: 52, key: 'p70pine',         name: '70 Pine Street',              lat: 40.70630, lon: -74.00740, mode: 'replace' },
   { id: 53, key: 'p28liberty',      name: '28 Liberty',                  lat: 40.70805, lon: -74.00885, mode: 'replace' },
   { id: 54, key: 'seagram',         name: 'Seagram Building',            lat: 40.75850, lon: -73.97220, mode: 'replace' },
@@ -110,6 +117,43 @@ export const LANDMARKS = [
   { id: 78, key: 'amnhNorth',       name: 'Museum of Natural History, north side (Gilder Center, 81st Street terrace)', lat: 40.781899, lon: -73.974332, mode: 'replace' },
   // HB25: the Highbridge Water Tower (city/lmHighbridgeTower.js) on its compiled ring (tile 6_-13 #8, OSM way 275059317)
   { id: 79, key: 'highbridgeTower', name: 'Highbridge Water Tower',      lat: 40.842543, lon: -73.932619, mode: 'replace' },
+  // LM63 (2026-10-30): City Hall, drawn until now as a generic 36.6 m extrusion of its plan (city/lmCivic.js buildCityHall)
+  { id: 80, key: 'cityHallNY',      name: 'New York City Hall',          lat: 40.71275, lon: -74.00597, mode: 'replace' },
+  // LM64 (2026-10-30): the Helmsley Building, 230 Park Avenue (city/lmGCT.js buildHelmsley), on its compiled footprint (tile
+  // -1_6 #32, BIN 1036185; the point is the footprint's vertex mean)
+  { id: 81, key: 'helmsley',        name: 'Helmsley Building (230 Park Avenue)', lat: 40.754399, lon: -73.976102, mode: 'replace' },
+  // LM65 (2026-10-31): the World Trade Center Transportation Hub (city/lmWTC.js buildOculus) on its compiled footprint (tile -7_15
+  // #36, BIN 1089309, a 33 m extrusion until now; the point is the footprint's vertex mean)
+  { id: 82, key: 'oculus',          name: 'World Trade Center Transportation Hub (Oculus)', lat: 40.711522, lon: -74.011407, mode: 'replace' },
+  // LM65: Brookfield Place's four towers (tile -8_15 #15, #13, #16; -8_14 #21), the Winter Garden (-8_15 #22, compiled at Two's
+  // 197 m) and 14 Wall Street (-7_16 #68) from the city's 3D building model (city/lmDowntown.js); points well inside each footprint
+  { id: 83, key: 'wfc1',            name: 'One World Financial Center (200 Liberty Street)', lat: 40.71055, lon: -74.015588, mode: 'replace' },
+  { id: 84, key: 'wfc2',            name: 'Two World Financial Center (225 Liberty Street)', lat: 40.712487, lon: -74.015414, mode: 'replace' },
+  { id: 85, key: 'wfc3',            name: 'Three World Financial Center (200 Vesey Street)', lat: 40.713576, lon: -74.014842, mode: 'replace' },
+  { id: 86, key: 'wfc4',            name: 'Four World Financial Center (250 Vesey Street)', lat: 40.714058, lon: -74.015912, mode: 'replace' },
+  { id: 87, key: 'winterGarden',    name: 'Winter Garden, Brookfield Place', lat: 40.713081, lon: -74.015372, mode: 'replace' },
+  { id: 88, key: 'wall14',          name: '14 Wall Street (Bankers Trust Company Building)', lat: 40.707667, lon: -74.010757, mode: 'replace' },
+  // LM65: the Battery's ferry terminals (tile -7_17 #68 and #55) from the city's 3D building model (city/lmDowntown.js)
+  { id: 89, key: 'whitehallTerminal', name: 'Whitehall Terminal (Staten Island Ferry)', lat: 40.70097, lon: -74.013039, mode: 'replace' },
+  { id: 90, key: 'batteryMaritime', name: 'Battery Maritime Building', lat: 40.701086, lon: -74.011647, mode: 'replace' },
+  // LM65: St. Paul's Chapel on Broadway (tile -7_15 #57, compiled as a 60.7 m block: the footprint's height is the steeple's)
+  { id: 91, key: 'stPaulsBroadway', name: "St. Paul's Chapel (Broadway)", lat: 40.711311, lon: -74.009164, mode: 'replace' },
+  // LM65: the Battery's Castle Clinton (tile -8_17 #13) and Pier A (tile -8_17 #7)
+  { id: 92, key: 'castleClinton',   name: 'Castle Clinton National Monument', lat: 40.703447, lon: -74.016813, mode: 'replace' },
+  { id: 93, key: 'pierA',           name: 'Pier A Harbor House', lat: 40.704462, lon: -74.017478, mode: 'replace' },
+  // LM66 (2026-10-31): Hudson Yards (city/lmHY.js), each point the vertex mean of its compiled footprint (30 Hudson Yards and
+  // the Shops keep id 59 on their lot, tile -5_6 #61)
+  { id: 100, key: 'hy10',            name: '10 Hudson Yards',             lat: 40.752763, lon: -74.001565, mode: 'replace' },   // -5_6 #17
+  { id: 101, key: 'hy35',            name: '35 Hudson Yards',             lat: 40.754640, lon: -74.002261, mode: 'replace' },   // -6_6 #18
+  { id: 102, key: 'hy15',            name: '15 Hudson Yards and The Shed', lat: 40.753407, lon: -74.002880, mode: 'replace' },  // -6_6 #28
+  { id: 103, key: 'hy50',            name: '50 Hudson Yards',             lat: 40.754529, lon: -74.000108, mode: 'replace' },   // -5_6 #31
+  { id: 104, key: 'hy55',            name: '55 Hudson Yards',             lat: 40.755171, lon: -74.001740, mode: 'replace' },   // -6_6 #51
+  { id: 105, key: 'hySpiral',        name: 'The Spiral (66 Hudson Boulevard)', lat: 40.755278, lon: -73.999489, mode: 'replace' },   // -5_6 #59
+  { id: 106, key: 'hyVessel',        name: 'The Vessel and the Public Square', lat: 40.753855, lon: -74.002236, mode: 'replace' },   // -6_6 #36
+  { id: 107, key: 'hyNone',          name: 'Hudson Yards footprint drawn by a neighbouring builder', lat: 40.753676, lon: -74.002163, mode: 'replace' },   // -6_6 #38
+  // UN67 (2026-11-01): the United Nations' General Assembly and Conference Buildings from the city's 3D building model
+  // (city/lmMid2.js buildUNCampus); the point is the General Assembly's dome (tile 0_7 #4)
+  { id: 108, key: 'unCampus',        name: 'UN General Assembly and Conference Buildings', lat: 40.750092, lon: -73.967714, mode: 'replace' },
 ];
 // TW: the points of four landmarks that fell on the wrong footprint in the five-borough compile (each now inside its own;
 // 30 Rockefeller Plaza's 28 m inside the complex's ring of the live tiles and of runs 7-9, the point the records lane gave)
@@ -148,16 +192,22 @@ export const DISTRICTS = [
 // floorH, winW, storeH, set/clear (BF flag names), wall (nycDress wall family, applied at read time only). Missing fields
 // keep the classifier's value.
 export const BUILDING_OVERRIDES = [
+  // ---- Brooklyn Bridge Park, Pier 1's land side (the reference view: classed as blue glass towers, they drew as dark slabs) ----
+  { key: 'oneHotelBbp', name: '1 Hotel Brooklyn Bridge, 60 Furman St (2017): reclaimed brick and charcoal panels, big glazing (tile -5_17 #2)',
+    lat: 40.70224, lon: -73.99554, style: 'CONDO_NEW', color: [96, 86, 78], clear: ['CORNICE', 'WATERTOWER', 'FIRE_ESCAPE'] },
+  { key: 'pierhouseBbp', name: 'Pierhouse, 90 Furman St (2016): pale stone-coloured panels and glass (tile -5_17 #1)',
+    lat: 40.70163, lon: -73.99596, style: 'CONDO_NEW', color: [204, 194, 176], clear: ['CORNICE', 'WATERTOWER', 'FIRE_ESCAPE'] },
   // ---- W 120th St & Amsterdam Ave, Morningside Heights (the reference views) ----
   { key: 'muddHall', name: 'Seeley W. Mudd Hall (Columbia Engineering, 1961)', lat: 40.80939, lon: -73.96005,
     // PROJECT_BRICK = red-brown brick, regular small windows, no cornice/sills/AC clutter: the closest style to a 1961
     // engineering tower (the critic read the PREWAR_APT version as an apartment block, docs/notes/amst120-critic.md)
     style: 'PROJECT_BRICK', color: [112, 60, 46], roofKind: 0, floors: 14, floorH: 4.6, winW: 1.8, storeH: 0,
     clear: ['CORNICE', 'WATERTOWER', 'STOREFRONT', 'SETBACKS', 'FIRE_ESCAPE'] },
-  // CR24: the old point (40.80957, -73.96043) fell in a 32 m2 sliver between CEPSR and Mudd; this one is inside CEPSR, whose
-  // crown is a pale copper-green mansard with a flat top (the reference north view)
+  // CR24: the old point (40.80957, -73.96043) fell in a 32 m2 sliver between CEPSR and Mudd; this one is inside CEPSR.
+  // 2026-11-03: pale stone-coloured cladding in a grid of punched windows under a flat grey roof with a pale penthouse box
+  // (the reference north and oblique views); the copper mansard read for it was Havemeyer's, in front of it in those views
   { key: 'schapiroCepsr', name: 'Schapiro CEPSR (Columbia, 1992)', lat: 40.809604, lon: -73.960750,
-    style: 'POSTWAR_BRICK', color: [150, 78, 58], roofKind: 2, storeH: 0, roof: { form: 'mansard', tone: 'pale', dormers: 0 },
+    style: 'POSTWAR_BRICK', color: [196, 190, 178], roofKind: 0, storeH: 0, noBalc: true,
     clear: ['CORNICE', 'WATERTOWER', 'STOREFRONT', 'SETBACKS'] },
   { key: 'whittierHall', name: 'Whittier Hall (Teachers College, 1901): red brick, limestone base', lat: 40.80978, lon: -73.95914,   // 3 m in from the Amsterdam wall: the centroid falls in a court
     // 11 storeys to the eave (two-storey rusticated limestone base, eight of brick, the gabled attic): the data's 9 x 4.8 m
@@ -195,9 +245,15 @@ export const BUILDING_OVERRIDES = [
   { key: 'cuFairchild', name: 'Sherman Fairchild Center', lat: 40.809139, lon: -73.960331, roofKind: 0, roof: { form: 'flat' } },
   { key: 'cuEngTerrace', name: 'Engineering Terrace', lat: 40.809040, lon: -73.959845, roofKind: 0, roof: { form: 'flat' } },
   { key: 'cuSchermerhornExt', name: 'Schermerhorn Extension', lat: 40.808653, lon: -73.960064, roofKind: 0, roof: { form: 'flat' } },
-  { key: 'cuUris', name: 'Uris Hall', lat: 40.809021, lon: -73.961266, roofKind: 0, roof: { form: 'flat' } },
+  // 2026-11-03: Uris Hall (1964; the compiled record holds University Hall's round gym too) in beige concrete, a grid of
+  // piers and dark recessed windows under flat roofs (the reference oblique views), not the brick apartment style dealt it
+  { key: 'cuUris', name: 'Uris Hall', lat: 40.809021, lon: -73.961266, style: 'DECO_MASONRY', color: [190, 180, 160], roofKind: 0, roof: { form: 'flat' },
+    clear: ['CORNICE', 'WATERTOWER', 'STOREFRONT', 'FIRE_ESCAPE', 'SETBACKS'] },
   { key: 'cuChandler', name: 'Chandler Hall', lat: 40.809612, lon: -73.962291, roofKind: 0, roof: { form: 'flat' } },
   { key: 'cuAveryPlaza', name: 'the plaza over the Avery extension', lat: 40.808294, lon: -73.960603, roofKind: 0, memb: 3, roof: { form: 'flat' } },
+  // 2026-11-03: the gym's round roof is a dark membrane inside a pale parapet (the reference north and oblique views); the
+  // hash had dealt it the silver coating, white with the ponding's blue
+  { key: 'cuUniversityHall', name: 'University Hall (the gym\'s round roof)', lat: 40.809262, lon: -73.961077, roofKind: 0, memb: 1, roof: { form: 'flat' } },
   { key: 'cuLerner', name: 'Alfred Lerner Hall', lat: 40.806864, lon: -73.963942, roofKind: 0, roof: { form: 'flat' } },
   { key: 'cuCarman', name: 'Carman Hall', lat: 40.806719, lon: -73.964391, roofKind: 0, roof: { form: 'flat' } },
   // the ground floors of the two east corners are modelled shop by shop in src/city/namedShops.js (Appletree Market / Deli
@@ -273,6 +329,13 @@ export const BUILDING_OVERRIDES = [
     { key: 'lm16AmnhNorth', name: 'AMNH north side: Gilder Center, 81st Street terrace (tile -1_0 #211)', lat: 40.781899, lon: -73.974332, landmarkId: 78 },
   );
 }
+// LM63: City Hall's ring on the tiles already compiled (tile -6_15 #66, no id) to its builder; `?lm63=0` leaves the extrusion
+{
+  const q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+  if (!q || q.get('lm63') !== '0') BUILDING_OVERRIDES.push(
+    { key: 'lm63CityHall', name: 'New York City Hall (tile -6_15 #66)', lat: 40.71275, lon: -74.00597, landmarkId: 80 },
+  );
+}
 // HB25: the Highbridge Water Tower's ring (tile 6_-13 #8, a 47.9 m octagon drawn as a cream prism) to its builder; `?hb25=0` leaves it
 {
   const q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
@@ -336,3 +399,88 @@ export const BUILDING_OVERRIDES = [
   );
 }
 // /LM16
+// LM66 (2026-10-31): Hudson Yards on the tiles already built (the ids of the LANDMARKS entries above, the same points; 100-107 since the downtown set took 82-93). The
+// footprint dataset gives 10 Hudson Yards (tile -5_6 #17) the 45.4 m of its podium and 55 Hudson Yards (tile -6_6 #51) 24.4 m;
+// the towers rise to 273 m and 237 m. `?lm66=0` keeps the compiled records.
+{
+  const q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+  if (!q || q.get('lm66') !== '0') BUILDING_OVERRIDES.push(
+    { key: 'lm66Hy10', name: '10 Hudson Yards (tile -5_6 #17)', lat: 40.752763, lon: -74.001565, landmarkId: 100, height: 273 },
+    { key: 'lm66Hy35', name: '35 Hudson Yards (tile -6_6 #18)', lat: 40.754640, lon: -74.002261, landmarkId: 101 },
+    { key: 'lm66Hy15', name: '15 Hudson Yards and The Shed (tile -6_6 #28)', lat: 40.753407, lon: -74.002880, landmarkId: 102 },
+    { key: 'lm66Hy50', name: '50 Hudson Yards (tile -5_6 #31)', lat: 40.754529, lon: -74.000108, landmarkId: 103 },
+    { key: 'lm66Hy55', name: '55 Hudson Yards (tile -6_6 #51)', lat: 40.755171, lon: -74.001740, landmarkId: 104, height: 237.4 },
+    { key: 'lm66Spiral', name: 'The Spiral (tile -5_6 #59)', lat: 40.755278, lon: -73.999489, landmarkId: 105 },
+    { key: 'lm66Vessel', name: 'The Vessel (tile -6_6 #36)', lat: 40.753855, lon: -74.002236, landmarkId: 106 },
+    { key: 'lm66VesselSliver', name: 'the sliver inside the Vessel\'s ring (tile -6_6 #38)', lat: 40.753676, lon: -74.002163, landmarkId: 107 },
+  );
+  // UN67: the UN complex's one compiled prism (tile 0_7 #4, 21.6 m) to its builder
+  if (!q || q.get('un67') !== '0') BUILDING_OVERRIDES.push(
+    { key: 'un67Campus', name: 'UN General Assembly and Conference Buildings (tile 0_7 #4)', lat: 40.750092, lon: -73.967714, landmarkId: 108 },
+  );
+}
+// /LM66
+// LM64 (2026-10-30): the MetLife Building and the Helmsley Building on the tiles already built. The footprint dataset gives the
+// MetLife footprint (tile -1_6 #18) the height of its base, 47.9 m (157 ft); the tower's roof is 241.7 m over the street in
+// the city's 3D building model, 246 m to its parapet. Id 25 had fallen on the Helmsley Building (#32), which takes its own
+// id 81. `?lm64=0` keeps the compiled records.
+{
+  const q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+  if (!q || q.get('lm64') !== '0') BUILDING_OVERRIDES.push(
+    { key: 'lm64MetLife', name: 'MetLife Building, 200 Park Avenue (tile -1_6 #18)', lat: 40.753556, lon: -73.976626, landmarkId: 25, height: 246, clear: ['WATERTOWER', 'SETBACKS'] },
+    { key: 'lm64Helmsley', name: 'Helmsley Building, 230 Park Avenue (tile -1_6 #32), which id 25 had replaced', lat: 40.754399, lon: -73.976102, landmarkId: 81, clear: ['WATERTOWER', 'SETBACKS'] },
+  );
+}
+// /LM64
+// LM65 (2026-10-31): lower Manhattan's landmarks on the tiles already built. Id 51 (40 Wall Street) had fallen on a 22 m building
+// at Pine and William Streets (tile -7_16 #23) and the tower (#47) drew as a generic 246 m extrusion; id 41 (56 Leonard) on a
+// 10.8 m shop row (tile -6_14 #100), and the tower's own footprint (#135) carries the footprint dataset's 77.7 m (255 ft) where
+// the tower rises to 250 m (821 ft). `?lm65=0` keeps the compiled records.
+{
+  const q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+  if (!q || q.get('lm65') !== '0') BUILDING_OVERRIDES.push(
+    { key: 'lm65W40', name: '40 Wall Street (tile -7_16 #47)', lat: 40.706963, lon: -74.009672, landmarkId: 51, clear: ['WATERTOWER', 'SETBACKS'] },
+    { key: 'lm65NotW40', name: 'the 22 m building at Pine and William Streets id 51 had replaced (tile -7_16 #23)', lat: 40.706968, lon: -74.008725, landmarkId: 0 },
+    { key: 'lm65Leonard', name: '56 Leonard Street (tile -6_14 #135)', lat: 40.717663, lon: -74.006322, landmarkId: 41, height: 250, clear: ['WATERTOWER', 'SETBACKS'] },
+    { key: 'lm65NotLeonard', name: 'the shop row id 41 had replaced (tile -6_14 #100)', lat: 40.717803, lon: -74.004855, landmarkId: 0 },
+    { key: 'lm65Oculus', name: 'World Trade Center Transportation Hub (tile -7_15 #36)', lat: 40.711522, lon: -74.011407, landmarkId: 82, clear: ['WATERTOWER', 'SETBACKS'] },
+    ...[[83, 40.71055, -74.015588], [84, 40.712487, -74.015414], [85, 40.713576, -74.014842], [86, 40.714058, -74.015912], [87, 40.713081, -74.015372], [88, 40.707667, -74.010757],
+      [89, 40.70097, -74.013039], [90, 40.701086, -74.011647], [91, 40.711311, -74.009164],
+      [92, 40.703447, -74.016813], [93, 40.704462, -74.017478]]
+      .map(([id, lat, lon]) => ({ key: 'lm65_' + id, name: LANDMARKS.find((l) => l.id === id).name, lat, lon, landmarkId: id, clear: ['WATERTOWER', 'SETBACKS'] })),
+  );
+}
+// /LM65
+// BP69 (2026-11-02): four towers east of the Battery the compile classed as glass curtain walls (style 3) on a blue-grey
+// tint; they are clad in aluminium, precast concrete and stone with punched or ribbon windows, and the path traced
+// dioramas drew their shaded faces black. Colours sampled off their sunlit faces. `?bp69=0` keeps the compiled records.
+{
+  const q = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
+  if (!q || q.get('bp69') !== '0') BUILDING_OVERRIDES.push(
+    { key: 'bp69OneNyPlaza', name: 'One New York Plaza (1969): silver aluminium, a grid of small recessed windows (tile -7_17 #57)', lat: 40.702042, lon: -74.011952,
+      style: 'PREWAR_APT', color: [178, 180, 180], winW: 1.5, clear: ['CORNICE', 'WATERTOWER', 'FIRE_ESCAPE', 'SETBACKS'] },
+    { key: 'bp69Broad125', name: '125 Broad Street: pale piers, dark glass between (tile -7_17 #16)', lat: 40.702362, lon: -74.01049,
+      style: 'DECO_MASONRY', color: [212, 212, 208], clear: ['CORNICE', 'WATERTOWER', 'FIRE_ESCAPE', 'SETBACKS'] },
+    { key: 'bp69Broad85', name: '85 Broad Street (1983): red-brown precast panels, ribbon windows (tile -7_17 #69)', lat: 40.704012, lon: -74.011144,
+      style: 'POSTWAR_BRICK', color: [146, 82, 66], clear: ['CORNICE', 'WATERTOWER', 'FIRE_ESCAPE', 'SETBACKS'] },
+    { key: 'bp69Water55', name: '55 Water Street (1972): dark glass between pale vertical piers (tile -7_17 #60)', lat: 40.703236, lon: -74.008945,
+      style: 'DECO_MASONRY', color: [112, 114, 120], clear: ['CORNICE', 'WATERTOWER', 'FIRE_ESCAPE', 'SETBACKS'] },
+    // the gap-fill's canopies (building=roof: a roof on posts) drawn as solid blocks in the plazas and the park, and the block
+    // on the East River esplanade under the FDR Drive's ramp up to the viaduct, which the ramp itself replaces
+    { key: 'bp69CanopyBroad', name: 'canopy on the plaza at Broad and South Streets (tile -7_17 #81)', lat: 40.702407, lon: -74.01103, drop: true },
+    { key: 'bp69CanopyBattery', name: 'canopy in the Battery by State Street (tile -8_17 #17, 12 m)', lat: 40.702308, lon: -74.014174, drop: true },
+    { key: 'bp69CanopyBridge', name: 'canopy at Bridge and Whitehall Streets (tile -7_17 #78)', lat: 40.704637, lon: -74.013532, drop: true },
+    { key: 'bp69CanopyWest', name: 'canopy by West Street (tile -8_16 #41)', lat: 40.70631, lon: -74.016912, drop: true },
+    { key: 'bp69FdrRamp', name: 'the block under the FDR Drive ramp at Old Slip (tile -7_17 #73)', lat: 40.702903, lon: -74.008164, drop: true },
+    // untagged small structures the gap-fill gave its 12 m default
+    { key: 'bp69VietnamWall', name: 'New York Vietnam Veterans Memorial (1985): the green glass block wall, 4.9 m (tile -7_17 #75)', lat: 40.702676, lon: -74.009788,
+      style: 'CIVIC_STONE', color: [126, 160, 146], height: 4.9, storeH: 0, clear: ['CORNICE', 'WATERTOWER', 'FIRE_ESCAPE', 'STOREFRONT'] },
+    { key: 'bp69BatteryShed', name: 'one-storey park building in the Battery (tile -8_17 #20)', lat: 40.703703, lon: -74.01605,
+      style: 'CIVIC_STONE', color: [206, 202, 192], height: 3.6, storeH: 0, clear: ['CORNICE', 'WATERTOWER', 'FIRE_ESCAPE', 'STOREFRONT'] },
+    { key: 'bp69BatteryShore', name: 'one-storey building on the Battery\'s east shore (tile -8_17 #15)', lat: 40.701033, lon: -74.013914,
+      style: 'CIVIC_STONE', color: [214, 212, 204], height: 5, storeH: 0, clear: ['CORNICE', 'WATERTOWER', 'FIRE_ESCAPE', 'STOREFRONT'] },
+    { key: 'bp69BroadPavilion', name: 'the low pale pavilion on the plaza at Broad and South Streets (tile -7_17 #80)', lat: 40.702167, lon: -74.011085,
+      style: 'CIVIC_STONE', color: [208, 208, 204], storeH: 0, clear: ['CORNICE', 'WATERTOWER', 'FIRE_ESCAPE', 'STOREFRONT'] },
+  );
+}
+// /BP69

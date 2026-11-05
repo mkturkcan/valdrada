@@ -30,7 +30,7 @@ import { ENV, applyLightTrim, applyCityAO, applySnowCap } from '../world/materia
 import { lampSpots } from '../world/life.js';
 import { TREE_SPECIES, TREE_ARCH, TREE_FORMS, TV25, tv25Spec, treePoolFor } from './furnitureKit.js';
 import { CP_FORMS, CP_TREES, CP_PARK, CP_TRANSVERSE, CP_LAMPS, CP_BENCHES, CP_BASKETS, CP_SP37, CP_SP, CP_SPCH, CP_SPECIES, CP_WOODMIX } from './cpFloraData.js';
-import { cpOnRock, cpWaterY, cpNearCoped } from './cpLand.js';
+import { cpOnRock, cpWaterY, cpNearCoped, cpOnPitch } from './cpLand.js';
 import { WOODS } from './cpLandData.js';
 import { cpbInside } from './cpBethesda.js';
 import { cpLmKeepOut } from './cpLandmarks.js';
@@ -120,6 +120,7 @@ export function furniture() {
   for (let i = 0; i < CP_TREES.length; i += 4) {
     const x0 = CP_TREES[i] / 10, z0 = CP_TREES[i + 1] / 10, cw = CP_TREES[i + 2] / 10, code = CP_TREES[i + 3];
     const F = CP_FORMS[code & 15], src = (code >> 4) & 3;
+    if (onPitch(x0, z0)) continue;
     const p0 = P0[F] ?? 0;
     const sp = TREE_SPECIES[p0] || TREE_SPECIES[0];
     let x = x0, z = z0, pool = null;
@@ -189,6 +190,9 @@ const onRock = (x, z) => { try { return cpOnRock(x, z); } catch (e) { return fal
 const inWater = (x, z) => { try { return cpWaterY(x, z, 0.3) !== null; } catch (e) { return false; } };
 // ...nor on Conservatory Water's esplanade (cpLand.js cpNearCoped: 8 m round the shore)
 const nearCoped = (x, z) => { try { return cpNearCoped(x, z); } catch (e) { return false; } };
+// ...nor on a sports ground (BE03, cpLand.js cpOnPitch: the canopy classification read the Great Lawn's turf as crowns
+// and planted 75 trees within 60 m of its middle, over its ballfields)
+const onPitch = (x, z) => { try { return cpOnPitch(x, z); } catch (e) { return false; } };
 // THE GROUND a trunk, a lamp, a bench or a basket stands on (CPFIX, 2026-09-30; docs/notes/central-park-fix.md). The
 // tile's padYNear answers from the nearest section triangle's PLANE up to 0.35 m outside it and, where no section
 // covers the point, from the highest answer of a ring 1.2 m round it. Beside the clipped slivers where the park's
@@ -310,7 +314,7 @@ function fillWoods(ctx, L) {
   for (let gx = ctx.ox + 4; gx < ctx.ox + 512; gx += 8) for (let gz = ctx.oz + 4; gz < ctx.oz + 512; gz += 8) {
     const x = gx + (hh(gx, gz, 1) - 0.5) * 5, z = gz + (hh(gx, gz, 2) - 0.5) * 5;
     if (!inWoods(W, x, z) || near(x, z, 8)) continue;
-    if (onRock(x, z) || inWater(x, z) || hardNear(ctx, x, z, 2.5)) continue;
+    if (onRock(x, z) || inWater(x, z) || onPitch(x, z) || hardNear(ctx, x, z, 2.5)) continue;
     const sp = WOOD_SP ? WOOD_SP[Math.floor(hh(x, z, 3) * WOOD_SP.length)] : -1;
     const F = sp >= 0 ? CP_SPECIES[sp][3] : WOOD_MIX[Math.floor(hh(x, z, 3) * WOOD_MIX.length)];
     const t = [x, z, 9 + 5 * hh(x, z, 4), F, 3, sp >= 0 ? CP_SPECIES[sp][4] : 0, 1, sp];
@@ -341,7 +345,7 @@ function claimTrees(group, ctx) {
       if (!st) { rock++; continue; }
       x = x0 + st[0]; z = z0 + st[1];
     }
-    if (inWater(x, z) || (CP33L && nearCoped(x, z))) { rock++; continue; }
+    if (inWater(x, z) || (CP33L && nearCoped(x, z)) || onPitch(x, z)) { rock++; continue; }
     const h1 = frac(Math.sin(x0 * 12.9898 + z0 * 78.233) * 43758.5453), h2 = frac(h1 * 91.3 + 0.17);
     const nv = (TREE_FORMS[F] && TREE_FORMS[F].variants) || 1;
     const pool = 'tree' + F + (nv > 1 && h2 < 0.5 ? '2' : '');

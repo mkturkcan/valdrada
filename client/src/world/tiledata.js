@@ -1,5 +1,6 @@
 import { BUILDING_OVERRIDES } from '../shared/landmarkSpec.js';
 import { project, STYLE, BF } from '../shared/geo.js';
+import { GAPFILL_FIX } from '../shared/gapfillFix.js';
 // RW13 (owner 2026-09-17, lod-r13.md §2.4): the compiler gave every ROWHOUSE a 2.4-3.0 m window module, so a 5.1-6.5 m
 // brownstone front carried ONE bay over its door in every shot of the ad. The classifier now emits 1.8 m (RW13); until the
 // next four-borough compile this bridges the live tiles at read time — the shader, the dresser and the hero ring all take
@@ -13,6 +14,24 @@ const rw13WinW = (style, w) => (RW13 && style === 5 && w >= 2.3) ? 1.75 : w;
 // override's point lying inside the footprint. Idempotent on tiles compiled with the same entry. ?rto=0 disables.
 const RTO = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('rto') === '0');
 const RT_OVR = RTO ? BUILDING_OVERRIDES.map((o) => { const [x, z] = project(o.lon, o.lat); return { o, x, z }; }) : [];
+// GF69 (shared/gapfillFix.js): the gap-fill's canopies out and its small untagged structures at a storey, per record (a
+// point in its footprint, its area matched), by 512 m tile; `?gf69=0` keeps the compiled records
+const GF69 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('gf69') === '0');
+let GF_IDX = null;
+function gfNear(org) {
+  if (!GF_IDX) {
+    GF_IDX = new Map();
+    for (const f of GAPFILL_FIX) { const k = `${Math.floor(f[0] / 512)}_${Math.floor(f[1] / 512)}`; let l = GF_IDX.get(k); if (!l) GF_IDX.set(k, (l = [])); l.push(f); }
+  }
+  const tx = Math.floor(org[0] / 512), tz = Math.floor(org[1] / 512), out = [];
+  for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) for (const f of GF_IDX.get(`${tx + dx}_${tz + dz}`) || []) out.push(f);
+  return out;
+}
+function ringArea(XZ, start, len) {
+  let A = 0;
+  for (let i = 0, j = len - 1; i < len; j = i++) A += XZ[(start + j) * 2] * XZ[(start + i) * 2 + 1] - XZ[(start + i) * 2] * XZ[(start + j) * 2 + 1];
+  return Math.abs(A) / 2;
+}
 function inRing(XZ, start, len, ox, oz, x, z) {
   let inside = false;
   for (let i = 0, j = len - 1; i < len; j = i++) {
@@ -36,9 +55,11 @@ function applyReadOverride(b, o) {
   // CR24 (campus roofs): runtime roof facts for assemble.js crPlan, a membrane override (packed bits 3-4), and the landmark id
   // where the compiler put a landmark point on the wrong footprint (St. Paul's Chapel had replaced Fayerweather Hall)
   if (o.roof) b.campusRoof = o.roof;
-  if (o.memb != null) b.roofKind = (b.roofKind & ~24) | ((o.memb & 3) << 3);
+  if (o.memb != null) { b.roofKind = (b.roofKind & ~24) | ((o.memb & 3) << 3); b.membO = o.memb & 3; }   // (membO: FAC8's dealt membrane yields to it)
   if (o.landmarkId != null) b.landmarkId = o.landmarkId;
+  if (o.noBalc) b.noBalc = true;      // no postwar balconies (world/heroFacades.js): a research building's punched front
   if (o.height) b.height = o.height;   // TW: a compiled height the live footprints correct (30 Rockefeller Plaza)
+  if (o.drop) b.drop = true;           // BP69: a record that is no building (a canopy the gap-fill drew as a solid block)
 }
 // Binary tile parser (matches tools/pipeline/binio.mjs writer)
 export function parseTile(buf) {
@@ -63,6 +84,7 @@ export function* buildingsOf(tile) {
   // overrides whose point falls near this tile (a footprint may reach a little past its tile's square)
   const org = tile.header && tile.header.origin;
   const near = org ? RT_OVR.filter((r) => r.x > org[0] - 150 && r.x < org[0] + 662 && r.z > org[1] - 150 && r.z < org[1] + 662) : [];
+  const gf = GF69 && org ? gfNear(org) : [];
   for (let i = 0; i < n; i++) {
     const o = i * 44;
     const b = {
@@ -78,7 +100,17 @@ export function* buildingsOf(tile) {
       area: dv.getUint16(o + 40, true), colorVar: dv.getUint8(o + 42) / 255,
       frontIdx: dv.getUint8(o + 43) - 1, // -1 = unknown (old tiles / no street frontage)
     };
+    // (GF69 first: a named override over the same record has the last word)
+    if (gf.length && b.height <= 25) for (const f of gf) {
+      if (!inRing(tile.S.bldgXZ, b.start, b.len, org[0], org[1], f[0], f[1])) continue;
+      const A = ringArea(tile.S.bldgXZ, b.start, b.len);
+      if (!(A > f[2] * 0.9 - 1 && A < f[2] * 1.1 + 1)) continue;
+      if (f[3] === 0) b.drop = true;
+      else if (b.height > f[3]) { b.height = f[3]; b.floors = 1; }
+      break;
+    }
     for (const r of near) if (inRing(tile.S.bldgXZ, b.start, b.len, org[0], org[1], r.x, r.z)) applyReadOverride(b, r.o);
+    if (b.drop) continue;
     // STORE12: a storefront never takes the whole wall. The compile gives 4.5 m to shops on buildings of any height, so a
     // 3.2 m one-storey building on Broadway at 121st St drew as one band of shop glass from kerb to roof (white slabs from
     // the air). Under 4 m of building a one-storey shopfront (bulkhead, glass, sign band) up to a 0.35 m parapet; above,

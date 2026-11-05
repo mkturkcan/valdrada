@@ -278,6 +278,10 @@ export const HA_BR_STRUCT = 8.0;
 // a double-deck bridge (the kit draws a second roadway `upper` m over its deck, city/br/arches.js): the LiDAR's class 17 is
 // the upper roadway's, so the deck (the lower roadway, the one the profile carries) is fitted that much under it
 export const HA_BR_UPPER = { henryHudson: 7.6 };
+// a double-deck kit whose record carries the TOP roadway (the LiDAR's class 17, city/br/suspension.js 'double'): its lower
+// roadway lies that much under the deck (the George Washington Bridge: the stiffening trusses' 8.8 m less the lower
+// roadway's 0.6 m over the bottom chord); a highway chain ending on the lower level lands there (city/hhp.js)
+export const HA_BR_LOWER = { gwb: 8.2 };
 export async function haAnchorBridges(B) {
   if (!HA_ON || !B || !(await haInit())) return 0;
   const A = await haAnchors();

@@ -33,7 +33,15 @@ export function marinaReady() {
   return P;
 }
 const tileOf = (ox, oz) => (D && D.tiles ? D.tiles[`${Math.floor(ox / 512)}_${Math.floor(oz / 512)}`] : null);
-export function marinaDropPier(ox, oz, id) { const T = tileOf(ox, oz); return !!(T && T.dropPier && T.dropPier.includes(id)); }
+// (area parts may drop a planimetric pier deck they draw themselves, by its outline: city/areas.js parts, marinaDropPierRule)
+const DROP_RULES = [];
+export function marinaDropPierRule(fn) { if (typeof fn === 'function' && !DROP_RULES.includes(fn)) DROP_RULES.push(fn); }
+export function marinaDropPier(ox, oz, id, ring = null) {
+  const T = tileOf(ox, oz);
+  if (T && T.dropPier && T.dropPier.includes(id)) return true;
+  for (const f of DROP_RULES) { try { if (f(ox, oz, id, ring)) return true; } catch (e) { /* a rule that throws drops nothing */ } }
+  return false;
+}
 const DROPB = new Map();
 export function marinaSkipBuilding(key, i) {
   if (!D || !D.tiles) return false;

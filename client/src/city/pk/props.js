@@ -29,6 +29,7 @@ import { regTex, mutTex, poleTagTex, poleGrimeTex, stripTex, busDiscTex, busRout
 const K = { ...K1, ...K2, sub38 };
 const ART = { ...ART1, ...ART2 };
 import { PK_ITEMS, PK_ZONES, PK_CORR } from './pkData.js';
+import { buildingsOf } from '../../world/tiledata.js';   // DK04: the footprints a shed stands against
 import { accessDrop } from '../stations/irt125.js';
 // ST38 (STATIONS2): the subway entrances at Lenox and St Nicholas Avenues as built, and the sidewalk at the Lenox corners
 import { ST38, st38Rows, st38Replaces, st38Inside, st38Apply, sub38, sub38SignTex, sub38SubwayTex } from '../stations/subEnt38.js';
@@ -344,6 +345,76 @@ function bins() {
 const _seatByTile = new Map();
 let _seatList = [];
 const _lampSeen = new Set();
+// DK04 (2026-11-04, `?dk04=0` as before). The survey places a kerbside piece where it stands at the real kerb, and the
+// compiled roadway runs ~1.25 m past that kerb here (groundY below): a basket, rack, hydrant, lamp or sign pole on that
+// strip stood at the walk's datum over the gutter, and the maroon baskets at the corners of 125th and Lenox stood half on
+// the crossings. Each such piece now moves square to the kerb, inboard, until its base (radius DK04_R) lies on the flags
+// or a lawn; one that finds no such place within 2.4 m and stands in the carriageway is left out. A shed covers the
+// frontage behind it and ends with it: each end is cut back to the last half metre whose wall side lies within 1.2 m of
+// a footprint (the shed east of Marshalls ran 8 m past the corner of 105 W 125th Street, over the corner to the subway
+// stair); a shed with no footprint behind it anywhere is kept as surveyed.
+export const DK04 = !(Q && Q.get('dk04') === '0');
+const DK04_R = { lamp: 0.32, signPole: 0.22, rack: 0.62, hydrant: 0.35, bin: 0.42, newsbox: 0.45, linknyc: 0.38, mailbox: 0.42, callBox: 0.3,
+  bollard: 0.16, busSign: 0.22, poleSign: 0.22, warnSign: 0.3, sbs: 0.45, drum: 0.45 };
+const DK_RING = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => [Math.cos(i * Math.PI / 4), Math.sin(i * Math.PI / 4)]);
+const DK_WALK = ['sidewalk', 'path', 'brick', 'plaza', 'gravel'], DK_ROAD = ['gutter', 'busred', 'asphalt'];
+export function dkSetBack(ctx, x, z, r) {
+  const flag = (u, w) => ctx.surfY(u, w, DK_WALK, 0.02) !== null || ctx.sectionY('grass', u, w, 0.02) !== null;
+  const clear = (u, w) => flag(u, w) && DK_RING.every(([a, b]) => flag(u + a * r, w + b * r));
+  if (clear(x, z)) return [x, z];
+  let ix = 0, iz = 0;
+  for (const [a, b] of DK_RING) if (!flag(x + a * r, z + b * r)) { ix -= a; iz -= b; }
+  const L = Math.hypot(ix, iz);
+  if (L > 1e-6) for (let s = 0.1; s <= 2.4; s += 0.1) { const u = x + (ix / L) * s, w = z + (iz / L) * s; if (clear(u, w)) return [u, w]; }
+  return flag(x, z) || ctx.surfY(x, z, DK_ROAD, 0.05) === null ? [x, z] : null;
+}
+const _dkRings = new Map();
+function dkRings(ctx) {
+  let L = _dkRings.get(ctx.key);
+  if (L) return L;
+  L = [];
+  const XZ = ctx.tile && ctx.tile.S && ctx.tile.S.bldgXZ;
+  if (XZ) for (const b of buildingsOf(ctx.tile)) {
+    const P = [];
+    let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+    for (let i = 0; i < b.len; i++) { const x = XZ[(b.start + i) * 2] + ctx.ox, z = XZ[(b.start + i) * 2 + 1] + ctx.oz; P.push([x, z]); x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    if (P.length > 2) L.push({ P, bb: [x0, z0, x1, z1] });
+  }
+  _dkRings.set(ctx.key, L);
+  return L;
+}
+function dkNear(R, x, z, d) {
+  if (x < R.bb[0] - d || x > R.bb[2] + d || z < R.bb[1] - d || z > R.bb[3] + d) return false;
+  const P = R.P;
+  let ins = false;
+  for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
+    const [xi, zi] = P[i], [xj, zj] = P[j];
+    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) ins = !ins;
+    const dx = xi - xj, dz = zi - zj, L2 = dx * dx + dz * dz || 1e-9, t = Math.max(0, Math.min(1, ((x - xj) * dx + (z - zj) * dz) / L2));
+    if (Math.hypot(xj + dx * t - x, zj + dz * t - z) < d) return true;
+  }
+  return ins;
+}
+export function dkShed(ctx, x, z, yaw, p, back = (p.dep || 4.4) / 2) {   // back: the wall side's distance behind the origin
+  const rings = dkRings(ctx), len = p.len;
+  const ux = Math.cos(yaw), uz = -Math.sin(yaw), nx = Math.sin(yaw), nz = Math.cos(yaw);
+  const inTile = (u, w) => u > ctx.ox + 2 && u < ctx.ox + 510 && w > ctx.oz + 2 && w < ctx.oz + 510;
+  const backed = (s) => {
+    const u = x + ux * s - nx * back, w = z + uz * s - nz * back;
+    return !inTile(u, w) || rings.some((R) => dkNear(R, u, w, 1.2));   // (past the tile's edge its footprints are not here)
+  };
+  let s0 = -len / 2, s1 = len / 2, any = false;
+  for (let s = s0; s <= s1; s += 0.5) if (backed(s)) { any = true; break; }
+  if (!any) return [x, z, p];
+  while (s0 < s1 && !backed(s0)) s0 += 0.5;
+  while (s1 > s0 && !backed(s1)) s1 -= 0.5;
+  if (s0 <= -len / 2 && s1 >= len / 2) return [x, z, p];
+  if (s1 - s0 < 2.5) return null;
+  const L2 = s1 - s0, m = (s0 + s1) / 2, cut0 = s0 + len / 2;
+  const q = { ...p, len: +L2.toFixed(2) };
+  if (p.open) q.open = p.open.map(([a, b]) => [a - cut0, b - cut0]).filter(([a, b]) => b > 0 && a < L2);
+  return [x + ux * m, z + uz * m, q];
+}
 function groundY(ctx, x, z, onWalk) {
   const y = ctx.padYNear(x, z);
   // the compiled roadway reaches ~1.25 m past the real kerb here: a kerbside piece standing on that strip stands on
@@ -401,12 +472,17 @@ export function build(group, ctx) {
   if (!list || !list.length) return;
   const cells = new Map();
   const seats = [];
+  // DK04: the pieces as placed, by tile, for placement audits (window.__PK_PLACED)
+  const dkPlaced = typeof window !== 'undefined' ? ((window.__PK_PLACED = window.__PK_PLACED || {})[ctx.key] = []) : null;
   for (const r of list) {
     if (qa36Drop(r)) continue;   // QA36
     const r36 = fx36Row(r, ctx);   // FX36
     if (!r36) continue;
-    const [kind, x, z, yaw, p] = r36;
+    let [kind, x, z, yaw, p] = r36;
+    if (DK04 && DK04_R[kind] && !(p && p.road)) { const at = dkSetBack(ctx, x, z, DK04_R[kind]); if (!at) continue; [x, z] = at; }
+    if (DK04 && kind === 'shed' && p && p.len) { const sh = dkShed(ctx, x, z, yaw, p); if (!sh) continue; [x, z, p] = sh; }
     const y = groundY(ctx, x, z, !(p && p.road));
+    if (dkPlaced) dkPlaced.push([kind, x, z, yaw, p && p.len ? p.len : 0, p && p.dep ? p.dep : 0]);
     const ck = `${Math.floor(x / CELL)}_${Math.floor(z / CELL)}`;
     let C = cells.get(ck);
     if (!C) cells.set(ck, (C = { items: [], box: new THREE.Box3(), near: null }));

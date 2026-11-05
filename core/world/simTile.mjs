@@ -28,8 +28,100 @@ import { wshCoastReady } from '../../client/src/city/wshCoast.js';   // (the Wes
 const warnOnce = new Set();
 const warn = (k, e) => { if (!warnOnce.has(k)) { warnOnce.add(k); console.warn(`[core] ${k}`, e?.message || e); } };
 
+// TILE CACHE (2026-11-04, the Unreal client's core): VALDRADA_TILE_CACHE names a folder of laid tiles' answers, each keyed by
+// the compiled tile's content and the ground flags: the records the sims read (roads, nodes, the terrain grid) and the
+// sampler's answers on a 0.5 m raster over the tile (surfaceY, surfaceInfo's kind and height, roadAt), read back bilinear
+// for heights and nearest for kinds. A tile found there skips its passes, which on the measured ground with the highways take
+// 15 to 45 s a tile; VALDRADA_TILE_CACHE_WRITE=1 writes each tile it lays (tools/core/tile_cache.mjs builds a release's).
+let CACHE_SIG;
+async function cacheSig() {
+  if (CACHE_SIG !== undefined) return CACHE_SIG;
+  CACHE_SIG = null;
+  try {
+    if (typeof process !== 'undefined' && process.env.VALDRADA_TILE_CACHE) {
+      const fs = await import('node:fs/promises'), crypto = await import('node:crypto');
+      const cells = process.env.TERRAIN_P1_CELLS ? crypto.createHash('sha1').update(await fs.readFile(process.env.TERRAIN_P1_CELLS)).digest('hex').slice(0, 12) : '';
+      CACHE_SIG = `p1=${HA_P1 ? 1 : 0};hhp=${HHP ? 1 : 0};cells=${cells}`;
+    }
+  } catch (e) { warn('tile cache', e); }
+  return CACHE_SIG;
+}
+const RN = 1024, RS = 512 / RN;   // the answers' raster: 0.5 m cells over the tile
+const KINDS_C = [null, 'sidewalk', 'path', 'brick', 'plaza', 'gravel', 'grass', 'gutter', 'busred', 'asphalt'];
+async function cacheRead(key, compiled, arrayBuf) {
+  const sig = await cacheSig();
+  if (!sig) return null;
+  try {
+    const fs = await import('node:fs/promises'), v8 = await import('node:v8'), path = await import('node:path'), zlib = await import('node:zlib');
+    const c = v8.deserialize(zlib.inflateSync(await fs.readFile(path.join(process.env.VALDRADA_TILE_CACHE, `${key}.v8z`))));
+    if (!c || c.sig !== sig || c.ckey !== tileContentKey(compiled)) return null;
+    const [ox, oz] = c.origin;
+    const cell = (x, z) => { const i = Math.floor((x - ox) / RS), j = Math.floor((z - oz) / RS); return i < 0 || j < 0 || i >= RN || j >= RN ? -1 : j * RN + i; };
+    // heights in cm over the tile's base (-32768: no answer); bilinear where the four cells answer, else the nearest
+    const height = (R, x, z) => {
+      const fx = (x - ox) / RS - 0.5, fz = (z - oz) / RS - 0.5, i = Math.floor(fx), j = Math.floor(fz);
+      if (i >= 0 && j >= 0 && i + 1 < RN && j + 1 < RN) {
+        const a = R[j * RN + i], b = R[j * RN + i + 1], c2 = R[(j + 1) * RN + i], d = R[(j + 1) * RN + i + 1];
+        // (across a step, a wall's or a deck's edge, the nearest cell: no height between two levels)
+        if (a > -32768 && b > -32768 && c2 > -32768 && d > -32768 && Math.max(a, b, c2, d) - Math.min(a, b, c2, d) <= 40) {
+          const u = fx - i, v = fz - j;
+          return c.base + ((a * (1 - u) + b * u) * (1 - v) + (c2 * (1 - u) + d * u) * v) / 100;
+        }
+      }
+      const k = cell(x, z);
+      return k < 0 || R[k] === -32768 ? null : c.base + R[k] / 100;
+    };
+    return {
+      key, roads: c.roads, nodes: c.nodes, terrain: c.terrain,
+      surfaceY: (x, z) => height(c.sy, x, z),
+      surfaceInfo: (x, z) => { const k = cell(x, z); if (k < 0 || !c.kind[k]) return null; const kind = KINDS_C[c.kind[k]], y = height(c.iy, x, z); return y === null ? null : { kind, y, road: c.kind[k] >= 7 }; },
+      roadAt: (x, z) => { const k = cell(x, z); return k >= 0 && !!c.road[k]; },
+      bytes: arrayBuf.byteLength, cached: true,
+    };
+  } catch { return null; }
+}
+async function cacheWrite(key, ckey, data, origin) {
+  const sig = await cacheSig();
+  if (!sig || process.env.VALDRADA_TILE_CACHE_WRITE !== '1') return;
+  try {
+    const fs = await import('node:fs/promises'), v8 = await import('node:v8'), path = await import('node:path'), zlib = await import('node:zlib');
+    const [ox, oz] = origin;
+    const syF = new Float32Array(RN * RN), iyF = new Float32Array(RN * RN), kind = new Uint8Array(RN * RN), road = new Uint8Array(RN * RN);
+    let base = Infinity;
+    for (let j = 0; j < RN; j++) for (let i = 0; i < RN; i++) {
+      const x = ox + (i + 0.5) * RS, z = oz + (j + 0.5) * RS, k = j * RN + i;
+      const y = data.surfaceY(x, z), q = data.surfaceInfo(x, z, 0.4);
+      syF[k] = y === null ? NaN : y; iyF[k] = q ? q.y : NaN;
+      kind[k] = q ? Math.max(0, KINDS_C.indexOf(q.kind === 'grassU' ? 'grass' : q.kind)) : 0;
+      road[k] = data.roadAt(x, z, 0.25) ? 1 : 0;
+      if (y !== null && y < base) base = y;
+      if (q && q.y < base) base = q.y;
+    }
+    if (!Number.isFinite(base)) base = 0;
+    const cm = (F) => { const R = new Int16Array(RN * RN); for (let k = 0; k < F.length; k++) R[k] = Number.isNaN(F[k]) ? -32768 : Math.max(-32767, Math.min(32767, Math.round((F[k] - base) * 100))); return R; };
+    const f = path.join(process.env.VALDRADA_TILE_CACHE, `${key}.v8z`);
+    await fs.mkdir(process.env.VALDRADA_TILE_CACHE, { recursive: true });
+    const out = { sig, ckey, origin, base, roads: data.roads, nodes: data.nodes, terrain: data.terrain, sy: cm(syF), iy: cm(iyF), kind, road };
+    await fs.writeFile(f + '.tmp', zlib.deflateSync(v8.serialize(out), { level: 6 }));
+    await fs.rename(f + '.tmp', f);
+  } catch (e) { warn('tile cache write', e); }
+}
+
 export async function simTile(key, arrayBuf) {
-  const tile = parseTile(arrayBuf);
+  const compiled = parseTile(arrayBuf);
+  const ckey0 = (await cacheSig()) ? tileContentKey(compiled) : null;
+  const hit = ckey0 ? await cacheRead(key, compiled, arrayBuf) : null;
+  if (hit) return hit;
+  const tile = compiled;
+  await layTile(key, tile, arrayBuf);
+  if (globalThis.__SIMTILE_KEEP) globalThis.__SIMTILE_KEEP.set(key, tile);   // (probes and gates: the tile's sections as laid)
+  const data = sampler(key, tile, arrayBuf);
+  if (ckey0) await cacheWrite(key, ckey0, data, tile.header.origin);
+  return data;
+}
+
+// the passes the page's assembleTile runs on a compiled tile's sections, in its order
+async function layTile(key, tile, arrayBuf) {
   // OV39: the overlays apply by the content key of the compiled tile, taken before any pass changes its sections
   const lf39D = await lf39Load(), gf38I = await gf38Index().catch(() => null);
   const ckey = (lf39D && lf39D.tiles && lf39D.tiles[key]) || (gf38I && gf38I.tiles && gf38I.tiles[key]) ? tileContentKey(tile) : null;
@@ -57,10 +149,19 @@ export async function simTile(key, arrayBuf) {
   if (P1T) { const held = haHoldDecks(tile, ox, oz); try { haApplyTile(tile, ox, oz); } catch (e) { warn('terrain p1', e); } haRestoreDecks(tile, held); }   // (P1 anchors: elevated decks held)
   if (P1T && cpTileHit(ox, oz)) { try { cpApplyP1(tile, ox, oz); } catch (e) { warn('cp32 p1', e); } }   // P1: the park's parts on the authority's ground
   if (HHPT) { try { hhpPost(tile, ox, oz, P1T); } catch (e) { warn('hhp post', e); } }
-  if (globalThis.__SIMTILE_KEEP) globalThis.__SIMTILE_KEEP.set(key, tile);   // (probes and gates: the tile's sections as laid)
   if (HHPT && P1T) { try { await wshCoastReady(); wshGroundFix(tile, ox, oz); } catch (e) { warn('wsh ground', e); } }
   if (P1T) haClampGround(tile);   // TERRAIN FIX: the natural ground never over the paving
   if (HHPT) hhpAfterClamp(tile);   // (the FDR structures' deck tops: over the drives by design)
+}
+
+// the sampler and the records the sims read, from a laid tile
+function sampler(key, tile, arrayBuf) {
+  const [ox, oz] = tile.header.origin;
+  const roadsW = () => [...roadsOf(tile)].map((r) => ({
+    ...r,
+    pts: Array.from({ length: r.len }, (_, i) => [tile.S.roadVerts[(r.start + i) * 3] + ox, tile.S.roadVerts[(r.start + i) * 3 + 1], tile.S.roadVerts[(r.start + i) * 3 + 2] + oz]),
+    name: tile.header.names[r.nameIdx] || '',
+  }));
 
   // ---- the section sampler (mirror of assembleTile's SURFACE SAMPLER block)
   const SURF = new Map();

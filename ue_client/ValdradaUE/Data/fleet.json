@@ -1,0 +1,1711 @@
+{
+ "about": "the client fleet's wheels (Tools/make_fleet.py): per kind its body mesh and each wheel's mesh (centred on its hub) and hub: p centre, r radius, n the web's wheel number (1, 2 front, steered)",
+ "kinds": {
+  "ambulance": {
+   "mesh": "/Game/Client/Fleet/ambulance/SM_ambulance",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/ambulance/SM_ambulance_w1",
+     "p": [
+      0.7841,
+      0.3545,
+      2.4019
+     ],
+     "r": 0.3548,
+     "w": 0.1714
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/ambulance/SM_ambulance_w2",
+     "p": [
+      -0.7821,
+      0.3545,
+      2.4019
+     ],
+     "r": 0.3548,
+     "w": 0.1714
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/ambulance/SM_ambulance_w3",
+     "p": [
+      0.8212,
+      0.3543,
+      -1.3677
+     ],
+     "r": 0.3521,
+     "w": 0.3194
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/ambulance/SM_ambulance_w4",
+     "p": [
+      -0.8193,
+      0.3543,
+      -1.3677
+     ],
+     "r": 0.3521,
+     "w": 0.3194
+    }
+   ]
+  },
+  "auditt": {
+   "mesh": "/Game/Client/Fleet/auditt/SM_auditt",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/auditt/SM_auditt_w1",
+     "p": [
+      0.7595,
+      0.3512,
+      1.2428
+     ],
+     "r": 0.3518,
+     "w": 0.2506
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/auditt/SM_auditt_w2",
+     "p": [
+      -0.7595,
+      0.3512,
+      1.2428
+     ],
+     "r": 0.3518,
+     "w": 0.2506
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/auditt/SM_auditt_w3",
+     "p": [
+      0.7005,
+      0.3512,
+      -1.3992
+     ],
+     "r": 0.3518,
+     "w": 0.2506
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/auditt/SM_auditt_w4",
+     "p": [
+      -0.7005,
+      0.3512,
+      -1.3992
+     ],
+     "r": 0.3518,
+     "w": 0.2506
+    }
+   ]
+  },
+  "boxtruck": {
+   "mesh": "/Game/Client/Fleet/boxtruck/SM_boxtruck",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/boxtruck/SM_boxtruck_w1",
+     "p": [
+      1.1864,
+      0.5734,
+      2.3401
+     ],
+     "r": 0.5734,
+     "w": 0.2463
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/boxtruck/SM_boxtruck_w2",
+     "p": [
+      -1.197,
+      0.5734,
+      2.3401
+     ],
+     "r": 0.5734,
+     "w": 0.2327
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/boxtruck/SM_boxtruck_w3",
+     "p": [
+      1.008,
+      0.5734,
+      -2.655
+     ],
+     "r": 0.5734,
+     "w": 0.4106
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/boxtruck/SM_boxtruck_w4",
+     "p": [
+      -1.0138,
+      0.5734,
+      -2.655
+     ],
+     "r": 0.5734,
+     "w": 0.4408
+    }
+   ]
+  },
+  "boxtruck26": {
+   "mesh": "/Game/Client/Fleet/boxtruck26/SM_boxtruck26",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/boxtruck26/SM_boxtruck26_w1",
+     "p": [
+      0.985,
+      0.419,
+      3.875
+     ],
+     "r": 0.419,
+     "w": 0.1425
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/boxtruck26/SM_boxtruck26_w2",
+     "p": [
+      -0.985,
+      0.419,
+      3.875
+     ],
+     "r": 0.419,
+     "w": 0.1425
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/boxtruck26/SM_boxtruck26_w3",
+     "p": [
+      0.85,
+      0.419,
+      -2.225
+     ],
+     "r": 0.419,
+     "w": 0.2834
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/boxtruck26/SM_boxtruck26_w4",
+     "p": [
+      -0.85,
+      0.419,
+      -2.225
+     ],
+     "r": 0.419,
+     "w": 0.2834
+    }
+   ]
+  },
+  "boxtruck26_vh36": {
+   "mesh": "/Game/Client/Fleet/boxtruck26_vh36/SM_boxtruck26_vh36",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/boxtruck26_vh36/SM_boxtruck26_vh36_w1",
+     "p": [
+      0.9041,
+      0.3997,
+      3.8155
+     ],
+     "r": 0.3954,
+     "w": 0.199
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/boxtruck26_vh36/SM_boxtruck26_vh36_w2",
+     "p": [
+      -0.9041,
+      0.3997,
+      3.8155
+     ],
+     "r": 0.3954,
+     "w": 0.199
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/boxtruck26_vh36/SM_boxtruck26_vh36_w3",
+     "p": [
+      0.8218,
+      0.3947,
+      -2.2845
+     ],
+     "r": 0.3947,
+     "w": 0.5178
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/boxtruck26_vh36/SM_boxtruck26_vh36_w4",
+     "p": [
+      -0.8218,
+      0.3947,
+      -2.2845
+     ],
+     "r": 0.3947,
+     "w": 0.5178
+    }
+   ]
+  },
+  "cargovan": {
+   "mesh": "/Game/Client/Fleet/cargovan/SM_cargovan",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/cargovan/SM_cargovan_w1",
+     "p": [
+      0.87,
+      0.356,
+      2.1155
+     ],
+     "r": 0.356,
+     "w": 0.1375
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/cargovan/SM_cargovan_w2",
+     "p": [
+      -0.87,
+      0.356,
+      2.1155
+     ],
+     "r": 0.356,
+     "w": 0.1375
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/cargovan/SM_cargovan_w3",
+     "p": [
+      0.85,
+      0.356,
+      -1.6445
+     ],
+     "r": 0.356,
+     "w": 0.1375
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/cargovan/SM_cargovan_w4",
+     "p": [
+      -0.85,
+      0.356,
+      -1.6445
+     ],
+     "r": 0.356,
+     "w": 0.1375
+    }
+   ]
+  },
+  "charger": {
+   "mesh": "/Game/Client/Fleet/charger/SM_charger",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/charger/SM_charger_w1",
+     "p": [
+      0.8119,
+      0.3569,
+      1.6171
+     ],
+     "r": 0.3614,
+     "w": 0.1407
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/charger/SM_charger_w2",
+     "p": [
+      -0.812,
+      0.3569,
+      1.6171
+     ],
+     "r": 0.3614,
+     "w": 0.1369
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/charger/SM_charger_w3",
+     "p": [
+      0.8269,
+      0.3569,
+      -1.4267
+     ],
+     "r": 0.364,
+     "w": 0.1556
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/charger/SM_charger_w4",
+     "p": [
+      -0.827,
+      0.3569,
+      -1.4267
+     ],
+     "r": 0.364,
+     "w": 0.1518
+    }
+   ]
+  },
+  "dsny": {
+   "mesh": "/Game/Client/Fleet/dsny/SM_dsny",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/dsny/SM_dsny_w1",
+     "p": [
+      1,
+      0.53,
+      3.4725
+     ],
+     "r": 0.53,
+     "w": 0.17
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/dsny/SM_dsny_w2",
+     "p": [
+      -1,
+      0.53,
+      3.4725
+     ],
+     "r": 0.53,
+     "w": 0.17
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/dsny/SM_dsny_w3",
+     "p": [
+      1.03,
+      0.53,
+      -1.2275
+     ],
+     "r": 0.53,
+     "w": 0.17
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/dsny/SM_dsny_w4",
+     "p": [
+      -1.03,
+      0.53,
+      -1.2275
+     ],
+     "r": 0.53,
+     "w": 0.17
+    },
+    {
+     "n": 5,
+     "mesh": "/Game/Client/Fleet/dsny/SM_dsny_w5",
+     "p": [
+      1.03,
+      0.53,
+      -2.5975
+     ],
+     "r": 0.53,
+     "w": 0.17
+    },
+    {
+     "n": 6,
+     "mesh": "/Game/Client/Fleet/dsny/SM_dsny_w6",
+     "p": [
+      -1.03,
+      0.53,
+      -2.5975
+     ],
+     "r": 0.53,
+     "w": 0.17
+    }
+   ]
+  },
+  "firetruck": {
+   "mesh": "/Game/Client/Fleet/firetruck/SM_firetruck",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/firetruck/SM_firetruck_w1",
+     "p": [
+      1.1864,
+      0.5734,
+      2.5146
+     ],
+     "r": 0.5734,
+     "w": 0.2327
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/firetruck/SM_firetruck_w2",
+     "p": [
+      -1.197,
+      0.5734,
+      2.5146
+     ],
+     "r": 0.5734,
+     "w": 0.2327
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/firetruck/SM_firetruck_w3",
+     "p": [
+      1.008,
+      0.5734,
+      -2.4805
+     ],
+     "r": 0.5734,
+     "w": 0.4572
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/firetruck/SM_firetruck_w4",
+     "p": [
+      -1.0138,
+      0.5734,
+      -2.4805
+     ],
+     "r": 0.5734,
+     "w": 0.4572
+    }
+   ]
+  },
+  "foodtruck": {
+   "mesh": "/Game/Client/Fleet/foodtruck/SM_foodtruck",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/foodtruck/SM_foodtruck_w1",
+     "p": [
+      0.97,
+      0.405,
+      2.898
+     ],
+     "r": 0.405,
+     "w": 0.1325
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/foodtruck/SM_foodtruck_w2",
+     "p": [
+      -0.97,
+      0.405,
+      2.898
+     ],
+     "r": 0.405,
+     "w": 0.1325
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/foodtruck/SM_foodtruck_w3",
+     "p": [
+      0.8,
+      0.405,
+      -1.112
+     ],
+     "r": 0.405,
+     "w": 0.2619
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/foodtruck/SM_foodtruck_w4",
+     "p": [
+      -0.8,
+      0.405,
+      -1.112
+     ],
+     "r": 0.405,
+     "w": 0.2619
+    }
+   ]
+  },
+  "icecream": {
+   "mesh": "/Game/Client/Fleet/icecream/SM_icecream",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/icecream/SM_icecream_w1",
+     "p": [
+      0.87,
+      0.372,
+      2.518
+     ],
+     "r": 0.372,
+     "w": 0.1325
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/icecream/SM_icecream_w2",
+     "p": [
+      -0.87,
+      0.372,
+      2.518
+     ],
+     "r": 0.372,
+     "w": 0.1325
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/icecream/SM_icecream_w3",
+     "p": [
+      0.8,
+      0.372,
+      -1.492
+     ],
+     "r": 0.372,
+     "w": 0.2619
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/icecream/SM_icecream_w4",
+     "p": [
+      -0.8,
+      0.372,
+      -1.492
+     ],
+     "r": 0.372,
+     "w": 0.2619
+    }
+   ]
+  },
+  "impala": {
+   "mesh": "/Game/Client/Fleet/impala/SM_impala",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/impala/SM_impala_w1",
+     "p": [
+      0.7762,
+      0.3512,
+      1.6524
+     ],
+     "r": 0.3518,
+     "w": 0.1353
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/impala/SM_impala_w2",
+     "p": [
+      -0.7731,
+      0.3512,
+      1.6524
+     ],
+     "r": 0.3518,
+     "w": 0.1358
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/impala/SM_impala_w3",
+     "p": [
+      0.7762,
+      0.3512,
+      -1.3295
+     ],
+     "r": 0.3518,
+     "w": 0.1353
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/impala/SM_impala_w4",
+     "p": [
+      -0.7731,
+      0.3512,
+      -1.3295
+     ],
+     "r": 0.3518,
+     "w": 0.1358
+    }
+   ]
+  },
+  "lincoln": {
+   "mesh": "/Game/Client/Fleet/lincoln/SM_lincoln",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/lincoln/SM_lincoln_w1",
+     "p": [
+      0.7965,
+      0.37,
+      1.4764
+     ],
+     "r": 0.3708,
+     "w": 0.1659
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/lincoln/SM_lincoln_w2",
+     "p": [
+      -0.7965,
+      0.37,
+      1.4764
+     ],
+     "r": 0.3708,
+     "w": 0.1659
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/lincoln/SM_lincoln_w3",
+     "p": [
+      0.7963,
+      0.37,
+      -1.3909
+     ],
+     "r": 0.3706,
+     "w": 0.1658
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/lincoln/SM_lincoln_w4",
+     "p": [
+      -0.7965,
+      0.37,
+      -1.3909
+     ],
+     "r": 0.3706,
+     "w": 0.1659
+    }
+   ]
+  },
+  "mercedes": {
+   "mesh": "/Game/Client/Fleet/mercedes/SM_mercedes",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/mercedes/SM_mercedes_w1",
+     "p": [
+      0.8019,
+      0.3443,
+      1.5486
+     ],
+     "r": 0.3449,
+     "w": 0.1313
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/mercedes/SM_mercedes_w2",
+     "p": [
+      -0.7965,
+      0.3443,
+      1.5486
+     ],
+     "r": 0.3449,
+     "w": 0.126
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/mercedes/SM_mercedes_w3",
+     "p": [
+      0.8019,
+      0.3443,
+      -1.2839
+     ],
+     "r": 0.3449,
+     "w": 0.1313
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/mercedes/SM_mercedes_w4",
+     "p": [
+      -0.7965,
+      0.3443,
+      -1.2839
+     ],
+     "r": 0.3449,
+     "w": 0.126
+    }
+   ]
+  },
+  "mini": {
+   "mesh": "/Game/Client/Fleet/mini/SM_mini",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/mini/SM_mini_w1",
+     "p": [
+      0.8487,
+      0.3444,
+      1.3053
+     ],
+     "r": 0.3446,
+     "w": 0.1422
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/mini/SM_mini_w2",
+     "p": [
+      -0.8487,
+      0.3444,
+      1.3053
+     ],
+     "r": 0.3446,
+     "w": 0.1422
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/mini/SM_mini_w3",
+     "p": [
+      0.8487,
+      0.3435,
+      -1.4809
+     ],
+     "r": 0.3452,
+     "w": 0.1422
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/mini/SM_mini_w4",
+     "p": [
+      -0.8487,
+      0.3435,
+      -1.4809
+     ],
+     "r": 0.3452,
+     "w": 0.1422
+    }
+   ]
+  },
+  "minibus": {
+   "mesh": "/Game/Client/Fleet/minibus/SM_minibus",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/minibus/SM_minibus_w1",
+     "p": [
+      0.7807,
+      0.4047,
+      2.262
+     ],
+     "r": 0.405,
+     "w": 0.1798
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/minibus/SM_minibus_w2",
+     "p": [
+      -0.9042,
+      0.4047,
+      2.262
+     ],
+     "r": 0.405,
+     "w": 0.1757
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/minibus/SM_minibus_w3",
+     "p": [
+      0.6768,
+      0.4051,
+      -1.3745
+     ],
+     "r": 0.406,
+     "w": 0.2903
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/minibus/SM_minibus_w4",
+     "p": [
+      -0.7961,
+      0.4051,
+      -1.3745
+     ],
+     "r": 0.406,
+     "w": 0.2902
+    }
+   ]
+  },
+  "model3": {
+   "mesh": "/Game/Client/Fleet/model3/SM_model3",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/model3/SM_model3_w1",
+     "p": [
+      0.8157,
+      0.3676,
+      1.5554
+     ],
+     "r": 0.3676,
+     "w": 0.1409
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/model3/SM_model3_w2",
+     "p": [
+      -0.8157,
+      0.3676,
+      1.5554
+     ],
+     "r": 0.3669,
+     "w": 0.1409
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/model3/SM_model3_w3",
+     "p": [
+      0.8157,
+      0.3676,
+      -1.3856
+     ],
+     "r": 0.3676,
+     "w": 0.1409
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/model3/SM_model3_w4",
+     "p": [
+      -0.8157,
+      0.3676,
+      -1.3856
+     ],
+     "r": 0.3676,
+     "w": 0.1409
+    }
+   ]
+  },
+  "mtalfs": {
+   "mesh": "/Game/Client/Fleet/mtalfs/SM_mtalfs",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/mtalfs/SM_mtalfs_w1",
+     "p": [
+      1.125,
+      0.495,
+      3.555
+     ],
+     "r": 0.5,
+     "w": 0.305
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/mtalfs/SM_mtalfs_w2",
+     "p": [
+      -1.125,
+      0.495,
+      3.555
+     ],
+     "r": 0.5,
+     "w": 0.305
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/mtalfs/SM_mtalfs_w3",
+     "p": [
+      0.94,
+      0.495,
+      -2.645
+     ],
+     "r": 0.5,
+     "w": 0.635
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/mtalfs/SM_mtalfs_w4",
+     "p": [
+      -0.94,
+      0.495,
+      -2.645
+     ],
+     "r": 0.5,
+     "w": 0.635
+    }
+   ]
+  },
+  "mtalfsa": {
+   "mesh": "/Game/Client/Fleet/mtalfsa/SM_mtalfsa",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/mtalfsa/SM_mtalfsa_w1",
+     "p": [
+      1.125,
+      0.495,
+      6.91
+     ],
+     "r": 0.5,
+     "w": 0.305
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/mtalfsa/SM_mtalfsa_w2",
+     "p": [
+      -1.125,
+      0.495,
+      6.91
+     ],
+     "r": 0.5,
+     "w": 0.305
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/mtalfsa/SM_mtalfsa_w3",
+     "p": [
+      0.94,
+      0.495,
+      0.71
+     ],
+     "r": 0.5,
+     "w": 0.635
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/mtalfsa/SM_mtalfsa_w4",
+     "p": [
+      -0.94,
+      0.495,
+      0.71
+     ],
+     "r": 0.5,
+     "w": 0.635
+    },
+    {
+     "n": 5,
+     "mesh": "/Game/Client/Fleet/mtalfsa/SM_mtalfsa_w5",
+     "p": [
+      0.94,
+      0.495,
+      -5.72
+     ],
+     "r": 0.5,
+     "w": 0.635
+    },
+    {
+     "n": 6,
+     "mesh": "/Game/Client/Fleet/mtalfsa/SM_mtalfsa_w6",
+     "p": [
+      -0.94,
+      0.495,
+      -5.72
+     ],
+     "r": 0.5,
+     "w": 0.635
+    }
+   ]
+  },
+  "mtalfsal": {
+   "mesh": "/Game/Client/Fleet/mtalfsal/SM_mtalfsal",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/mtalfsal/SM_mtalfsal_w1",
+     "p": [
+      1.125,
+      0.495,
+      6.91
+     ],
+     "r": 0.5,
+     "w": 0.305
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/mtalfsal/SM_mtalfsal_w2",
+     "p": [
+      -1.125,
+      0.495,
+      6.91
+     ],
+     "r": 0.5,
+     "w": 0.305
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/mtalfsal/SM_mtalfsal_w3",
+     "p": [
+      0.94,
+      0.495,
+      0.71
+     ],
+     "r": 0.5,
+     "w": 0.635
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/mtalfsal/SM_mtalfsal_w4",
+     "p": [
+      -0.94,
+      0.495,
+      0.71
+     ],
+     "r": 0.5,
+     "w": 0.635
+    },
+    {
+     "n": 5,
+     "mesh": "/Game/Client/Fleet/mtalfsal/SM_mtalfsal_w5",
+     "p": [
+      0.94,
+      0.495,
+      -5.72
+     ],
+     "r": 0.5,
+     "w": 0.635
+    },
+    {
+     "n": 6,
+     "mesh": "/Game/Client/Fleet/mtalfsal/SM_mtalfsal_w6",
+     "p": [
+      -0.94,
+      0.495,
+      -5.72
+     ],
+     "r": 0.5,
+     "w": 0.635
+    }
+   ]
+  },
+  "mtaxd40": {
+   "mesh": "/Game/Client/Fleet/mtaxd40/SM_mtaxd40",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/mtaxd40/SM_mtaxd40_w1",
+     "p": [
+      1.125,
+      0.495,
+      3.82
+     ],
+     "r": 0.5,
+     "w": 0.305
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/mtaxd40/SM_mtaxd40_w2",
+     "p": [
+      -1.125,
+      0.495,
+      3.82
+     ],
+     "r": 0.5,
+     "w": 0.305
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/mtaxd40/SM_mtaxd40_w3",
+     "p": [
+      0.94,
+      0.495,
+      -3.39
+     ],
+     "r": 0.5,
+     "w": 0.635
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/mtaxd40/SM_mtaxd40_w4",
+     "p": [
+      -0.94,
+      0.495,
+      -3.39
+     ],
+     "r": 0.5,
+     "w": 0.635
+    }
+   ]
+  },
+  "mtaxd60": {
+   "mesh": "/Game/Client/Fleet/mtaxd60/SM_mtaxd60",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/mtaxd60/SM_mtaxd60_w1",
+     "p": [
+      1.125,
+      0.495,
+      6.84
+     ],
+     "r": 0.5,
+     "w": 0.305
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/mtaxd60/SM_mtaxd60_w2",
+     "p": [
+      -1.125,
+      0.495,
+      6.84
+     ],
+     "r": 0.5,
+     "w": 0.305
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/mtaxd60/SM_mtaxd60_w3",
+     "p": [
+      0.94,
+      0.495,
+      1.02
+     ],
+     "r": 0.5,
+     "w": 0.635
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/mtaxd60/SM_mtaxd60_w4",
+     "p": [
+      -0.94,
+      0.495,
+      1.02
+     ],
+     "r": 0.5,
+     "w": 0.635
+    },
+    {
+     "n": 5,
+     "mesh": "/Game/Client/Fleet/mtaxd60/SM_mtaxd60_w5",
+     "p": [
+      0.94,
+      0.495,
+      -6.42
+     ],
+     "r": 0.5,
+     "w": 0.635
+    },
+    {
+     "n": 6,
+     "mesh": "/Game/Client/Fleet/mtaxd60/SM_mtaxd60_w6",
+     "p": [
+      -0.94,
+      0.495,
+      -6.42
+     ],
+     "r": 0.5,
+     "w": 0.635
+    }
+   ]
+  },
+  "mustang": {
+   "mesh": "/Game/Client/Fleet/mustang/SM_mustang",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/mustang/SM_mustang_w1",
+     "p": [
+      0.7769,
+      0.3189,
+      1.4991
+     ],
+     "r": 0.3189,
+     "w": 0.124
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/mustang/SM_mustang_w2",
+     "p": [
+      -0.7769,
+      0.3189,
+      1.4991
+     ],
+     "r": 0.3189,
+     "w": 0.124
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/mustang/SM_mustang_w3",
+     "p": [
+      0.7769,
+      0.3189,
+      -1.3294
+     ],
+     "r": 0.3189,
+     "w": 0.1258
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/mustang/SM_mustang_w4",
+     "p": [
+      -0.7769,
+      0.3189,
+      -1.3294
+     ],
+     "r": 0.3189,
+     "w": 0.1258
+    }
+   ]
+  },
+  "nypd": {
+   "mesh": "/Game/Client/Fleet/nypd/SM_nypd",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/nypd/SM_nypd_w1",
+     "p": [
+      0.85,
+      0.3815,
+      1.575
+     ],
+     "r": 0.3815,
+     "w": 0.1475
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/nypd/SM_nypd_w2",
+     "p": [
+      -0.85,
+      0.3815,
+      1.575
+     ],
+     "r": 0.3815,
+     "w": 0.1475
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/nypd/SM_nypd_w3",
+     "p": [
+      0.85,
+      0.3815,
+      -1.45
+     ],
+     "r": 0.3815,
+     "w": 0.1475
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/nypd/SM_nypd_w4",
+     "p": [
+      -0.85,
+      0.3815,
+      -1.45
+     ],
+     "r": 0.3815,
+     "w": 0.1475
+    }
+   ]
+  },
+  "police": {
+   "mesh": "/Game/Client/Fleet/police/SM_police",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/police/SM_police_w1",
+     "p": [
+      0.8027,
+      0.3581,
+      1.5045
+     ],
+     "r": 0.3585,
+     "w": 0.1406
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/police/SM_police_w2",
+     "p": [
+      -0.8119,
+      0.3581,
+      1.5045
+     ],
+     "r": 0.3585,
+     "w": 0.137
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/police/SM_police_w3",
+     "p": [
+      0.8027,
+      0.3581,
+      -1.5367
+     ],
+     "r": 0.3585,
+     "w": 0.1406
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/police/SM_police_w4",
+     "p": [
+      -0.8119,
+      0.3581,
+      -1.5367
+     ],
+     "r": 0.3585,
+     "w": 0.137
+    }
+   ]
+  },
+  "schoolbus": {
+   "mesh": "/Game/Client/Fleet/schoolbus/SM_schoolbus",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/schoolbus/SM_schoolbus_w1",
+     "p": [
+      1.02,
+      0.525,
+      4.42
+     ],
+     "r": 0.525,
+     "w": 0.16
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/schoolbus/SM_schoolbus_w2",
+     "p": [
+      -1.02,
+      0.525,
+      4.42
+     ],
+     "r": 0.525,
+     "w": 0.16
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/schoolbus/SM_schoolbus_w3",
+     "p": [
+      1.05,
+      0.525,
+      -1.78
+     ],
+     "r": 0.525,
+     "w": 0.16
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/schoolbus/SM_schoolbus_w4",
+     "p": [
+      -1.05,
+      0.525,
+      -1.78
+     ],
+     "r": 0.525,
+     "w": 0.16
+    }
+   ]
+  },
+  "stepvan": {
+   "mesh": "/Game/Client/Fleet/stepvan/SM_stepvan",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/stepvan/SM_stepvan_w1",
+     "p": [
+      0.97,
+      0.405,
+      2.857
+     ],
+     "r": 0.405,
+     "w": 0.1325
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/stepvan/SM_stepvan_w2",
+     "p": [
+      -0.97,
+      0.405,
+      2.857
+     ],
+     "r": 0.405,
+     "w": 0.1325
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/stepvan/SM_stepvan_w3",
+     "p": [
+      0.8,
+      0.405,
+      -1.153
+     ],
+     "r": 0.405,
+     "w": 0.2619
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/stepvan/SM_stepvan_w4",
+     "p": [
+      -0.8,
+      0.405,
+      -1.153
+     ],
+     "r": 0.405,
+     "w": 0.2619
+    }
+   ]
+  },
+  "suv": {
+   "mesh": "/Game/Client/Fleet/suv/SM_suv",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/suv/SM_suv_w1",
+     "p": [
+      0.918,
+      0.4658,
+      1.7378
+     ],
+     "r": 0.4663,
+     "w": 0.1753
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/suv/SM_suv_w2",
+     "p": [
+      -0.918,
+      0.4658,
+      1.7378
+     ],
+     "r": 0.4663,
+     "w": 0.1753
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/suv/SM_suv_w3",
+     "p": [
+      0.918,
+      0.4658,
+      -1.5412
+     ],
+     "r": 0.4663,
+     "w": 2.0113
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/suv/SM_suv_w4",
+     "p": [
+      -0.918,
+      0.4658,
+      -1.5412
+     ],
+     "r": 0.4663,
+     "w": 2.0113
+    }
+   ]
+  },
+  "taxi": {
+   "mesh": "/Game/Client/Fleet/taxi/SM_taxi",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/taxi/SM_taxi_w1",
+     "p": [
+      0.7537,
+      0.3493,
+      1.5932
+     ],
+     "r": 0.3493,
+     "w": 0.1377
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/taxi/SM_taxi_w2",
+     "p": [
+      -0.7536,
+      0.3493,
+      1.5932
+     ],
+     "r": 0.3493,
+     "w": 0.1377
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/taxi/SM_taxi_w3",
+     "p": [
+      0.7537,
+      0.3493,
+      -1.3233
+     ],
+     "r": 0.3493,
+     "w": 0.1377
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/taxi/SM_taxi_w4",
+     "p": [
+      -0.7536,
+      0.3493,
+      -1.3233
+     ],
+     "r": 0.3493,
+     "w": 0.1377
+    }
+   ]
+  },
+  "taxinv200": {
+   "mesh": "/Game/Client/Fleet/taxinv200/SM_taxinv200",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/taxinv200/SM_taxinv200_w1",
+     "p": [
+      0.6899,
+      0.3015,
+      1.4648
+     ],
+     "r": 0.3015,
+     "w": 0.2179
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/taxinv200/SM_taxinv200_w2",
+     "p": [
+      -0.6882,
+      0.3015,
+      1.4648
+     ],
+     "r": 0.3015,
+     "w": 0.2149
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/taxinv200/SM_taxinv200_w3",
+     "p": [
+      0.6882,
+      0.3015,
+      -1.5028
+     ],
+     "r": 0.3015,
+     "w": 0.2149
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/taxinv200/SM_taxinv200_w4",
+     "p": [
+      -0.6882,
+      0.3015,
+      -1.5028
+     ],
+     "r": 0.3015,
+     "w": 0.2149
+    }
+   ]
+  },
+  "uspsllv": {
+   "mesh": "/Game/Client/Fleet/uspsllv/SM_uspsllv",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/uspsllv/SM_uspsllv_w1",
+     "p": [
+      0.8,
+      0.345,
+      1.46
+     ],
+     "r": 0.345,
+     "w": 0.12
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/uspsllv/SM_uspsllv_w2",
+     "p": [
+      -0.8,
+      0.345,
+      1.46
+     ],
+     "r": 0.345,
+     "w": 0.12
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/uspsllv/SM_uspsllv_w3",
+     "p": [
+      0.8,
+      0.345,
+      -1.093
+     ],
+     "r": 0.345,
+     "w": 0.12
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/uspsllv/SM_uspsllv_w4",
+     "p": [
+      -0.8,
+      0.345,
+      -1.093
+     ],
+     "r": 0.345,
+     "w": 0.12
+    }
+   ]
+  },
+  "uspsngdv": {
+   "mesh": "/Game/Client/Fleet/uspsngdv/SM_uspsngdv",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/uspsngdv/SM_uspsngdv_w1",
+     "p": [
+      0.89,
+      0.375,
+      2.06
+     ],
+     "r": 0.375,
+     "w": 0.1375
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/uspsngdv/SM_uspsngdv_w2",
+     "p": [
+      -0.89,
+      0.375,
+      2.06
+     ],
+     "r": 0.375,
+     "w": 0.1375
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/uspsngdv/SM_uspsngdv_w3",
+     "p": [
+      0.89,
+      0.375,
+      -1.166
+     ],
+     "r": 0.375,
+     "w": 0.1375
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/uspsngdv/SM_uspsngdv_w4",
+     "p": [
+      -0.89,
+      0.375,
+      -1.166
+     ],
+     "r": 0.375,
+     "w": 0.1375
+    }
+   ]
+  },
+  "van": {
+   "mesh": "/Game/Client/Fleet/van/SM_van",
+   "wheels": [
+    {
+     "n": 1,
+     "mesh": "/Game/Client/Fleet/van/SM_van_w1",
+     "p": [
+      0.8402,
+      0.3656,
+      1.9429
+     ],
+     "r": 0.3656,
+     "w": 0.1499
+    },
+    {
+     "n": 2,
+     "mesh": "/Game/Client/Fleet/van/SM_van_w2",
+     "p": [
+      -0.8358,
+      0.3656,
+      1.9429
+     ],
+     "r": 0.3656,
+     "w": 0.1503
+    },
+    {
+     "n": 3,
+     "mesh": "/Game/Client/Fleet/van/SM_van_w3",
+     "p": [
+      0.8402,
+      0.3656,
+      -1.7186
+     ],
+     "r": 0.3656,
+     "w": 0.1499
+    },
+    {
+     "n": 4,
+     "mesh": "/Game/Client/Fleet/van/SM_van_w4",
+     "p": [
+      -0.8358,
+      0.3656,
+      -1.7186
+     ],
+     "r": 0.3656,
+     "w": 0.1503
+    }
+   ]
+  }
+ },
+ "bad_wheels": []
+}

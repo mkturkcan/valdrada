@@ -37,8 +37,9 @@ TREE = [
     ('client/package.json', 'client/package.json', None),
     ('client/src', 'client/src', None),
     # data/lod16 is the web client's far-field chunk bank (2.9 GB), which the core never reads (it reads the cell cache's
-    # indices, below)
-    ('client/public/data', 'client/public/data', lambda rel: not rel.startswith('lod16/')),
+    # indices, below); the measured ground's products the core reads come in GROUND below, the bakes' own (terrain_mn,
+    # m64, the vegetation) never
+    ('client/public/data', 'client/public/data', lambda rel: not rel.startswith(('lod16/', 'terrain_', 'veg_p1/', 'm64/', 'hhp_p2/'))),
     ('client/public/fonts', 'client/public/fonts', None),
     ('client/public/models/fleet24', 'client/public/models/fleet24', lambda rel: rel.endswith('.glb') or rel.endswith('.json')),
     ('client/public/models/peds24', 'client/public/models/peds24', lambda rel: os.path.basename(rel) == 'manifest.json'),
@@ -49,6 +50,13 @@ TREE = [
     ('client/node_modules/@dgreenheck/ez-tree', 'client/node_modules/@dgreenheck/ez-tree', lambda rel: not rel.startswith(('docs/', 'examples/', 'test/'))),
 ]
 TILES = ('client/public/tiles', 'client/public/tiles')
+# 0.7.0: the core on the city's own ground (the launcher sets TERRAIN_P1, HHP_P2 and TERRAIN_P1_CELLS when the list is in
+# the bundle): the measured ground's chunks of the tiles holding a cell baked on the terrain profile (config/far/lift_cells.json,
+# shipped as data/terrain_cells.json; the height authority leaves every other tile flat, as the renderer's blocks are),
+# its membrane, walls, stairs and decks, the grade's stations, the anchors, the highways and the grade's cover
+GROUND_CELLS = 'config/far/lift_cells.json'
+GROUND = [('client/public/data/terrain_grade', None), ('client/public/data/terrain_p1a', None), ('client/public/data/hhp_p2', None),
+          ('client/public/data/veg_p1', lambda rel: rel.startswith('cover/'))]
 # the indices of the cells and far chunks that the renderer holds (core/api/render.mjs reads them from VALDRADA_CELLCACHE to
 # send render.load); they must come from the same city build as the cooked content
 CELLCACHE = '/data0/projectnyc_aux/cellcache'
@@ -148,6 +156,8 @@ def main():
     ap.add_argument('--node-version', default=NODE_VERSION)
     ap.add_argument('--node-local', default=None, help='Linux: an extracted node-v<version>-linux-x64 folder to copy instead of downloading')
     ap.add_argument('--cache', default=os.path.join(HERE, 'out', 'cache'), help='where the Node archives are kept')
+    ap.add_argument('--no-tile-cache', action='store_true', help='leave out the laid-tile cache of the measured ground (the core lays those tiles as it loads them)')
+    ap.add_argument('--tile-cache-jobs', type=int, default=32, help='processes that lay the tile cache')
     a = ap.parse_args()
 
     t0 = time.time()
@@ -161,6 +171,32 @@ def main():
         copy_tree(os.path.join(a.repo, src), os.path.join(app, dst), flt, stats, part)
     for f in CELLCACHE_FILES:
         copy_tree(os.path.join(a.cellcache, f), os.path.join(app, 'cellcache', f), None, stats, 'cellcache')
+    cells_f = os.path.join(a.repo, GROUND_CELLS)
+    if os.path.exists(cells_f) and os.path.isdir(os.path.join(a.repo, 'client/public/data/terrain_p1')):
+        cells = json.load(open(cells_f))
+        tiles_g = {f'{int(k.split("_")[0]) // 4}_{int(k.split("_")[1]) // 4}' for k in cells}
+        keep = lambda rel: not rel.startswith('t_') or rel[2:].rsplit('.', 1)[0] in tiles_g
+        copy_tree(os.path.join(a.repo, 'client/public/data/terrain_p1'), os.path.join(app, 'client/public/data/terrain_p1'), keep, stats, 'client/public/data')
+        for src, flt in GROUND:
+            if os.path.isdir(os.path.join(a.repo, src)):
+                copy_tree(os.path.join(a.repo, src), os.path.join(app, src), flt, stats, 'client/public/data')
+        with open(os.path.join(app, 'client/public/data/terrain_cells.json'), 'w') as f:
+            json.dump(cells, f)
+        print(f'ground: {len(cells)} terrain cells in {len(tiles_g)} tiles', flush=True)
+        # the tiles on the measured ground laid once, by this tree's code (tools/core/tile_cache.mjs): the core reads them
+        # instead of laying each again (15 to 45 s a tile)
+        if not a.no_tile_cache:
+            cdir = os.path.join(app, 'cache', 'tiles')
+            env = dict(os.environ, TERRAIN_P1='1', HHP_P2='1', TERRAIN_P1_CELLS=os.path.join(app, 'client/public/data/terrain_cells.json'),
+                       VALDRADA_TILES=a.tiles or os.path.join(a.repo, TILES[0]))
+            node_bin = shutil.which('node') or 'node'
+            r = subprocess.run([node_bin, os.path.join(a.repo, 'tools', 'core', 'tile_cache.mjs'), cdir, '--jobs', str(a.tile_cache_jobs)], cwd=a.repo, env=env)
+            if r.returncode != 0:
+                sys.exit('tile cache: some tiles failed (see above)')
+            nb = sum(os.path.getsize(os.path.join(cdir, f)) for f in os.listdir(cdir))
+            stats['cache'] = [len(os.listdir(cdir)), nb]
+    else:
+        print('ground: no terrain cell list or no measured ground in the repository: the core stays flat', flush=True)
     if not a.no_tiles:
         tiles = a.tiles or os.path.join(a.repo, TILES[0])
         copy_tree(tiles, os.path.join(app, TILES[1]), None, stats, 'client/public/tiles')

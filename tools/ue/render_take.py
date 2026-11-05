@@ -995,6 +995,9 @@ def main():
     lock = open(os.path.join(UECACHE, 'locks', f'{a.shot}.lock' if tag == 'all' else f'{a.shot}_{tag}.lock'), 'w'); fcntl.flock(lock, fcntl.LOCK_EX)
     runid = time.strftime('%Y%m%d-%H%M%S'); rdir = os.path.join(UECACHE, 'runs', f'{a.shot}_{runid}' if tag == 'all' else f'{a.shot}_{tag}_{runid}'); os.makedirs(rdir)
     logf = os.path.join(rdir, 'render_take.log')
+    # (2026-11-04: a take reads the built city, so it waits while a city build rewrites blocks or the library, and the build
+    # waits for it: asset_guard.READ_LOCK, held to the end of this process; the world's levels are stamped and checked)
+    import asset_guard; asset_guard.hold_read(f'render_take {a.shot}', log)
     if CITYMODE and tag != 'all' and os.environ.get('UE_RANGE_WORLD', 'own') != 'shot':   # (a part's world is cut from its own frames: the near blocks and far chunks they draw; trailer12, 2026-10-22: UE_RANGE_WORLD=shot draws every range with the whole shot's world, no brightness seams at range boundaries)
         LS_ = json.load(open(I['loadset'])); fr_ = LS_['frames'][fa:fb]
         LS_['frames'] = fr_; u_ = set(c for f in fr_ for c in (f.get('cells') or []))
@@ -1037,7 +1040,7 @@ def main():
             json.dump(W, open(wj, 'w'), indent=1); rec['world'] = 'built'; rec['world_s'] = W['stages']['secs']
         fcntl.flock(wlock, fcntl.LOCK_UN)
     # the take
-    usd_list = sorted((n, os.path.getsize(os.path.join(I['usd'], n))) for n in os.listdir(I['usd']) if os.path.isfile(os.path.join(I['usd'], n)))
+    usd_list =sorted((n, os.path.getsize(os.path.join(I['usd'], n))) for n in os.listdir(I['usd']) if os.path.isfile(os.path.join(I['usd'], n)))
     # a settings file other than render_take.json (a preset): the shot's exposure from its ev_shot, the settings written
     # once by content and in the take's key, so each preset's take (its manifest, its light) is its own
     xkey = {}
@@ -1088,12 +1091,19 @@ def main():
         code, s_ = run(['python3', os.path.join(HERE, 'r1c_lodmat.py'), '--dest', W['far_dest'], '--fw14', os.path.join(CELLCACHE, 'tex', 'daab9257ff80ba32fbedb2bd.png'),
                         '--night', str(TK['night']), '--wink', '3', '--out', os.path.join(rdir, 'lodmat')], logf)
         if code == 0: W['far_night'] = TK['night']; json.dump(W, open(wj, 'w'), indent=1); rec['far_night_s'] = s_
-    # the render
+    # the render (the world's levels stamped as the render will load them: the take's build is done)
+    wstamp = asset_guard.stamp(W.get('levels') or [])
     raw = os.path.join(rdir, 'raw'); os.makedirs(raw)
     rel = f'MovieRenderPipeline/rt_{a.shot}_{runid}.utxt' if tag == 'all' else f'MovieRenderPipeline/rt_{a.shot}_{tag}_{runid}.utxt'
     # (stream06, 2026-10-26: a preset's cvars_shot, per-shot cvars over its cvars, e.g. pLibGold's Nanite detail; cvars
     # only, so the take is shared with the preset's other renders)
     S_cv = json.load(open(a.settings)); cv_ = dict(S_cv.get('cvars') or {}); cv_.update((S_cv.get('cvars_shot') or {}).get(a.shot) or {})
+    # (2026-11-04: at the presets' 256 MB a city world's Nanite pages outran the pool and every street tree drew from its
+    # coarse pages, flat green shards from the street (t7ArchTrack, the deck); 1024 MB draws them leaf by leaf, and the pool
+    # and Nanite's root pages share one 2048 MB resource on these cards: 1920 MB stopped Unreal, out of root pages)
+    cv_.setdefault('r.Nanite.Streaming.StreamingPoolSize', 1024)
+    if float(cv_['r.Nanite.Streaming.StreamingPoolSize']) < 1024 and os.environ.get('UE_NANITE_POOL_OK') != '1':
+        log(f'render: the Nanite streaming pool is {cv_["r.Nanite.Streaming.StreamingPoolSize"]} MB; under 1024 MB the city\'s trees draw from their coarse pages (UE_NANITE_POOL_OK=1 renders anyway)'); sys.exit(5)
     if (S_cv.get('cvars_shot') or {}).get(a.shot): log('cvars for', a.shot + ':', json.dumps(S_cv['cvars_shot'][a.shot]))
     if not patch_manifest(TK['manifest'], os.path.join(SAVED, rel), raw, fa, fb - 1, cv_): log('render: the manifest has no output setting'); sys.exit(5)
     env = ue_env(); env['DRI_PRIME'] = f'pci-0000_{a.gpu_pci}_00_0'
@@ -1117,6 +1127,10 @@ def main():
         log(f'render attempt {attempt} failed (exit {code}, {len(fs)} frames)')
     fcntl.flock(gl, fcntl.LOCK_UN); gl.close()
     rec['render_s'] = secs; rec['render_attempts'] = attempt
+    ch_ = asset_guard.changed(wstamp)
+    if ch_:   # (2026-11-04: a level rewritten while the render loads it, by a build or by another take's save)
+        rec['world_changed'] = ch_[:20]; json.dump(rec, open(os.path.join(rdir, 'take_ue.json'), 'w'), indent=1)
+        log(f'render failed: {len(ch_)} of the world\'s levels changed on disk during the take, e.g. {ch_[:3]}; the frames are not kept'); sys.exit(6)
     try:   # (stream06: the warm-up Movie Render Queue actually ran; fewer than the preset's means a short pre-roll, see take_start)
         import re as re_
         m_ = re_.search(r'having (\d+) warm up frames', open(os.path.join(rdir, f'render_{attempt}.log'), errors='replace').read())
@@ -1146,12 +1160,24 @@ def main():
         try: rec['xgate'] = dict({k: v for k, v in json.load(open(os.path.join(rdir, 'xgate', 'xgate.json'))).items() if k in ('pass', 'failing', 'sign_tiles', 'sign_ncc_median')}, report=os.path.join(rdir, 'xgate'))
         except Exception: rec['xgate'] = {'error': f'exit {code_x}'}
         xfail = code_x == 3
+    # the lens holes: steep downward rays that met nothing, a lens under the ground (tools/qa/lens_holes.py; 2026-11-04,
+    # tuValleyTrainDusk's 10-13 lens path under the terrain's street for 46 frames, its cars standing on the sky)
+    lfail = False
+    if not missing and os.path.isdir(os.path.join(outdir, '_depth')):
+        code_l, rec['lens_s'] = run(uvpy('numpy', 'pillow') + [os.path.join(ROOT, 'tools', 'qa', 'lens_holes.py'), outdir, '--frames', f'{fa}-{fb - 1}',
+                                                              '--json', os.path.join(rdir, 'lens_holes.json')], logf)
+        try: rec['lens_holes'] = json.load(open(os.path.join(rdir, 'lens_holes.json')))
+        except Exception: rec['lens_holes'] = {'error': f'exit {code_l}'}
+        lfail = (rec['lens_holes'].get('over') or 0) > 0 and os.environ.get('UE_LENS_HOLES_OK') != '1'
     rec['missing'] = missing[:20]; rec['total_s'] = round(time.time() - T0, 1); rec['log'] = logf
     json.dump(rec, open(os.path.join(outdir, 'take_ue.json'), 'w'), indent=1); json.dump(rec, open(os.path.join(rdir, 'take_ue.json'), 'w'), indent=1)
     if not a.keep_raw: shutil.rmtree(raw, ignore_errors=True)
     print('RENDER_TAKE ' + json.dumps({k: v for k, v in rec.items() if k != 'missing'}), flush=True)
     if code or missing: log('frames failed:', len(missing), 'missing'); sys.exit(6)
     if xfail: log('cross-renderer gate failed: signs that do not match the three.js take (', os.path.join(rdir, 'xgate'), ')'); sys.exit(7)
+    if lfail:
+        L_ = rec['lens_holes']
+        log(f'lens gate failed: {L_["over"]} frames ({L_["over_first"]} to {L_["over_last"]}) see nothing below the lens: under the ground, or over open water (UE_LENS_HOLES_OK=1 keeps the take)'); sys.exit(8)
     log('done:', len(fs), 'frames in', outdir)
 
 

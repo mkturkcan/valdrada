@@ -102,7 +102,13 @@ start_core() {
   local args=(--port "$PORT" --host "$HOST" --res "$RES" --quality "$CORE_Q" --time "$TIME" --start-lat "$LAT" --start-lon "$LON"
               --seed "$SEED" --pedestrians "$PEDS" --log "$LOGDIR/core.log")
   [ $VERBOSE = 1 ] && args+=(--verbose)
-  VALDRADA_CELLCACHE="$CORE/app/cellcache" "$node" "$CORE/app/tools/core/serve.mjs" "${args[@]}" > "$LOGDIR/core.out" 2>&1 &
+  # the city's ground as the renderer's blocks have it: the measured terrain on the cells the city was baked on it (the
+  # list ships with the core), the highways' decks with it; elsewhere the flat compile (a core without the list stays flat)
+  local ground=()
+  [ -f "$CORE/app/client/public/data/terrain_cells.json" ] && ground=(TERRAIN_P1=1 HHP_P2=1 "TERRAIN_P1_CELLS=$CORE/app/client/public/data/terrain_cells.json")
+  # (the tiles on the measured ground laid once when the release was built: tools/core/tile_cache.mjs)
+  [ -d "$CORE/app/cache/tiles" ] && ground+=("VALDRADA_TILE_CACHE=$CORE/app/cache/tiles")
+  env "${ground[@]}" VALDRADA_CELLCACHE="$CORE/app/cellcache" "$node" "$CORE/app/tools/core/serve.mjs" "${args[@]}" > "$LOGDIR/core.out" 2>&1 &
   CORE_PID=$!
   say "core starting (pid $CORE_PID, $HOST:$PORT, log $LOGDIR/core.log)"
   local i

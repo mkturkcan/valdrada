@@ -19,11 +19,13 @@ import { st38ClipTri, st38GapFill } from '../city/stations/subEnt38.js';   // ST
 import { gf38Load, gf38Apply, gf38Index } from '../city/groundFix38.js';   // GF38 (GROUNDFIX): the bare ground paved from the planimetric data
 import { tileContentKey } from '../shared/overlay.js';   // OV39: the overlays' content key
 import { gradeBaseClasses } from './terrainGrade.js';   // TERRAIN GRADE: the base's urban pieces as one surface
-import { HA_P1, HA_GROUND, haInCentralPark, haTileReady, haApplyTile, haGridDraw, haBuildingGround, haBuildingFloor, haClampGround, haTerrainAt, HA_PAVED } from './heightAuthority.js';   // P1 TERRAIN (`?terrain=p1`)
+import { CU03, cuSteepIn } from './campusGround.js';   // CU04: Columbia's built ground
+import { HA_P1, HA_GROUND, haInCentralPark, haTileReady, haApplyTile, haGridDraw, haBuildingGround, haBuildingFloor, haClampGround, haTerrainAt, HA_PAVED, haPortalPre } from './heightAuthority.js';   // P1 TERRAIN (`?terrain=p1`)
 import { haLift, haPreload, haHoldDecks, haRestoreDecks, haWarpDeep, haAnchors, haBpWarp } from './haAnchor.js';   // P1 TERRAIN: the re-anchored furniture, Central Park's chunks
 import { HHP, hhpReady, hhpPre, hhpPost, hhpSkipBuilding, hhpAfterClamp } from '../city/hhp.js';   // HIGHWAYS P2 (`?hhp=1`): the Henry Hudson Parkway as designed alignments
 import { wshGroundFix } from '../city/wshGround.js';
 import { wshCoastReady } from '../city/wshCoast.js';   // (the West Side Highway's and the northern parkway's shore ground)
+import { lcGroundReady, lcGroundApply } from '../city/lcGround.js';   // LC69: the compiled lawns' paved parts by the land cover
 import { MARINA, marinaReady, marinaSlivers, marinaGround, marinaSkipBuilding, buildMarina } from '../city/marinaKit.js';   // MARINA KIT: docks, gangways, pilings and boats city-wide; the slabs they replace out
 import { SEAWALL, seawallExtract, buildSeawall } from '../city/seawallKit.js';   // SEAWALL KIT: coursed granite and concrete seawalls, copings, rails, ladders, outfalls, fenders, piers on piles
 import { pbrMaterial } from '../city/mat/pbrLib.js';   // P2C: the built walls' stone
@@ -187,7 +189,8 @@ function smoothNatural(pos, mat, nrm, ox, oz) {
 }
 import { vegTile, vegDropTree, vegBuild } from './vegP1.js';
 import { placeGuard, PG_ON } from './placeGuard.js';   // TERRAIN INT2: one placement rule for every standing instance   // VEG P1 (terrain art, lane 1): the parks' woodland from the LiDAR canopy (`?vegp1=0` off)
-import { lf39Load, lf39Apply } from './lotfix39.js';   // LF39 (LOTFIX): missing buildings, lot cars, NYCHA lawns and trees
+import { lf39Load, lf39Apply } from './lotfix39.js';
+import { m64Load, m64Apply } from './massing64.js';   // M64: the measured roof levels (?m64=1)   // LF39 (LOTFIX): missing buildings, lot cars, NYCHA lawns and trees
 import { areaTileHit, areaApply, areaSkipBuilding, areaDropFurniture, areaFurniture, areaBuild } from '../city/areas.js';
 import { tpTileHit, tpApply, tpStepsOwner, tpBuildSteps, tpSkipBuilding, tpBuildFurniture, tpDropFrontage } from '../city/tsqPlaza.js';
 import { placeCurbRamps } from '../city/streetNYC.js';
@@ -893,12 +896,14 @@ function campusHipWings(buf, ring, topY, b, col, cx, cz, riseK = 0.3) {
 //      sheen. The reference views (top, north, east and west) show light verdigris copper
 //      behind a limestone balustrade on the cornice: a steep MANSARD holding the attic storey, with a row of dormers
 //      and a flat top on the deep halls (Hartley, Wallach, John Jay, Furnald, Hamilton, Kent, Journalism, Havemeyer,
-//      Schermerhorn, Pupin, Dodge, CEPSR), a plain hip to a ridge on the narrow ones (Philosophy, Avery, Fayerweather,
+//      Schermerhorn, Pupin, Dodge), a plain hip to a ridge on the narrow ones (Philosophy, Avery, Fayerweather,
 //      Lewisohn, Mathematics), brick chimneys on the dormitories, Earl Hall's pale dome and Pupin's two observatory domes.
 // The roof takes the building's top storey: the walls stop at the eave and the roof rises to the record's height, so
 // the silhouette keeps its measured height. Per-building facts come from BUILDING_OVERRIDES `roof` (landmarkSpec.js,
 // applied at tile read); any other campus record (compiler roofKind 2) takes the defaults. ?cr24=0 restores round 14.
 const CR24 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('cr24') === '0');
+// DK04 (2026-11-04): kerb pieces stand wholly on the flags (the furniture loop below); `?dk04=0` as before
+const DK04 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('dk04') === '0');
 // patina bases (sRGB-ish, GeoBuf squares them), set against the reference captures: sunlit verdigris reads about (100, 165, 145)
 const CR_TONE = { mint: [0.30, 0.52, 0.44], pale: [0.43, 0.50, 0.46], lead: [0.50, 0.55, 0.58], obs: [0.70, 0.71, 0.70], slate: [0.25, 0.26, 0.28] };
 const CR_STONE = [214, 205, 186], CR_GLASS = [0.10, 0.11, 0.12], CR_FRAME = [0.87, 0.86, 0.82], CR_BRICK = [0.56, 0.31, 0.23];
@@ -1862,10 +1867,13 @@ export async function assembleTile(key, arrayBuf, ctx) {
   // OV39 (shared/overlay.js): the baked overlays (LF39, GF38) apply by the content key of the compiled tile, taken here
   // before any pass changes its sections (only for a tile that has an overlay entry)
   const lf39D = await lf39Load(), gf38I = await gf38Index().catch(() => null);
-  const ckey = (lf39D && lf39D.tiles && lf39D.tiles[key]) || (gf38I && gf38I.tiles && gf38I.tiles[key]) ? tileContentKey(tile) : null;
+  const m64E = await m64Load(key);
+  const ckey = (lf39D && lf39D.tiles && lf39D.tiles[key]) || (gf38I && gf38I.tiles && gf38I.tiles[key]) || m64E ? tileContentKey(tile) : null;
   // LF39 (LOTFIX, world/lotfix39.js; `?lf39=0` none): the baked buildings, campus trees and lawn join the tile's sections
   // before anything below reads them
   try { lf39Apply(key, tile, arrayBuf.byteLength, lf39D, ckey); } catch (e) { console.warn('[lf39] apply', e); }
+  // M64 (world/massing64.js): a building whose roof stands at several measured levels becomes one record per level
+  try { m64Apply(key, tile, m64E, ckey, arrayBuf.byteLength); } catch (e) { console.warn('[m64] apply', e); }
   const [ox, oz] = tile.header.origin;
   const gf38P = gf38Load(key, arrayBuf.byteLength, ckey).catch(() => null);   // GF38: the tile's baked fill (applied below)
   const group = new THREE.Group();
@@ -1931,6 +1939,11 @@ export async function assembleTile(key, arrayBuf, ctx) {
   const MKT = MARINA && await marinaReady();   // (before wshCoast: its planimetric pier decks the kit replaces are dropped there)
   if (MARINA) { try { marinaSlivers(tile); } catch (e) { console.warn('[marina] slivers', e); } }   // (the compile's sunk-bank lawn slivers, before the cut)
   const P1T = HA_P1 && await haTileReady(Math.floor(ox / 512), Math.floor(oz / 512));
+  // LC69: what the land cover has as paved in the compiled lawns goes to plaza (city/lcGround.js), once the region's
+  // relief is loaded (a piece on a bank stays lawn)
+  try { if (await lcGroundReady()) lcGroundApply(tile, ox, oz); } catch (e) { console.warn('[lc69] lawns', e); }
+  // PF69: a tunnel portal's cover: the compile's cut past the trench's end out, its floor as the plaza (heightAuthority.js)
+  try { haPortalPre(tile); } catch (e) { console.warn('[pf69] portal', e); }
   if (HHPT) { try { hhpPre(tile, ox, oz, P1T); } catch (e) { console.warn('[hhp] pre', e); } }
   // (P1 anchors: the elevated decks and the FDR under the park decks are Phase 2's structures: held out of the cut)
   if (P1T) await haAnchors();   // (the cuts' profiles: haHoldDecks holds the cut roads and the street bridges too)
@@ -2298,6 +2311,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
     const cellD = (x, z) => Math.floor(x / 55) + "_" + Math.floor(z / 55);
     const byCell = new Map();
     for (const b of buildingsOf(tile)) {
+      if (tile.m64 && tile.m64.has(b.i) && tile.m64.get(b.i) !== b.i) continue;   // M64: an appended level deals as its building
       const bx = tile.S.bldgXZ[b.start * 2] + ox, bz = tile.S.bldgXZ[b.start * 2 + 1] + oz;
       const k2 = cellD(bx, bz);
       let a = byCell.get(k2); if (!a) byCell.set(k2, a = []);
@@ -2318,6 +2332,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
   const cyMap = CY12 ? holesOf(tile) : new Map();
   let cyCourts = 0, cyDropped = 0;            // realised / dropped by a massing branch, reported on the tile record
   let fpPents = 0;                            // FP18: penthouse storeys drawn (towers and the mid-rise), on the tile record
+  const m64Y = new Map();                     // M64: one ground floor for all the levels of a building (its largest level's)
   const p1Bl = [];   // P1 TERRAIN: each building's footprint and lift (its roof and wall furniture moves with it)
   for (const b of buildingsOf(tile)) {
     buf.curBid = b.i;
@@ -2330,10 +2345,13 @@ export async function assembleTile(key, arrayBuf, ctx) {
     b.hasTank = !!(b.roofKind & 32);
     b.membrane = (b.roofKind >> 3) & 3; // 0 silver, 1 dark, 2 gravel, 3 pavers
     b.roofKind = b.roofKind & 7;        // shape only, for massing logic
-    if (FAC8) { fac8Palette(b); b.fmemb = b.greenRoof ? 5 : fac8Membrane(b); }
+    // (a named override's membrane, landmarkSpec `memb` 0 silver, 1 dark, 2 gravel, 3 pavers, wins over the dealt one)
+    if (FAC8) { fac8Palette(b); b.fmemb = b.greenRoof ? 5 : b.membO != null ? b.membO + 1 : fac8Membrane(b); }
     // R12: the dealt ordinal for this building (see the dealer pass above).
     // -1 means "no deal" and every consumer falls back to its round-11 hash.
-    b.__deal = R12 ? (deals.has(b.i) ? deals.get(b.i) : -1) : -1;
+    b.m64o = tile.m64 ? tile.m64.get(b.i) : undefined;   // M64: the compiled record this measured level belongs to
+    const dealI = b.m64o !== undefined ? b.m64o : b.i;
+    b.__deal = R12 ? (deals.has(dealI) ? deals.get(dealI) : -1) : -1;
     // world-space ring
     const ring = [];
     for (let i = 0; i < b.len; i++) {
@@ -2392,6 +2410,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
     }
     // TERRAIN FIX: on a slope the ground floor never lies under the drawn ground along its facades (heightAuthority)
     if (P1T && b.haLift !== undefined && !b.landmarkId) y0 = haBuildingFloor(ring, y0, p1GroundTop, p1PavedTop);
+    if (b.m64o !== undefined) { const gy = m64Y.get(b.m64o); if (gy !== undefined) y0 = gy; else m64Y.set(b.m64o, y0); }
     b.baseY = y0;                                          // decals / hero recs / roof all read this
     const topY = y0 + b.height;
     const fndY = Math.min(y0, Math.max(minT - 1.0, y0 - (P1T ? 25 : 6)));   // P1: an exposed base on a slope can be 10 m
@@ -2517,7 +2536,8 @@ export async function assembleTile(key, arrayBuf, ctx) {
       } else if (!b.greenRoof && (b.style === 1 || b.style === 4 || b.style === 8 || (R12 && b.style === 5)
             || (WB13 && b.style === STYLE.FRAME_HOUSE))
           && b.height > (WB13 && b.style === STYLE.FRAME_HOUSE ? 6.5 : R12 && b.style === 5 ? 9 : 14) && b.height < 46
-          && rectness > 0.62 && !b.roofKind && !holes.length   // CY12: not over a light court
+          && rectness > 0.62 && !b.roofKind && !holes.length && b.m64o === undefined   // CY12: not over a light court; M64: measured
+          && !b.campusRoof   // (2026-11-03: a named override's roof wins: Uris and University Hall's flat roofs drew a slate mansard)
           && ((b.colorVar * 13.7) % 1) < (WB13 && b.style === STYLE.FRAME_HOUSE ? 0.12 : R12 ? (b.style === 5 ? 0.10 : 0.19) : 0.12)) {
         // MANSARD cap: prewar/deco/civic slice — steep slate band from the
         // wall line to an inset flat crown (the missing non-flat NYC roof)
@@ -2555,7 +2575,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
           const twT = [];
           // FP18: a pre-war tower's penthouse storey on its terrace (fp18Pent), the kit's last tier
           b.__fpPent = null;
-          const pn = !lmId && !b.roofKind ? fp18Pent(b, ring, y0) : null;
+          const pn = !lmId && !b.roofKind && b.m64o === undefined ? fp18Pent(b, ring, y0) : null;   // M64: the measured levels carry the penthouse
           if (pn) {
             const set = buildSetbacks(buf, ring, cx, cz, y0, topY, b, { ...opts, fndY, pentY: pn.y, pentStep: pn.step }, twTiers(twT, y0));
             if (set.top !== ring && twT.length === 2) { twT[1].pent = true; b.__fpPent = set.top; fpPents++; }
@@ -2584,7 +2604,8 @@ export async function assembleTile(key, arrayBuf, ctx) {
           // lidded whatever we emitted here; towers.js belongs to the silhouette owner this
           // round, so this is a deliberate scope line, counted in `cyDropped`.
           cyDrop();
-          towerCap = b.__fpPent ? buildTower(buf, b.__fpPent, cx, cz, y0, topY, b, { kind: 'flat' })   // FP18: the penthouse's roof
+          towerCap = b.m64o !== undefined ? buildTower(buf, ring, cx, cz, y0, topY, b, { kind: 'flat', noMech: true })   // M64: a measured level's roof, no era crown
+            : b.__fpPent ? buildTower(buf, b.__fpPent, cx, cz, y0, topY, b, { kind: 'flat' })   // FP18: the penthouse's roof
             : buildTower(buf, ring, cx, cz, y0, topY, b);
           b.__roofRing = towerCap.roofRing;
         } else {
@@ -2746,7 +2767,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
         blind: b.blind, flags: b.flags, colorVar: b.colorVar, floors: b.floors, area: b.area, lit: b.lit,
         deal: b.__deal,          // R12: the block ordinal, so nycDress deals the same building the same way
         membrane: b.membrane, fmemb: b.fmemb, greenRoof: b.greenRoof, roofKind: b.roofKind, setbacks: !!((b.flags & BF.SETBACKS) && convexish),
-        doorI: door.doorI, doorPack: door.doorPack, frontIdx: b.frontIdx,
+        doorI: door.doorI, doorPack: door.doorPack, frontIdx: b.frontIdx, noBalc: !!b.noBalc,
         // CY12: the dresser fills its own roof deck from `ring` and would lid every court
         // it draws over. It gets the court rings so that fill can be earcut with holes;
         // the court's walls, floor and parapet stay with the tile under the sentinel bid.
@@ -2759,6 +2780,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
         key: `${key}:${b.i}`, bid: b.i, tile: key, ring, tiers: b.__twTiers, cx, cz, baseY: y0, height: b.height, style: b.style,
         color: [b.r, b.g, b.b], floorH: b.floorH, winW: b.winW, storeH: b.storeH, colorVar: b.colorVar, blind: b.blind, flags: b.flags,
         lit: b.lit, floors: b.floors, area: b.area, doorI: door.doorI, doorPack: door.doorPack, frontIdx: b.frontIdx, roofKind: b.roofKind,
+        noBalc: !!b.noBalc,
       });
     }
     // /TW
@@ -2930,19 +2952,27 @@ export async function assembleTile(key, arrayBuf, ctx) {
     const pos = new Float32Array((total + terrVerts) * 3);
     const mat = new Float32Array(total + terrVerts);
     let o = 0;
+    // BRK69 (2026-11-02): the campus brick (10) yields its ties in the geometry too, 2 cm under its datum. The ground
+    // shader's depth bias (materials.js: the College Walk ribbons run under the grey walk and the lawn beds, Low Plaza's
+    // field under its pale panels) has no counterpart in a path tracer, which drew the brick over them. `?brk69=0` none.
+    const BRK69 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('brk69') === '0');
     for (const [name, mid] of sections.concat(RAIL_SECTIONS, APRON_SECTIONS)) {
       const src = tile.S[name];
       if (!src) continue;
+      const yDrop = BRK69 && name === 'brick' ? 0.02 : 0;
       const perV = name === 'rtop' && tile.S.rtopA && tile.S.rtopA.length * 3 === src.length ? tile.S.rtopA : null;
       // (TERRAIN INT2: the region's base where it shows in Central Park is the park's lawn: one surface, one shading)
       const cpB = name === 'terrP1' && CPT ? (i) => haInCentralPark((src[i] + src[i + 3] + src[i + 6]) / 3 + ox, (src[i + 2] + src[i + 5] + src[i + 8]) / 3 + oz) : null;
       // (TERRAIN GRADE, world/terrainGrade.js: the base's urban pieces as one surface each, the lawn's or a plaza's)
       const gbc = name === 'terrP1' && P1T ? gradeBaseClasses(tile) : null;
+      // (CU04, world/campusGround.js: on Columbia's campus a steep piece of the base or its backing is a retaining wall's
+      // face, the bare earth's in the pits' yards and areaways: drawn as the built walls (21), never as natural ground)
+      const cuW = (name === 'terrP1' || name === 'terrBack') && P1T && CU03 ? (i) => cuSteepIn(src, i, ox, oz) : null;
       let tm = mid;
       for (let i = 0, v = 0; i < src.length; i += 3, v++) {
-        if ((cpB || gbc) && v % 3 === 0) tm = cpB && cpB(i) ? 5 : gbc && gbc[v / 3] ? gbc[v / 3] : mid;
-        pos[o * 3] = src[i] + ox; pos[o * 3 + 1] = src[i + 1]; pos[o * 3 + 2] = src[i + 2] + oz;
-        mat[o] = perV ? perV[v] : cpB || gbc ? tm : mid; o++;
+        if ((cpB || gbc || cuW) && v % 3 === 0) tm = cuW && cuW(i) ? 21 : cpB && cpB(i) ? 5 : gbc && gbc[v / 3] ? gbc[v / 3] : mid;
+        pos[o * 3] = src[i] + ox; pos[o * 3 + 1] = src[i + 1] - yDrop; pos[o * 3 + 2] = src[i + 2] + oz;
+        mat[o] = perV ? perV[v] : cpB || gbc || cuW ? tm : mid; o++;
       }
     }
     const T = TILE_OF(tile);
@@ -3077,6 +3107,28 @@ export async function assembleTile(key, arrayBuf, ctx) {
     }
     return null;
   };
+  // DK04 (2026-11-04, `?dk04=0` as before): a kerb piece stands wholly on the flags. The nudge above stops as soon as a
+  // record's centre is within 0.2 m of a flag, so a census tree whose point lay in the gutter kept its trunk on the kerb
+  // line and half of its 1.48 m guard and its pit over the gutter (71 street trees within 230 m of 125th and Lenox, 0 to
+  // 0.4 m outside the kerb), and hydrants, baskets, racks, lamp standards and sign poles the same. Each such piece now
+  // moves square to the kerb, inboard, until its footprint (radius DK04_R: a tree's guard, the others' bases) lies on the
+  // flags or a lawn; one that finds no such place within 2.4 m and stands in the carriageway is left out.
+  const DK04_R = new Map([[FURN.TREE, 0.82], [FURN.HYDRANT, 0.35], [FURN.LITTER, 0.42], [FURN.BIKE_RACK, 0.62], [FURN.PLANTER, 0.7],
+    [FURN.PARKING_METER, 0.25], [FURN.LAMP_COBRA, 0.32], [FURN.LAMP_CROOK, 0.32], [FURN.MAILBOX, 0.42], [FURN.LINKNYC, 0.38],
+    [FURN.PHONE, 0.38], [34, 0.22], [35, 0.16], [36, 0.45]]);
+  const DK04_RING = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => [Math.cos(i * Math.PI / 4), Math.sin(i * Math.PI / 4)]);
+  const dkFlag = (x, z) => surfY(x, z, WALK_KINDS, 0.02) !== null || sectionY('grass', x, z, 0.02) !== null;
+  const dkClear = (x, z, r) => dkFlag(x, z) && DK04_RING.every(([u, w]) => dkFlag(x + u * r, z + w * r));
+  const dkSetBack = (x, z, r) => {
+    // inboard: away from the ring points that miss the flags
+    let ix = 0, iz = 0;
+    for (const [u, w] of DK04_RING) if (!dkFlag(x + u * r, z + w * r)) { ix -= u; iz -= w; }
+    const L = Math.hypot(ix, iz);
+    if (L > 1e-6) for (let s = 0.1; s <= 2.4; s += 0.1) { const px = x + (ix / L) * s, pz = z + (iz / L) * s; if (dkClear(px, pz, r)) return [px, pz]; }
+    for (const [dx2, dz2] of NUDGE) if (dkClear(x + dx2, z + dz2, r)) return [x + dx2, z + dz2];
+    return null;
+  };
+  const DKS = { moved: 0, dropped: 0 };
   // BP28: Bryant Park's allee planes join this tile's furniture (and its compiled scatter trees are dropped below)
   const tsxT = (await TSX)?.[`${Math.round(ox / 512)}_${Math.round(oz / 512)}`] || null;   // AR34 TREES: census species 9-12
   // AR34 TREES: the tile's records once (furnitureOf yields fresh objects), and the street-tree fixes keyed by index
@@ -3172,6 +3224,15 @@ export async function assembleTile(key, arrayBuf, ctx) {
       } else if (frontageOnTerrain && FRONTAGE_HUNG.has(f.k)) {
         const lift = padYNear(wx, wz) - sampleT(wx, wz);
         if (lift > 0 && lift < 0.6) f.y += lift;
+      }
+    }
+    // DK04: the kerb setback (a backyard tree, compiler p2 bit 1, stands in its yard; a median tree keeps a smaller box)
+    if (DK04 && DK04_R.has(f.k) && (f.y0 !== undefined ? f.y0 : f.y) < 12 && !NO_DATUM && !(f.k === FURN.TREE && (f.p2 & 2))) {
+      const r = f.k === FURN.TREE && (f.p2 & 4) ? 0.5 : DK04_R.get(f.k);
+      if (!dkClear(wx, wz, r)) {
+        const p = dkSetBack(wx, wz, r);
+        if (p) { wx = p[0]; wz = p[1]; const gy = padYAt(wx, wz, 0.05); if (gy !== null && Math.abs(gy - f.y) < 0.5) f.y = gy; DKS.moved++; }
+        else if (!dkFlag(wx, wz) && surfY(wx, wz, ROAD_KINDS, 0.05) !== null) { DKS.dropped++; continue; }
       }
     }
     // TERRAIN INT2: the placement rule (world/placeGuard.js) at the record's final place (after the kerb nudge): no tree
@@ -3614,6 +3675,7 @@ export async function assembleTile(key, arrayBuf, ctx) {
     fpPents,                                 // FP18: penthouse storeys drawn in this tile
     cyDropped,                               // CY12: …and dropped by a massing branch that cannot hold one
     strandedInRoad,
+    dk04: DKS,                               // DK04: kerb pieces moved onto the flags / left out
     dispose: (scene, instancer) => {
       for (const [pool, id] of claims) instancer.release(pool, id);
       for (const [p, h] of poolHandles) p.free(h);

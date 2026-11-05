@@ -189,6 +189,7 @@ def main():
     a = ap.parse_args()
     if a.shot == 'serve': return serve(a)
     if a.cooked and not a.server: return cooked(a)
+    import asset_guard; asset_guard.hold_read(f'persist_render {a.shot}')   # (2026-11-04: the editor's content, never over a city build)
     t0 = time.time()
     rdir = a.out or os.path.join(PDIR, 'runs', f'{a.shot}_{time.strftime("%Y%m%d-%H%M%S")}')
     os.makedirs(rdir, exist_ok=True)
@@ -216,6 +217,10 @@ def main():
         for k_, v_ in json.load(open(os.path.join(HERE, 'persist_tiers.json')))[a.tier].items():
             if k_ != 'res': cv[k_] = float(v_)
     for kv in a.cvar: k_, v_ = kv.split('=', 1); cv[k_] = float(v_)
+    # (under 1024 MB the city-block worlds' street trees draw from their coarse Nanite pages, flat green shards: render_take's rule)
+    cv.setdefault('r.Nanite.Streaming.StreamingPoolSize', 1024)
+    if float(cv['r.Nanite.Streaming.StreamingPoolSize']) < 1024 and os.environ.get('UE_NANITE_POOL_OK') != '1':
+        print(f'the Nanite streaming pool is {cv["r.Nanite.Streaming.StreamingPoolSize"]} MB; under 1024 MB the city\'s trees draw from their coarse pages (UE_NANITE_POOL_OK=1 renders anyway)'); sys.exit(5)
     side = json.load(open(T['side'])) if os.path.exists(T.get('side', '')) else {}
     lo, hi = (side.get('frames') or [0, 150])
     fa, fb = (map(int, a.frames.split('-')) if a.frames else (lo, hi))

@@ -1,6 +1,7 @@
 import { CP_PARK } from '../city/cpFloraData.js';
 import { buildingsOf } from './tiledata.js';   // TERRAIN FIX: the buildings set into a hillside (haClampGround)   // TERRAIN FIX: Central Park's outline (haClampGround leaves the park to its own parts)
-import { gradeGround, gradeLoad, gradeCut, gradeStrips, gradeCrossings, gradeDrapePaths, baseUnderLawn } from './terrainGrade.js';   // TERRAIN GRADE: the ground cut and graded to every paving edge (haClampGround)
+import { gradeGround, gradeLoad, gradeCut, gradeStrips, gradeCrossings, gradeDrapePaths, baseUnderLawn } from './terrainGrade.js';
+import { CU03, cuAC, cuRegionId, cuSurface, cuLinesAC, cuBox, cuInBlock, cuInModel, cuLawnFate, cuPanelReshape } from './campusGround.js';   // CU03: Columbia's authored ground   // TERRAIN GRADE: the ground cut and graded to every paving edge (haClampGround)
 // P1 TERRAIN (phase 1a of the terrain round): the one height authority for a terrain region. Behind the flag
 // `?terrain=p1` (page, bake) or TERRAIN_P1=1 (node: core, tests); off, nothing here runs and the city stays flat.
 //
@@ -143,16 +144,182 @@ export function haInit() {
   return initP;
 }
 
+// PF69 (2026-11-02): a tunnel portal's cover. At the Hugh L. Carey Tunnel's Manhattan portal, where the approach trench
+// ends under the plaza at Battery Place, the bare earth climbs from the trench floor (4 to 5 m down) to the plaza over a
+// 2 to 5 m slope, and the compile cut the approach road 11 m on into the plaza (its floor at 0.45, walls and kerbs): the
+// plaza's paving lay down the slope and round a pit as tilted slabs. Inside a cover the relief never goes under the
+// street's beside it (the median at its reference points, read off the same chunk first), so the step is one row of the
+// TIN's triangles; and the compile's cut pieces there (haPortalPre) leave, their floor laid as the plaza's paving at the
+// street's level. `?pf69=0` none.
+const PF69 = (() => { try { if (typeof location !== 'undefined' && location.search) return new URLSearchParams(location.search).get('pf69') !== '0'; } catch { /* */ } return !(typeof process !== 'undefined' && process.env && process.env.PF69 === '0'); })();
+const PORTAL_COVERS = [
+  // (the trench ends at z 8667.5; the cover reaches Battery Place's north kerb; the street's level from three points on it)
+  // (the north edge on the foot of the bare earth's slope at the trench's end, the south edge short of the Battery Park
+  // Underpass's ramps at 8702; the street's level from the walks either side)
+  { name: 'Hugh L. Carey Tunnel, Manhattan portal', ring: [[-3848, 8666.5], [-3840, 8667], [-3830, 8668.5], [-3820, 8669.5], [-3810, 8669.5], [-3810, 8698], [-3848, 8698]],
+    ref: [[-3856, 8676], [-3804, 8676], [-3856, 8692], [-3804, 8692]] },
+];
+const near10 = (C, px, pz) => {
+  const b = C.bb || (C.bb = [Math.min(...C.ring.map((p) => p[0])), Math.min(...C.ring.map((p) => p[1])), Math.max(...C.ring.map((p) => p[0])), Math.max(...C.ring.map((p) => p[1]))]);
+  return px > b[0] - 10 && px < b[2] + 10 && pz > b[1] - 10 && pz < b[3] + 10;
+};
+const inCover = (C, px, pz) => { let c = false; for (let i = 0, j = C.ring.length - 1; i < C.ring.length; j = i++) { const [xi, zi] = C.ring[i], [xj, zj] = C.ring[j]; if ((zi > pz) !== (zj > pz) && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi) c = !c; } return c; };
+// the compiled cut's pieces inside a cover out of the sections, before anything samples them: its floor and paint (every
+// corner under 3.0: the street's paving lies at 3.37 to 3.52), its kerb faces (any corner under 3.0) and its walls; the
+// floor laid again as plaza at 3.50; and the open cut's rectangles there (header.railCuts), whose walls and bed the rail
+// cut would build again. Past the cover's edge, the street's paving the compile laid out over the trench (within 10 m of
+// the cover, where the relief is more than 1.5 m down) leaves too: draped, it slid into the trench
+export function haPortalPre(tile) {
+  if (!PF69 || !tile || !tile.S || !tile.header) return null;
+  const [ox, oz] = tile.header.origin, st = { floor: 0, walls: 0 };
+  const covers = PORTAL_COVERS.filter((C) => C.ring.some(([x, z]) => x > ox - 64 && x < ox + TILE + 64 && z > oz - 64 && z < oz + TILE + 64));
+  if (!covers.length) return null;
+  const floor = [];
+  for (const nm of ['asphalt', 'curb', 'gutter', 'rwall', 'paintW', 'paintY', 'busred', 'sidewalk', 'plaza']) {
+    const a = tile.S[nm];
+    if (!a || a.length < 9) continue;
+    // (a section's per-vertex or per-triangle attributes go with its triangles, as the rail cut's filter has it)
+    const nt = a.length / 9, par = Object.keys(tile.S).filter((q) => q !== nm && q.startsWith(nm) && tile.S[q] && tile.S[q].length && tile.S[q].length % nt === 0 && /^(UV|We|Mat)$/.test(q.slice(nm.length)));
+    const keep = [], keepP = par.map(() => []);
+    let dropped = 0;
+    for (let i = 0; i + 8 < a.length; i += 9) {
+      const cx = (a[i] + a[i + 3] + a[i + 6]) / 3 + ox, cz = (a[i + 2] + a[i + 5] + a[i + 8]) / 3 + oz;
+      const lo = Math.min(a[i + 1], a[i + 4], a[i + 7]), hi = Math.max(a[i + 1], a[i + 4], a[i + 7]);
+      const over = lo >= 3.0 && nm !== 'rwall' && covers.some((C) => near10(C, cx, cz) && !inCover(C, cx, cz)) && (() => { const q = haInfo(cx, cz); return !!q && q.tag < 3 && q.relief < -1.5; })();
+      if (over) { dropped++; st.over = (st.over || 0) + 1; continue; }
+      if ((nm === 'rwall' || (nm === 'curb' ? lo : hi) < 3.0) && covers.some((C) => inCover(C, cx, cz))) {
+        dropped++;
+        if (nm === 'asphalt') { for (let k = 0; k < 9; k += 3) floor.push(a[i + k], 3.50, a[i + k + 2]); st.floor++; } else st.walls++;
+        continue;
+      }
+      for (let k = 0; k < 9; k++) keep.push(a[i + k]);
+      par.forEach((q, j) => { const b = tile.S[q], w = b.length / nt, o = (i / 9) * w; for (let k = 0; k < w; k++) keepP[j].push(b[o + k]); });
+    }
+    if (!dropped) continue;
+    tile.S[nm] = Float32Array.from(keep);
+    par.forEach((q, j) => { tile.S[q] = tile.S[q] instanceof Uint8Array ? Uint8Array.from(keepP[j]) : Float32Array.from(keepP[j]); });
+  }
+  if (floor.length) { const c = tile.S.plaza || new Float32Array(0), m = new Float32Array(c.length + floor.length); m.set(c); m.set(floor, c.length); tile.S.plaza = m; }
+  const RC = tile.header.railCuts;
+  if (RC && RC.length) {
+    const keep = RC.filter(([x, z]) => !covers.some((C) => inCover(C, x + ox, z + oz)));
+    st.cuts = RC.length - keep.length;
+    if (st.cuts) tile.header.railCuts = keep;
+  }
+  tile.__pf69 = st;
+  return st;
+}
+function portalCovers(ch) {
+  const { x, z, tri, rel, nT } = ch, X0 = ch.ox, Z0 = ch.oz, X1 = X0 + TILE + 2 * MARGIN, Z1 = Z0 + TILE + 2 * MARGIN;
+  const relAtP = (px, pz) => {
+    for (let t = 0; t < nT; t++) {
+      const a = tri[3 * t], b = tri[3 * t + 1], c = tri[3 * t + 2];
+      const d = (z[b] - z[c]) * (x[a] - x[c]) + (x[c] - x[b]) * (z[a] - z[c]);
+      if (Math.abs(d) < 1e-12) continue;
+      const w0 = ((z[b] - z[c]) * (px - x[c]) + (x[c] - x[b]) * (pz - z[c])) / d, w1 = ((z[c] - z[a]) * (px - x[c]) + (x[a] - x[c]) * (pz - z[c])) / d, w2 = 1 - w0 - w1;
+      if (w0 >= -1e-6 && w1 >= -1e-6 && w2 >= -1e-6) return w0 * rel[3 * t] + w1 * rel[3 * t + 1] + w2 * rel[3 * t + 2];
+    }
+    return null;
+  };
+  for (const C of PORTAL_COVERS) {
+    const xs = C.ring.map((p) => p[0]), zs = C.ring.map((p) => p[1]);
+    const bx0 = Math.min(...xs), bx1 = Math.max(...xs), bz0 = Math.min(...zs), bz1 = Math.max(...zs);
+    if (bx1 < X0 || bx0 > X1 || bz1 < Z0 || bz0 > Z1) continue;
+    const R = C.ref.map(([px, pz]) => relAtP(px, pz)).filter((v) => v !== null).sort((u, w) => u - w);
+    if (!R.length) continue;
+    const r0 = R[R.length >> 1];
+    let n = 0;
+    for (let t = 0; t < nT; t++) for (let k = 0; k < 3; k++) {
+      const v = tri[3 * t + k];
+      if (x[v] < bx0 || x[v] > bx1 || z[v] < bz0 || z[v] > bz1 || !(rel[3 * t + k] < r0) || !inCover(C, x[v], z[v])) continue;
+      rel[3 * t + k] = r0; n++;
+    }
+    if (n) (ch.pf69 = ch.pf69 || []).push({ name: C.name, r0: +r0.toFixed(2), corners: n });
+  }
+}
+// CU03 (world/campusGround.js): the TIN round Columbia's campus cut along the authored model's lines (constant a' or c' in
+// its frame: every triangle a line crosses split there, across the whole model, so no cut ends in a T-junction) and every
+// piece laid on the surface of the region its centre is in: the court, the flights, the landings and the plateau exactly
+// flat or ramped, the walls exact discontinuities (slits: the faces' builder closes them, city/campus.js dresses them),
+// the bare earth's own slits inside the model gone with its ground. Corner relief = the surface - S - 0.135 (the walks'
+// and the lawns' tops on the surface); a laid piece is no steep face any more (its tag 2 cleared: the walls' builder takes
+// a slit between steep natural ground for rock). The split points of an edge are interpolated from its endpoints in a
+// fixed order, so the two triangles sharing it meet exactly.
+function cuCutArrays(tx, tz, X, Z, TRI, REL, TAG) {
+  if (!SG) return null;
+  const B = cuBox(), x0 = tx * TILE - MARGIN, z0 = tz * TILE - MARGIN, x1 = x0 + TILE + 2 * MARGIN, z1 = z0 + TILE + 2 * MARGIN;
+  if (B[2] < x0 || B[0] > x1 || B[3] < z0 || B[1] > z1) return null;
+  const L = cuLinesAC(), A0 = L.A[0] - 1, A1 = L.A[L.A.length - 1] + 1, C0 = L.C[0] - 1, C1 = L.C[L.C.length - 1] + 1;
+  const nT = TAG.length, vx = Array.from(X), vz = Array.from(Z), vid = new Map();
+  const key = (x, z) => Math.round(x * 1000) * 4194304 + Math.round(z * 1000);
+  for (let i = 0; i < vx.length; i++) { const k = key(vx[i], vz[i]); if (!vid.has(k)) vid.set(k, i); }
+  const vOf = (x, z) => { const k = key(x, z); let i = vid.get(k); if (i === undefined) { i = vx.length; vx.push(x); vz.push(z); vid.set(k, i); } return i; };
+  const T = [], R = [], G = [];
+  const st = { cut: 0, laid: 0, pieces: 0 };
+  // (a polygon vertex: x, z, its a' and c', its weights over the source triangle's corners)
+  const split = (poly, ax, v) => {
+    const lo = [], hi = [];
+    for (let i = 0; i < poly.length; i++) {
+      const P = poly[i], Q = poly[(i + 1) % poly.length], dp = P[ax] - v, dq = Q[ax] - v;
+      if (dp <= 0) lo.push(P);
+      if (dp >= 0) hi.push(P);
+      if ((dp < 0 && dq > 0) || (dp > 0 && dq < 0)) {
+        const [U, W] = P.x < Q.x || (P.x === Q.x && P.z < Q.z) ? [P, Q] : [Q, P], t = (v - U[ax]) / (W[ax] - U[ax]);
+        const M = { x: U.x + (W.x - U.x) * t, z: U.z + (W.z - U.z) * t, w: [0, 1, 2].map((k) => U.w[k] + (W.w[k] - U.w[k]) * t) };
+        M[ax] = v; M[ax === 'a' ? 'c' : 'a'] = U[ax === 'a' ? 'c' : 'a'] + (W[ax === 'a' ? 'c' : 'a'] - U[ax === 'a' ? 'c' : 'a']) * t;
+        lo.push(M); hi.push(M);
+      }
+    }
+    return [lo, hi].filter((p) => p.length >= 3);
+  };
+  for (let t = 0; t < nT; t++) {
+    const I = [TRI[3 * t], TRI[3 * t + 1], TRI[3 * t + 2]];
+    const P = I.map((i, k) => { const [a, c] = cuAC(X[i], Z[i]); return { x: X[i], z: Z[i], a, c, w: [k === 0 ? 1 : 0, k === 1 ? 1 : 0, k === 2 ? 1 : 0] }; });
+    const amin = Math.min(P[0].a, P[1].a, P[2].a), amax = Math.max(P[0].a, P[1].a, P[2].a), cmin = Math.min(P[0].c, P[1].c, P[2].c), cmax = Math.max(P[0].c, P[1].c, P[2].c);
+    if (TAG[t] >= 3 || amax < A0 || amin > A1 || cmax < C0 || cmin > C1) {   // (outside the model: as it was)
+      for (let k = 0; k < 3; k++) { T.push(I[k]); R.push(REL[3 * t + k]); }
+      G.push(TAG[t]); continue;
+    }
+    let polys = [P];
+    for (const v of L.A) if (v > amin + 1e-6 && v < amax - 1e-6) polys = polys.flatMap((p) => split(p, 'a', v));
+    for (const v of L.C) if (v > cmin + 1e-6 && v < cmax - 1e-6) polys = polys.flatMap((p) => split(p, 'c', v));
+    if (polys.length > 1) st.cut++;
+    for (const p of polys) {
+      let ca = 0, cc = 0; for (const q of p) { ca += q.a; cc += q.c; } ca /= p.length; cc /= p.length;
+      const id = cuRegionId(ca, cc);
+      const relQ = p.map((q) => {
+        const rl = q.w[0] * REL[3 * t] + q.w[1] * REL[3 * t + 1] + q.w[2] * REL[3 * t + 2];
+        if (!id) return rl;
+        const s = haS(q.x, q.z);
+        if (s === null) return rl;
+        return cuSurface(id, q.a, q.c) - s - 0.135;
+      });
+      const vI = p.map((q) => vOf(q.x, q.z));
+      for (let k = 1; k + 1 < p.length; k++) {
+        const ar = (p[k].x - p[0].x) * (p[k + 1].z - p[0].z) - (p[k + 1].x - p[0].x) * (p[k].z - p[0].z);
+        if (Math.abs(ar) < 1e-7 || vI[0] === vI[k] || vI[k] === vI[k + 1] || vI[0] === vI[k + 1]) continue;
+        T.push(vI[0], vI[k], vI[k + 1]); R.push(relQ[0], relQ[k], relQ[k + 1]); G.push(id && TAG[t] === 2 ? 0 : TAG[t]);
+        st.pieces++; if (id) st.laid++;
+      }
+    }
+  }
+  return { x: Float32Array.from(vx), z: Float32Array.from(vz), tri: Uint32Array.from(T), rel: Float32Array.from(R), tag: Uint8Array.from(G), nV: vx.length, nT: G.length, st };
+}
 function parseChunk(buf, tx, tz) {
   const h = new Uint32Array(buf, 0, 4);
   if (h[0] !== 0x31505456) throw new Error('terrain_p1 chunk: bad magic');
-  const nV = h[2], nT = h[3];
+  let nV = h[2], nT = h[3];
   let o = 16;
-  const x = new Float32Array(buf, o, nV); o += 4 * nV;
-  const z = new Float32Array(buf, o, nV); o += 4 * nV;
-  const tri = new Uint32Array(buf, o, 3 * nT); o += 12 * nT;
-  const rel = new Float32Array(buf, o, 3 * nT); o += 12 * nT;
-  const tag = new Uint8Array(buf, o, nT);
+  let x = new Float32Array(buf, o, nV); o += 4 * nV;
+  let z = new Float32Array(buf, o, nV); o += 4 * nV;
+  let tri = new Uint32Array(buf, o, 3 * nT); o += 12 * nT;
+  let rel = new Float32Array(buf, o, 3 * nT); o += 12 * nT;
+  let tag = new Uint8Array(buf, o, nT);
+  let cuSt = null;
+  if (CU03) {
+    const cut = cuCutArrays(tx, tz, x, z, tri, rel, tag);
+    if (cut) { ({ x, z, tri, rel, tag, nV, nT } = cut); cuSt = cut.st; }
+  }
   // 4 m buckets over the tile square (CSR; PERF: built on the first read of off or list, a chunk loaded round a bridge's
   // deck may never be asked)
   const ox = tx * TILE - MARGIN, oz = tz * TILE - MARGIN;
@@ -171,7 +338,8 @@ function parseChunk(buf, tx, tz) {
     for (let t = 0; t < nT; t++) { const i0 = RG[4 * t], i1 = RG[4 * t + 1], j0 = RG[4 * t + 2], j1 = RG[4 * t + 3]; for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) list[fill[j * NB + i]++] = t; }
     return [cnt, list];
   };
-  const ch = { tx, tz, ox, oz, nV, nT, x, z, tri, rel, tag, stamp: new Uint32Array(nT), sc: 0 };
+  const ch = { tx, tz, ox, oz, nV, nT, x, z, tri, rel, tag, stamp: new Uint32Array(nT), sc: 0, cu03: cuSt };
+  if (PF69) portalCovers(ch);   // (PF69: before anything reads the relief)
   // (on first read both become plain properties)
   const built = () => { const [off, list] = buckets(); Object.defineProperty(ch, 'off', { value: off, enumerable: true, writable: true, configurable: true }); Object.defineProperty(ch, 'list', { value: list, enumerable: true, writable: true, configurable: true }); };
   Object.defineProperty(ch, 'off', { enumerable: true, configurable: true, get: () => { built(); return ch.off; } });
@@ -179,12 +347,34 @@ function parseChunk(buf, tx, tz) {
   return ch;
 }
 
+// UE CLIENT PARITY (2026-11-04): TERRAIN_P1_CELLS (node only: the headless core behind the Unreal client) names the 128 m
+// cells whose packages the city baked on the terrain profile (config/far/lift_cells.json, `city far-lift`). A tile holding
+// none of them stays flat, as the Unreal city draws it there (every borough's relief would otherwise lift the core's
+// road users off the flat blocks, and without the flag the core's were 28 m under Morningside's streets).
+let GATE;
+async function gateTiles() {
+  if (GATE !== undefined) return GATE;
+  GATE = null;
+  try {
+    if (isNode && process.env.TERRAIN_P1_CELLS) {
+      const fs = await import('node:fs/promises');
+      const cells = JSON.parse(await fs.readFile(process.env.TERRAIN_P1_CELLS, 'utf8'));
+      const per = TILE / 128;
+      GATE = new Set(cells.map((k) => { const [cx, cz] = String(k).split('_').map(Number); return `${Math.floor(cx / per)}_${Math.floor(cz / per)}`; }));
+    }
+  } catch (e) { console.warn('[terrain p1] cell gate', e?.message || e); }
+  return GATE;
+}
+export const haGateTiles = gateTiles;
+
 // is there region data for this tile? (loads it; false when the flag is off, the data is missing or the tile has none)
 // (chunkOnly: the region's chunk alone, for a reader of its relief (a bridge's deck anchors); the grade's stations and the
 // cover round the tile are a tile's own to load when it is laid, and only its own and its neighbours' are read)
 export async function haTileReady(tx, tz, chunkOnly = false) {
   if (!FLAG || !(await haInit()) || !MAN) return false;
   const k = `${tx}_${tz}`;
+  const G = await gateTiles();
+  if (G && !G.has(k)) { CH.set(k, false); return false; }
   if (!chunkOnly) {
     if (!LOADING.has('g' + k)) LOADING.set('g' + k, gradeLoad(tx, tz).catch(() => null));   // (TERRAIN GRADE: its stations, the cover)
     await LOADING.get('g' + k);
@@ -284,6 +474,7 @@ export function haWorldOf(h, x, z) {
 }
 
 // the compiled pad under a campus vertex (tile-local grid g, res r): its height over the flat base, 0 off the campus
+const inQuad0 = (x, z) => inQuad(x, z);
 function inQuad(x, z) {
   let ins = false;
   for (let i = 0, j = 3; i < 4; j = i++) {
@@ -1525,6 +1716,7 @@ function wallFaces(tile, ch, ox, oz, stats) {
     const { ux, uz, dx, dz, S, n, hiSide, loSide, side, hiKind, loKind, wi, natural } = f;
     let c = wi >= 0 ? WALLS[wi].c : 'trace';
     if (c === 'trace') { const v = wi >= 0 ? votes.get(wi) : null; c = (v ? v[0] >= 0.6 * v[1] : natural) ? 'rock' : 'mas'; }
+    if (c === 'rock' && cuInBlock(ux + dx * 0.5, uz + dz * 0.5)) c = 'mas';   // (CU04: Columbia's superblock is built ground: its walls are masonry)
     const buf = c === 'rock' ? rockOut : wallOut;
     if (c === 'rock') st.rock++; else st.masonry++;
     st.faces++;
@@ -1901,7 +2093,60 @@ export function haApplyTile(tile, ox, oz) {
   stats.relay = { whole: 0, partial: 0, areaErr: 0 };
   const NO_TL = new Set(['rsteel', 'rbal', 'rtop', 'rwall', 'apron']);
   const cand = [];
-  const campusTile = grid0 && res >= 64 && CAMPUS_Q.some(([x, z]) => x > ox - 600 && x < ox + TILE + 600 && z > oz - 600 && z < oz + TILE + 600);
+  const campusTile0 = grid0 && res >= 64 && CAMPUS_Q.some(([x, z]) => x > ox - 600 && x < ox + TILE + 600 && z > oz - 600 && z < oz + TILE + 600);
+  // CU03: the campus's ground is the authored model in the TIN (cuCutArrays), so its sections go through the same cut as
+  // the city's, once their compiled pads are taken out: inside the superblock a horizontal piece is laid flat at its
+  // section's offset over the pads (the median of its vertices'), a vertical one (a kerb face) keeps its own heights over
+  // the pad under it. The lift then lays every piece on the model, exactly flat on the terraces and the landings
+  const campusTile = campusTile0 && !(CU03 && ch.cu03);
+  if (campusTile0 && !campusTile) {
+    // (CU04: over the whole model's square, past the compile's quad: the plaza by Pupin lay on the compile's own grid there)
+    const inQuad = (x, z) => inQuad0(x, z) || cuInModel(x, z);
+    // (CU04: the compile's lawn fill over the north plaza becomes its brick, before the lift lays it; the lawns under the
+    // flights go after it, in cuHoldGround, once the lift has cut them along the model's lines)
+    {
+      let paved = 0;
+      const moved = [];
+      for (const [nm, up] of [['grassU', true], ['grass', false]]) {   // (the lawn fill, and the lawns on paving: Dodge's areaway)
+        const a = tile.S[nm];
+        if (!a || a.length < 9) continue;
+        const keep = []; let n = 0;
+        for (let i = 0; i + 8 < a.length; i += 9) {
+          const f = cuLawnFate((a[i] + a[i + 3] + a[i + 6]) / 3 + ox, (a[i + 2] + a[i + 5] + a[i + 8]) / 3 + oz, up);
+          const dst = f === 'brick' ? moved : keep;
+          if (f === 'brick') n++;
+          for (let k = 0; k < 9; k++) dst.push(a[i + k]);
+        }
+        if (n) tile.S[nm] = Float32Array.from(keep);
+        paved += n;
+      }
+      if (moved.length) { const b = tile.S.brick && tile.S.brick.length ? Array.from(tile.S.brick) : []; tile.S.brick = Float32Array.from(b.concat(moved)); }
+      if (paved) stats.cuLawn = { paved };
+      // (LP28: the fountains' parterre panels to the ring's arc, campusGround.js)
+      const rs = cuPanelReshape(tile.S, ox, oz);
+      if (rs) stats.cuPanels = rs;
+    }
+    for (const name of HA_GROUND) {
+      const a = tile.S[name];
+      if (!a || a.length < 9) continue;
+      const d = [], isV = (i) => Math.abs((a[i + 3] - a[i]) * (a[i + 8] - a[i + 2]) - (a[i + 6] - a[i]) * (a[i + 5] - a[i + 2])) < 1e-3;
+      for (let i = 0; i + 8 < a.length; i += 9) {
+        if (isV(i)) continue;
+        for (let k = 0; k < 9; k += 3) { const x = a[i + k] + ox, z = a[i + k + 2] + oz; if (inQuad(x, z)) d.push(a[i + k + 1] - (HA_BASE + pad(x, z))); }
+      }
+      d.sort((u, w) => u - w);
+      const offK = d.length ? d[d.length >> 1] : 0;
+      for (let i = 0; i + 8 < a.length; i += 9) {
+        const vert = isV(i);
+        for (let k = 0; k < 9; k += 3) {
+          const x = a[i + k] + ox, z = a[i + k + 2] + oz;
+          if (!inQuad(x, z)) continue;
+          a[i + k + 1] = vert ? a[i + k + 1] - pad(x, z) : HA_BASE + offK;
+        }
+      }
+      (stats.cu03 = stats.cu03 || {})[name] = +offK.toFixed(3);
+    }
+  }
   // P2A: the lifting cut's per-tile state (edge and point caches shared by every section, so a shared edge splits alike)
   const LIFT = CUT === 'lift' && !campusTile;
   const lctx = LIFT ? { ch, ox, oz, cand: [], cand2: [], edges: new Map(), verts: new Map(), vmark: new Uint32Array(ch.nV), vstamp: 0, noTL: false, onEmit: null } : null;
@@ -2273,8 +2518,53 @@ function capGround(tile, st) {
   }
   st.caps = (st.caps || 0) + n;
 }
+// CU04: Columbia's superblock (world/campusGround.js) is built ground laid exactly on the authored model; the clamp's and
+// the grade's passes (natural ground meeting the paving's edges) are the city's natural ground's, and on the campus they
+// bent the lawns (the parterres' laid in waves up to 0.5 m under their own base) and dropped 6,700 of its lawn points
+// (client/tools/tests/campus_ground.mjs): its ground is held out of them and put back after, as laid
+const CU_HOLD = ['asphalt', 'sidewalk', 'curb', 'paintW', 'paintY', 'grass', 'path', 'paintG', 'brick', 'gutter', 'busred', 'warn', 'warnIron', 'grassU', 'plaza', 'gravel', 'terrP1', 'terrBack', 'terrRock', 'terrWall'];
+const CU_HOLD_ATT = { terrWall: [['terrWallUV', 6], ['terrWallWe', 9], ['terrWallMat', 1]] };
+function cuHoldGround(tile) {
+  if (!CU03 || !tile.header) return null;
+  const [ox, oz] = tile.header.origin, B = cuBox();
+  if (B[2] < ox || B[0] > ox + TILE || B[3] < oz || B[1] > oz + TILE) return null;
+  const held = {};
+  for (const nm of CU_HOLD) {
+    const a = tile.S[nm];
+    if (!a || a.length < 9) continue;
+    const nT = (a.length / 9) | 0, att = (CU_HOLD_ATT[nm] || []).filter(([k, w]) => tile.S[k] && tile.S[k].length === nT * w);
+    const inn = new Uint8Array(nT);
+    let n = 0;
+    // (the lawns under the flights, laid on a flight's ramp at the lawn's offset, rose between its treads (South Field's
+    // steps): cut along the model's lines by the lift, they are held and never put back; the treads cover the base there)
+    const lawn = nm === 'grass' || nm === 'grassU';
+    for (let t = 0; t < nT; t++) {
+      const o = 9 * t, cx = (a[o] + a[o + 3] + a[o + 6]) / 3 + ox, cz = (a[o + 2] + a[o + 5] + a[o + 8]) / 3 + oz;
+      if (cuInModel(cx, cz)) { inn[t] = lawn && cuLawnFate(cx, cz, false) === 'drop' ? 2 : 1; n++; }
+    }
+    if (!n) continue;
+    let n1 = 0; for (let t = 0; t < nT; t++) if (inn[t] === 1) n1++;
+    const part = (arr, w, keep) => { const C = arr.constructor, out = new C((keep ? n1 : nT - n) * w); let j = 0; for (let t = 0; t < nT; t++) if (keep ? inn[t] === 1 : !inn[t]) { out.set(arr.subarray(w * t, w * t + w), j); j += w; } return out; };
+    held[nm] = { a: part(a, 9, true), att: att.map(([k, w]) => [k, w, part(tile.S[k], w, true)]), dropped: n - n1 };
+    tile.S[nm] = part(a, 9, false);
+    for (const [k, w] of att) tile.S[k] = part(tile.S[k], w, false);
+  }
+  return held;
+}
+function cuRestoreGround(tile, held) {
+  const cat = (u, v) => { if (!u || !u.length) return v; const out = new v.constructor(u.length + v.length); out.set(u, 0); out.set(v, u.length); return out; };
+  for (const [nm, h] of Object.entries(held)) {
+    const nT0 = tile.S[nm] ? (tile.S[nm].length / 9) | 0 : 0;
+    for (const [k, w, v] of h.att) {
+      // (a pass that added walls without their attributes: the held ones go back without theirs, the arrays kept in step)
+      if (tile.S[k] && tile.S[k].length === nT0 * w) tile.S[k] = cat(tile.S[k], v); else if (!nT0) tile.S[k] = v;
+    }
+    tile.S[nm] = cat(tile.S[nm], h.a);
+  }
+}
 export function haClampGround(tile) {
   if (CLAMP_OFF || !FLAG || !tile || !tile.S) return null;
+  const cuHeld = cuHoldGround(tile);   // (CU04: the campus's ground out of the passes, back at the end)
   const st = { base: 0, grass: 0, maxDrop: 0, passes: 0 };
   railCutStructure(tile, st);   // (first: the clamp then keeps its re-laid ground off the paving too)
   capGround(tile, st);   // (PORTAL FIX)
@@ -2301,6 +2591,7 @@ export function haClampGround(tile) {
   if (st.grade) baseUnderLawn(tile, st.grade);   // (TERRAIN GRADE: last: the base under the lawns as every pass left them)
   capGround(tile, st);   // (PORTAL FIX: and last, over whatever the passes raised)
   delete st.cpDrop;
+  if (cuHeld) { cuRestoreGround(tile, cuHeld); st.cuHeld = Object.fromEntries(Object.entries(cuHeld).map(([k, h]) => [k, h.a.length / 9])); }
   if (tile.p1) tile.p1.clamp = st;
   return st;
 }
@@ -2712,6 +3003,9 @@ function buildingBands(tile) {
     if (b.landmarkId > 0) continue;
     const ring = [];
     for (let i = 0; i < b.len; i++) ring.push([S.bldgXZ[(b.start + i) * 2] + ox, S.bldgXZ[(b.start + i) * 2 + 1] + oz]);
+    // (CU04: not on Columbia's campus, where the terraces are built and a hall's lower floors open only on the street or
+    // yard side: a band round Havemeyer, whose floor is its service yard's, dropped the lawn before it 3.7 m)
+    if (cuInBlock(ring.reduce((u, p) => u + p[0], 0) / ring.length, ring.reduce((u, p) => u + p[1], 0) / ring.length)) continue;
     const q = haBuildingGround(ring, tile, ox, oz);
     if (!q) continue;
     const y0 = b.baseY + q.lift;

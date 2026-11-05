@@ -25,7 +25,8 @@ NODE_LOCAL=${NODE_LOCAL:-/data0/projectnyc_aux/node/node-v24.19.0-linux-x64}
 [ $BUILD = 1 ] && { bash "$PKG_DIR/build_linux.sh" Shipping || die "build"; }
 bash "$PKG_DIR/package_linux.sh" Shipping "${PKG_ARGS[@]}" || die "package"
 NODE_ARG=(); [ -d "$NODE_LOCAL" ] && NODE_ARG=(--node-local "$NODE_LOCAL")
-timed "core-bundle-linux" python3 "$PKG_DIR/core_bundle.py" --platform linux --out "$VUE_OUT/core_linux" "${NODE_ARG[@]}" \
+# (VUE_CORE_REPO: the checkout the core's code and data come from, the release's own tree; this checkout by default)
+timed "core-bundle-linux" python3 "$PKG_DIR/core_bundle.py" --platform linux --out "$VUE_OUT/core_linux" "${NODE_ARG[@]}" --repo "${VUE_CORE_REPO:-$(cd "$PKG_DIR/../.." && pwd)}" \
   --cellcache "${VALDRADA_CELLCACHE_SRC:-/data0/projectnyc_aux/cellcache}" || die "core bundle"
 timed "release-files-linux" python3 "$PKG_DIR/ue_release.py" --version "$VERSION" --platform linux \
   --app "$VUE_OUT/archive/Shipping/Linux" --core "$VUE_OUT/core_linux" --out "$REL" \

@@ -13,5 +13,8 @@ OUT = os.path.join(HERE, '..', 'Data', 'tiers.json')
 src = json.load(open(SRC))
 out = {t: {k: v for k, v in sorted(cv.items()) if not k.startswith(('_', 'valdrada.')) and k != 'res'}
        for t, cv in src.items() if not t.startswith('_') and isinstance(cv, dict)}
+# (under 1024 MB the city-block worlds' street trees draw from their coarse Nanite pages, flat green shards from the street)
+low = {t: v.get('r.Nanite.Streaming.StreamingPoolSize') for t, v in out.items() if float(v.get('r.Nanite.Streaming.StreamingPoolSize', 1024)) < 1024}
+if low: raise SystemExit(f'make_tiers: the Nanite streaming pool is under 1024 MB in {low}; fix tools/ue/persist_tiers.json')
 json.dump(out, open(OUT, 'w'), indent=1)
 print({t: len(v) for t, v in out.items()})

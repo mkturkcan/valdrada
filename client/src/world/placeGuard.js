@@ -2,7 +2,8 @@
 // litter baskets and the rest of the street furniture): an instance is rejected where its footprint meets
 //   - a building footprint (a tree: its trunk within 2 m of a facade or inside; anything else standing on the ground:
 //     inside the footprint),
-//   - a carriageway: the compile's asphalt or bus lane at grade, or a Central Park drive's (cpDrives.js, the bike lane
+//   - a carriageway: the compile's asphalt, gutter or bus lane at grade (DK04 2026-11-04: the gutter, the kerbside strip
+//     of the roadway, had been left out, so a tree in it stood), or a Central Park drive's (cpDrives.js, the bike lane
 //     included).
 // placeGuard(tile, ox, oz) builds the tile's index once (cached on the tile); guard.why(wx, wz, kind) returns null or the
 // reason ('bldg', 'road', 'drive'). assemble.js (the page) and tools/terrain/place_gate.mjs (the city-wide gate) use it.
@@ -41,10 +42,10 @@ export function placeGuard(tile, ox, oz) {
   // way, walks included)
   // (the asphalt runs on under the walks, 15 cm lower: a point under a walk, a lawn or a plaza is not in the carriageway)
   const HX = new Map(), X = [];
-  for (const nm of ['asphalt', 'busred', 'sidewalk', 'plaza', 'brick', 'path', 'grass', 'grassU']) {
+  for (const nm of ['asphalt', 'busred', 'gutter', 'sidewalk', 'plaza', 'brick', 'path', 'grass', 'grassU']) {
     const A = tile.S && tile.S[nm];
     if (!A) continue;
-    const road = nm === 'asphalt' || nm === 'busred', M = road ? HR : HX, L = road ? R : X;
+    const road = nm === 'asphalt' || nm === 'busred' || nm === 'gutter', M = road ? HR : HX, L = road ? R : X;
     for (let i = 0; i + 8 < A.length; i += 9) {
       if (A[i + 1] > 4.2 || A[i + 4] > 4.2 || A[i + 7] > 4.2) continue;
       const ax = A[i] + ox, az = A[i + 2] + oz, bx = A[i + 3] + ox, bz = A[i + 5] + oz, cx = A[i + 6] + ox, cz = A[i + 8] + oz;

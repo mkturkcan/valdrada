@@ -83,7 +83,7 @@ export function wshCoast(tile, ox, oz) {
   // ---- piers
   const deck = { plaza: [], curb: [] };
   for (const p of T.piers) {
-    if (marinaDropPier(ox, oz, p.id)) { st.marinaDrop = (st.marinaDrop || 0) + 1; continue; }
+    if (marinaDropPier(ox, oz, p.id, p.ring)) { st.marinaDrop = (st.marinaDrop || 0) + 1; continue; }
     if (p.ring && towerPier(p.ring)) { st.towerDrop = (st.towerDrop || 0) + 1; continue; }   // (MARINA KIT: a dock outline drawn as a slab; the kit's floating docks there)
     // (one level for every pier, so a pier split over tiles meets itself: the compile's flat pier level, 0.45 m under its
     // bulkheads' caps)

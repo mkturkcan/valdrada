@@ -12,12 +12,16 @@ import { setCampusPads } from './landmarks.js';
 import { FW25, FW26, FW27, fountainProbe, fountainSpray, poolRings, veilMat } from './fountainFX.js';   // FW25: spray, ring waves; FW26: water veils, foam; FW27: probe-lit clear pools
 import { HA_ON, haPreload, haGround, haGroundMin, haGroundReady, haFoot } from '../world/haAnchor.js';
 import { haRegistry } from '../world/heightAuthority.js';   // P1 TERRAIN (`?terrain=p1`): the kit on the real ground
+import { CU03, CU, CU_A, cuXZ, cuAC, cuRegionId, cuFlights, CU_FLIGHT_IDS, cuLevel } from '../world/campusGround.js';   // CU03: the McKim core on the authored ground
 
 // every campus material takes the scene light trim (see applyLightTrim): the
 // untrimmed granite and limestone clipped to pure white at noon
 const LT = (m) => applyLightTrim(m);
 // LP26: no kit stone panels over Low Plaza's compiled paving (see the plaza block)
 const LP26 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('lp26') === '0');
+// LS02 (2026-11-02): the McKim axis's grand flights on the terrain flag as one full-width flight each (haAxis layWide);
+// `?ls02=0` lays them strip by strip as before
+const LS02 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('ls02') === '0');
 const GRANITE = LT(new THREE.MeshStandardMaterial({ color: 0x8f8a80, roughness: 0.82, metalness: 0.02 }));
 const STONE = LT(new THREE.MeshStandardMaterial({ color: 0x7d7468, roughness: 0.9 }));
 const BRONZE = LT(new THREE.MeshStandardMaterial({ color: 0x51604a, roughness: 0.55, metalness: 0.55 })); // patinated
@@ -502,6 +506,10 @@ export async function buildCampus(scene) {
       // P1: an OSM flight from the real ground at its two ends (0.3 m past each end: the foot and the head)
       const a0 = p[0], b0 = p[p.length - 1], L0 = Math.hypot(b0[0] - a0[0], b0[1] - a0[1]);
       if (haZone((a0[0] + b0[0]) / 2, (a0[1] + b0[1]) / 2) || L0 < 0.8) continue;
+      if (CU03) {   // (CU03: the core's flights and CU04's are the model's; the stoops and gate flights elsewhere stay OSM's)
+        const [am, cm] = cuAC((a0[0] + b0[0]) / 2, (a0[1] + b0[1]) / 2), id = cuRegionId(am, cm);
+        if (id && (CU_FLIGHT_IDS.has(id) || (am < 26 && Math.abs(cm) < CU.flank + 2))) continue;
+      }
       const ux = (b0[0] - a0[0]) / L0, uz = (b0[1] - a0[1]) / L0;
       const ga = gS(a0[0] - ux * 0.3, a0[1] - uz * 0.3), gb = gS(b0[0] + ux * 0.3, b0[1] + uz * 0.3);
       if (ga === null || gb === null) continue;
@@ -597,6 +605,8 @@ export async function buildCampus(scene) {
   // ---- P1 TERRAIN: the McKim axis on the real ground (see the note at the top of buildCampus)
   const gAC = (a, c) => { const q = relPt(a, c); return gS(q[0], q[1]); };
   let haAlma = null;   // Alma Mater's landing: [along, y]
+  const lsFlights = {};   // LS02: the wide flights' extents along and across (granite landings between them, below)
+  const LS02_HALF = 20.5;
   const haAxis = () => {
     // the flights on the line of constant across c within [a0, a1]: runs steeper than 1 in 6 over a metre (the plaza and
     // the landings are under 3 %), refined to where the ground leaves the foot and reaches the head
@@ -687,8 +697,47 @@ export async function buildCampus(scene) {
         const qf = relPt(S.u - 0.3, cm), qh = relPt(Math.max(E, S.w) + 0.3, cm);
         haFoot('campus', `${tag}:${cm}`, 'flight', qf[0], qf[1], S.foot, { x1: qh[0], z1: qh[1], y1: S.head });
       };
-      for (const S0 of strips) lay(S0, 0);
+      if (!(LS02 && strips.length >= 2 && layWide(F, strips, tag))) for (const S0 of strips) lay(S0, 0);
       return { ...F, strips: strips.length };
+    };
+    // LS02 (owner 2026-11-02: "the steps near the two fountains near Low library are broken and eaten by the heightmap
+    // again"): each 4 m strip found its own foot, head and start on the 2017 bare earth, which smooths the flights into
+    // uneven ramps, and a strip whose fit failed was left to the terrain: the grand flights drew as staggered blocks with
+    // grass between them. One flight over the strips that carry the axis's rise instead: its foot and head the landings'
+    // median levels across the width, uniform risers of ~0.155 m, one start line laid so the line through the treads'
+    // inner corners clears the HIGHEST ground across the whole width at every station (no tread under the ground anywhere),
+    // the top tread run on to where the ground reaches the head, every tread one granite block over the full width.
+    const layWide = (F, strips, tag) => {
+      // (across: the strips that carry the rise, held between the parterres' lawn panels, OSM's grass at |across| 20.5)
+      const c0 = Math.max(-LS02_HALF, Math.min(...strips.map((q) => q.c0))), c1 = Math.min(LS02_HALF, Math.max(...strips.map((q) => q.c1))), cm = (c0 + c1) / 2, wdt = c1 - c0;
+      const cs = []; for (let c = c0 + 0.15; c <= c1 - 0.15 + 1e-6; c += 1.0) cs.push(c);
+      const gm = (a) => { let m = -Infinity; for (const c of cs) { const g = gAC(a, c); if (g !== null) m = Math.max(m, g); } return Number.isFinite(m) ? m : null; };
+      const med = (a) => { const v = []; for (const c of cs) { const g = gAC(a, c); if (g !== null) v.push(g); } if (!v.length) return null; v.sort((p, q) => p - q); return v[v.length >> 1]; };
+      const foot = med(F.u - 0.6), head = med(F.w + 0.6);
+      if (foot === null || head === null || head - foot < 0.25) return false;   // (the strips laid one by one, as before)
+      const rise = head - foot, n = Math.max(1, Math.round(rise / 0.155)), rh = rise / n;
+      const tr = Math.min(0.6, Math.max(0.28, (F.w - F.u) / n)), slope = rh / tr;
+      let r0 = F.u;
+      for (let a = F.u - 2.0; a <= F.w + 2.0; a += 0.1) { const g = gm(a); if (g !== null && g > foot + 0.005 && g < head) r0 = Math.min(r0, a - (g - foot) / slope); }
+      r0 = Math.max(r0, F.u - 1.5);   // (a side that rises far sooner is the side terrain, not the flight: at most 1.5 m earlier)
+      let E = r0 + n * tr;
+      for (let a = r0 + n * tr; a <= F.w + 2.0; a += 0.05) { const g = med(a); if (g !== null && g >= head - 0.03) { E = a; break; } E = a; }
+      let lo = Math.min(foot, head);
+      for (let t = 0; t <= 1.0001; t += 0.0625) for (const c of [c0 - 0.4, ...cs, c1 + 0.4]) { const g = gAC(r0 + (r0 + n * tr - r0) * t, c); if (g !== null) lo = Math.min(lo, g); }
+      for (let i = 0; i < n; i++) {
+        const a0 = r0 + i * tr, a1 = i === n - 1 ? Math.max(E, r0 + n * tr) : r0 + (i + 1) * tr, d = a1 - a0, am = (a0 + a1) / 2;
+        const top = foot + rh * (i + 1) + 0.01, q = relPt(am, cm), h = top - (lo - 0.3);
+        granite.add(q[0], top - h / 2, q[1], wdt + 0.01, h, d + 0.03, yawAxis);
+        addPrism(rectPts(q[0], q[1], wdt / 2, d / 2 + 0.01, yawAxis), top - 0.45, top, true);
+        const pts = [];
+        for (const da of [-0.45, 0, 0.45]) for (const dc of [-0.45, 0, 0.45]) pts.push(relPt(am + da * d, cm + dc * wdt));
+        haFoot('campus', `${tag}:wide:${i}`, 'deck', q[0], q[1], top, { pts, skirt: h });
+      }
+      const qf = relPt(r0 - 0.3, cm), qh = relPt(Math.max(E, r0 + n * tr) + 0.3, cm);
+      haFoot('campus', `${tag}:wide`, 'flight', qf[0], qf[1], foot, { x1: qh[0], z1: qh[1], y1: head });
+      console.log(`[terrain p1] campus ${tag}: one flight over across ${c0.toFixed(1)}..${c1.toFixed(1)}, ${n} risers of ${rh.toFixed(3)} from ${r0.toFixed(2)}, foot ${foot.toFixed(2)} head ${head.toFixed(2)}`);
+      lsFlights[tag] = { a0: r0, a1: Math.max(E, r0 + n * tr), c0, c1 };
+      return true;
     };
     const south = flight(-45, -27, 'southSteps');
     const g1 = flight(-13, -5, 'grandA');
@@ -700,7 +749,237 @@ export async function buildCampus(scene) {
     haAlma = Number.isFinite(ay) ? [aA, ay] : null;
     console.log('[terrain p1] campus axis:', JSON.stringify({ south, g1, g2, alma: haAlma }));
   };
-  if (HA) haAxis();
+  // ==== CU03 (world/campusGround.js): the McKim core built on the authored ground, the numbers the ground was laid from:
+  // the grand flights A and B with Alma Mater's landing between them, the side flights to Kent and Dodge, the broad south
+  // steps from College Walk, and the retaining walls round the court (the parterre-north wall and the flank walls) and the
+  // flights' cheeks, dressed as the flat kit's (ashlar between a granite plinth, string course and cap, pilaster piers) with
+  // McKim's balustrade along every top that drops over a metre. Every height is the drawn ground's at the piece (gS): a
+  // flight runs from the ground 0.3 m before its foot to the ground 0.3 m past its head, a wall from its low side's ground
+  // to its high side's, so nothing floats or sinks if a section's offset moves
+  const cuKit = () => {
+    const K = CU, yawN = Math.atan2(CU_A[0], CU_A[1]);
+    const gAt = (a, c) => { const [x, z] = cuXZ(a, c); return gS(x, z); };
+    // a box in the model's frame: centred at (a, c), da along, dc across, from y0 to y1
+    const mbox = (b, a, c, da, dc, y0, y1) => { if (!(y1 > y0)) return; const [x, z] = cuXZ(a, c); b.add(x, (y0 + y1) / 2, z, dc, y1 - y0, da, yawN); };
+    const mcol = (a, c, da, dc, y0, y1, deck) => { const [x, z] = cuXZ(a, c); addPrism(rectPts(x, z, dc / 2, da / 2, yawN), y0, y1, deck); };
+    let nT = 0, nW = 0;
+    // ---- the flights: one granite block per tread over the full width, its top a riser over the one before, set into
+    // the ramp under it
+    const flight = (F) => {
+      const along = F.axis === 'a', s = F.side || 1;
+      const u0 = along ? F.a0 : Math.abs(F.c0), u1 = along ? F.a1 : Math.abs(F.c1);   // foot -> head
+      const w0 = along ? F.c0 : F.a0, w1 = along ? F.c1 : F.a1, wm = (w0 + w1) / 2, W = w1 - w0;
+      const pt = (u, w) => (along ? [u, w] : [w, s * u]);
+      const foot = gAt(...pt(u0 - 0.3, wm)), am_ = (F.a0 + F.a1) / 2;
+      const head = F.kit ? (foot === null ? null : foot + F.head(am_) - F.foot(am_)) : gAt(...pt(u1 + 0.3, wm));
+      if (foot === null || head === null || head - foot < 0.3) { console.warn('[cu03] flight', F.id, 'no ground', foot, head); return null; }
+      const n = F.n, rh = (head - foot) / n, tr = (u1 - u0) / n;
+      for (let i = 0; i < n; i++) {
+        const t0 = u0 + i * tr, t1 = t0 + tr, um = (t0 + t1) / 2, top = foot + rh * (i + 1);
+        let lo = top - rh;
+        for (const ww of [w0 + 0.2, wm, w1 - 0.2]) { const g = gAt(...pt(t0, ww)); if (g !== null) lo = Math.min(lo, g); }
+        const [ac, cc] = pt(um, wm);
+        if (along) { mbox(granite, ac, cc, tr + 0.03, W + 0.02, lo - 0.3, top); mcol(ac, cc, tr, W, top - 0.45, top, true); }
+        else { mbox(granite, ac, cc, W + 0.02, tr + 0.03, lo - 0.3, top); mcol(ac, cc, W, tr, top - 0.45, top, true); }
+        nT++;
+      }
+      const qf = cuXZ(...pt(u0 - 0.3, wm)), qh = cuXZ(...pt(u1 + 0.3, wm));
+      // (a kit flight's head is its own landing, over the drawn base: the gate checks its foot)
+      if (F.kit) haFoot('campus', `cu03:${F.id}`, 'foot', qf[0], qf[1], foot, { r: 0 });
+      else haFoot('campus', `cu03:${F.id}`, 'flight', qf[0], qf[1], foot, { x1: qh[0], z1: qh[1], y1: head });
+      return { foot, head, n, rh, tr };
+    };
+    // the south steps: the walk falls 1 m across their 100 m, so each tread is warped from end to end (its top a fixed
+    // share of the way from the walk to the court at every point across), laid in 5 m pieces
+    const south = (F) => {
+      const n = 8, segs = Math.round((F.c1 - F.c0) / 5), dc = (F.c1 - F.c0) / segs, tr = (F.a1 - F.a0) / n;
+      for (let j = 0; j < segs; j++) {
+        const cm = F.c0 + (j + 0.5) * dc, foot = gAt(F.a0 - 0.3, cm), head = gAt(F.a1 + 0.3, cm);
+        if (foot === null || head === null) continue;
+        for (let i = 0; i < n; i++) {
+          const am = F.a0 + (i + 0.5) * tr, top = foot + ((head - foot) * (i + 1)) / n, g = gAt(F.a0 + i * tr, cm);
+          mbox(granite, am, cm, tr + 0.03, dc + 0.01, Math.min(g ?? top, top) - 0.35, top);
+          mcol(am, cm, tr, dc, top - 0.45, top, true);
+          nT++;
+        }
+      }
+    };
+    // ---- the walls. A wall is a straight line of constant a' or c' and the direction it faces (its low side); it stands
+    // from its low side's ground (0.4 m out) to its high side's (0.4 m in), in pieces of at most `seg` m along it, each a
+    // level block (a raked wall's pieces step with the flight beside it)
+    const BAL_IN = 0.45;
+    const wall = (id, a0, c0, a1, c1, fa, fc, opts = {}) => {
+      const L = Math.hypot(a1 - a0, c1 - c0);
+      if (L < 0.5) return;
+      const seg = opts.seg || 4.0, n = Math.max(1, Math.ceil(L / seg)), alongWall = a0 === a1 ? 'c' : 'a';
+      for (let k = 0; k < n; k++) {
+        const t0 = k / n, t1 = (k + 1) / n, tm = (t0 + t1) / 2;
+        const am = a0 + (a1 - a0) * tm, cm = c0 + (c1 - c0) * tm, len = L / n;
+        const lowY = [t0, t1, tm].map((t) => gAt(a0 + (a1 - a0) * t + fa * 0.4, c0 + (c1 - c0) * t + fc * 0.4)).filter((v) => v !== null);
+        const hiY = [t0 + 0.02, t1 - 0.02, tm].map((t) => gAt(a0 + (a1 - a0) * t - fa * 0.4, c0 + (c1 - c0) * t - fc * 0.4)).filter((v) => v !== null);
+        if (!lowY.length || !hiY.length) continue;
+        const yFoot = Math.min(...lowY), yTop = opts.raked ? Math.max(...hiY) : Math.min(...hiY);
+        if (yTop - yFoot < 0.25) continue;
+        // (the face's frame: v across the wall toward the low side, u along it)
+        const at = (u, v) => (alongWall === 'a' ? [am + u, cm + v * fc] : [am + v * fa, cm + u]);
+        const box = (b, v0, v1, y0, y1, run = len + 0.02) => {
+          const [ac, cc] = at(0, (v0 + v1) / 2), dv = Math.abs(v1 - v0);
+          if (alongWall === 'a') mbox(b, ac, cc, run, dv, y0, y1); else mbox(b, ac, cc, dv, run, y0, y1);
+        };
+        // the mass behind the face, its dressed courses proud of it, the cap over the walk at its top
+        box(stone, -0.9, 0.0, yFoot - 0.3, yTop - 0.05);
+        box(granite, 0.0, 0.18, yFoot - 0.05, yFoot + Math.min(1.0, (yTop - yFoot) * 0.35));            // plinth
+        if (yTop - yFoot > 2.2) box(granite, 0.0, 0.12, yTop - 0.95, yTop - 0.72);                       // string course
+        box(granite, -1.0, 0.22, yTop - 0.18, yTop + 0.06);                                               // cap
+        if (!opts.raked && k % 2 === 0) box(granite, 0.0, 0.26, yFoot - 0.05, yTop - 0.18, 1.5);   // pilaster pier
+        addPrism(rectPts(...cuXZ(...at(0, -0.45)), alongWall === 'a' ? 0.5 : len / 2, alongWall === 'a' ? len / 2 : 0.5, yawN), yFoot - 0.5, yTop + (opts.bal === false ? 0.1 : 1.05));
+        // McKim's balustrade along the top: plinth, balusters, rail, 0.45 m in from the face
+        if (opts.bal !== false && yTop - yFoot >= 1.0) {
+          const [ba, bc] = at(0, -BAL_IN), yb = yTop + 0.06;
+          const dvb = 0.62;
+          if (alongWall === 'a') { mbox(granite, ba, bc, len, dvb, yb, yb + 0.18); mbox(granite, ba, bc, len, 0.5, yb + 0.86, yb + 1.02); }
+          else { mbox(granite, ba, bc, dvb, len, yb, yb + 0.18); mbox(granite, ba, bc, 0.5, len, yb + 0.86, yb + 1.02); }
+          const nb = Math.max(1, Math.floor(len / 0.46));
+          for (let q = 0; q < nb; q++) {
+            const u = -len / 2 + (q + 0.5) * (len / nb), [qa, qc] = at(u, -BAL_IN), [x, z] = cuXZ(qa, qc);
+            balB.add(x, yb + 0.52, z, 0.13, 0.68, 0.13, yawN);
+          }
+        }
+        nW++;
+      }
+      haFoot('campus', `cu03:wall:${id}`, 'foot', ...cuXZ(a0, c0), gAt(a0 + fa * 0.4, c0 + fc * 0.4) ?? 0, { pts: [cuXZ(a0, c0), cuXZ(a1, c1)] });
+    };
+    // an urn pier at (a, c) on the ground there
+    const urnAt = (a, c, h = 1.9, w = 1.35) => {
+      const [x, z] = cuXZ(a, c), y = gAt(a, c);
+      if (y === null) return;
+      stone.add(x, y + h / 2 - 0.3, z, w, h + 0.6, w, yawN);
+      granite.add(x, y + h + 0.13, z, w * 1.19, 0.26, w * 1.19, yawN);
+      uniq.add(cyl(GRANITE, 0.4 * w / 1.85, 0.5 * w / 1.85, 0.6 * w / 1.85, x, y + h + 0.56 * w / 1.85, z, 12));
+      const urn = new THREE.Mesh(new THREE.SphereGeometry(0.52 * w / 1.85, 12, 10), GRANITE);
+      urn.scale.set(1, 1.18, 1); urn.position.set(x, y + h + 1.3 * w / 1.85, z); urn.castShadow = true;
+      uniq.add(urn);
+      addPrism(rectPts(x, z, w * 0.53, w * 0.53, yawN), y - 1.2, y + h + 0.4);
+    };
+    const FL = cuFlights(), byId = Object.fromEntries(FL.map((f) => [f.id, f]));
+    const R = {};
+    for (const id of ['flightA', 'flightB', 'sideE', 'sideW', 'urisSteps', 'sfSteps', 'sfStepsE', 'sfStepsW', 'earlSteps', 'dodgeStair']) R[id] = flight(byId[id]);
+    // the flights' cheek walls (2026-11-03, the owner: "the side walls of the side stairs are still missing"): the side
+    // flights stand out of the flank wall into the court, Uris Hall's steps out of its podium and Earl Hall's portico
+    // flight out of the plateau, open at their sides; there each gets a solid stone wall 0.5 m thick outside the treads,
+    // raked with the flight under a granite coping 0.95 m over the nosings, from a newel at the foot to the wall it meets
+    // at the head, or along the landing to the front (the slits' raked faces closed only the ramp under the treads; a
+    // first pass stepped the wall with the treads, which read as a second stair)
+    const solid8 = (mat, P) => {
+      // eight corners (the foot end's left-bottom, right-bottom, left-top, right-top, then the head end's): the faces
+      // turned outward, flat, uv in metres
+      const cx = P.reduce((v, p) => v + p[0], 0) / 8, cy = P.reduce((v, p) => v + p[1], 0) / 8, cz = P.reduce((v, p) => v + p[2], 0) / 8;
+      const pos = [], uv = [];
+      for (const f of [[0, 1, 3, 2], [4, 6, 7, 5], [0, 2, 6, 4], [1, 5, 7, 3], [2, 3, 7, 6], [0, 4, 5, 1]]) {
+        let [a, b, c, d] = f.map((i) => P[i]);
+        const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], e2 = [d[0] - a[0], d[1] - a[1], d[2] - a[2]];
+        const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+        if (n[0] * ((a[0] + c[0]) / 2 - cx) + n[1] * ((a[1] + c[1]) / 2 - cy) + n[2] * ((a[2] + c[2]) / 2 - cz) < 0) [b, d] = [d, b];
+        const L1 = Math.hypot(b[0] - a[0], b[1] - a[1], b[2] - a[2]), L2 = Math.hypot(d[0] - a[0], d[1] - a[1], d[2] - a[2]);
+        const q = [[a, 0, 0], [b, L1, 0], [c, L1, L2], [d, 0, L2]];
+        for (const k of [0, 1, 2, 0, 2, 3]) { pos.push(...q[k][0]); uv.push(q[k][1], q[k][2]); }
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+      geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, mat);
+      m.castShadow = true; m.receiveShadow = true;
+      uniq.add(m);
+    };
+    for (const id of ['sideE', 'sideW', 'urisSteps', 'earlSteps']) {
+      const F = byId[id], r = R[id];
+      if (!F || !r) continue;
+      const along = F.axis === 'a', s = F.side || 1;
+      const u0 = along ? F.a0 : Math.abs(F.c0), u1 = along ? F.a1 : Math.abs(F.c1);
+      const pt = (u, w) => (along ? [u, w] : [w, s * u]);   // (a', c') of a point u along the flight, w across it
+      const box = (b, um, w, du, dw, y0, y1) => { const [a_, c_] = pt(um, w); if (along) mbox(b, a_, c_, du, dw, y0, y1); else mbox(b, a_, c_, dw, du, y0, y1); };
+      const col = (um, w, du, dw, y0, y1) => { const [a_, c_] = pt(um, w); if (along) mcol(a_, c_, du, dw, y0, y1); else mcol(a_, c_, dw, du, y0, y1); };
+      const q3 = (u, w, y) => { const [x, z] = cuXZ(...pt(u, w)); return [x, y, z]; };
+      // a piece from uA to uB, wl to wr across, its underside from bA to bB and its top from tA to tB
+      const run = (mat, uA, uB, wl, wr, bA, bB, tA, tB) => solid8(mat, [q3(uA, wl, bA), q3(uA, wr, bA), q3(uA, wl, tA), q3(uA, wr, tA),
+        q3(uB, wl, bB), q3(uB, wr, bB), q3(uB, wl, tB), q3(uB, wr, tB)]);
+      const nose = (u) => r.foot + r.rh + (u - u0) * (r.rh / r.tr);   // the nosings' line
+      const w0 = along ? F.c0 : F.a0, w1 = along ? F.c1 : F.a1;
+      for (const [ww, out] of [[w0 - 0.25, -1], [w1 + 0.25, 1]]) {
+        let yLo = Infinity;
+        for (let i = 0; i <= r.n; i++) {
+          const u = u0 + i * r.tr;
+          for (const g of [gAt(...pt(u, ww + out * 0.4)), gAt(...pt(u, ww))]) if (g !== null) yLo = Math.min(yLo, g);
+        }
+        yLo = (Number.isFinite(yLo) ? yLo : r.foot) - 0.3;
+        const uA = u0 + 0.16, uB = u1 + (F.land ?? 0.45), hA = nose(uA), hB = nose(u1);
+        run(STONE, uA, u1, ww - 0.25, ww + 0.25, yLo, yLo, hA + 0.85, hB + 0.85);
+        run(STONE, u1, uB, ww - 0.25, ww + 0.25, yLo, yLo, hB + 0.85, hB + 0.85);
+        run(GRANITE, uA, u1, ww - 0.31, ww + 0.31, hA + 0.83, hB + 0.83, hA + 0.97, hB + 0.97);
+        run(GRANITE, u1, uB, ww - 0.31, ww + 0.31, hB + 0.83, hB + 0.83, hB + 0.97, hB + 0.97);
+        for (let i = 0; i < r.n; i++) { const um = u0 + (i + 0.5) * r.tr; col(um, ww, r.tr, 0.5, yLo, nose(um) + 0.97); nW++; }
+        if (F.kit && out > 0) {   // the kit's landing: granite at the flight's head, over the cheeks' feet, to the front
+          box(granite, (u1 + uB) / 2, (w0 + w1) / 2, uB - u1 + 0.02, w1 - w0 + 1.0, r.head - 1.8, r.head);
+          col((u1 + uB) / 2, (w0 + w1) / 2, uB - u1, w1 - w0, r.head - 1.8, r.head);
+        }
+        box(granite, u0 - 0.2, ww, 0.72, 0.72, yLo, r.foot + 1.3);   // the newel at the foot, capped
+        box(granite, u0 - 0.2, ww, 0.84, 0.84, r.foot + 1.3, r.foot + 1.42);
+        col(u0 - 0.2, ww, 0.72, 0.72, yLo, r.foot + 1.42);
+        haFoot('campus', `cu03:${id}:cheek${out > 0 ? '1' : '0'}`, 'foot', ...cuXZ(...pt(u0, ww)), yLo + 0.3, { pts: [cuXZ(...pt(u0, ww)), cuXZ(...pt(u1, ww))] });
+      }
+    }
+    south(byId.south);
+    for (const s of [1, -1]) {
+      // the parterre-north wall, facing the court (south), from the grand flights' cheek to the flank
+      wall(`north${s}`, K.wallN, s * K.cheek, K.wallN, s * K.flank, -1, 0);
+      // the flank wall, facing the court, from the side flight's north cheek to the north wall
+      wall(`flankN${s}`, K.side1, s * K.flank, K.wallN, s * K.flank, 0, -s);
+      // the grand flights' cheeks, facing the parterres: raked with the flights and the landing
+      wall(`cheek${s}`, K.fA0, s * K.cheek, K.wallN, s * K.cheek, 0, s, { raked: true, seg: 0.5 });
+      // (the side flights' cheeks: their own walls, above)
+      urnAt(K.wallN + 0.9, s * (K.cheek + 0.9));
+      urnAt(K.wallN + 0.9, s * (K.flank + 0.9));
+    }
+    // south of the side flights: on the east Kent Hall's terrace over the court; on the west the south steps' end over
+    // Dodge Hall's areaway
+    wall('flankES', K.courtS, K.flank, K.side0, K.flank, 0, -1);
+    wall('flankWS', K.stepsFoot + 0.5, -K.flank, K.courtS, -K.flank, 0, -1);
+    // the court's west wall from the south steps to the side flight (2026-11-03, the reference views: a tall rusticated
+    // wall like the flank wall north of the flight, its flat coping at the terrace's level, two urn piers), standing from
+    // the floor of Dodge Hall's areaway behind it (College Walk's level, 1.6 m under the court, to Dodge's front at
+    // c' -54.4, and its flight up to the terrace): the walls here had faced the areaway at the court's height and left
+    // the bare earth's ramp from the terrace into the areaway open to the court
+    {
+      const a0 = K.courtS, a1 = K.side0 - 0.5, n = Math.ceil((a1 - a0) / 3.5), cF = -K.flank, yawW = yawN;
+      for (let k = 0; k < n; k++) {
+        const am = a0 + ((a1 - a0) * (k + 0.5)) / n, len = (a1 - a0) / n + 0.02;
+        const yC = gAt(am, cF + 0.4) ?? cuLevel.CT(am), yT = cuLevel.UP(am, cF);
+        let yB = yC;
+        for (const dc of [0.4, 1.2, 2.4, 3.6]) { const g = gAt(am, cF - dc); if (g !== null) yB = Math.min(yB, g); }
+        mbox(stone, am, cF - 0.45, len, 0.9, yB - 0.3, yT - 0.05);                                  // the mass, from the areaway's floor
+        mbox(granite, am, cF + 0.09, len, 0.18, yC - 0.05, yC + 0.9);                               // plinth
+        for (let r = 0; r < 3; r++) mbox(granite, am, cF + 0.05, len, 0.1, yC + 1.25 + r * 0.62, yC + 1.31 + r * 0.62);   // rustication joints
+        mbox(granite, am, cF - 0.45, len, 1.12, yT - 0.18, yT + 0.08);                              // the coping
+        addPrism(rectPts(...cuXZ(am, cF - 0.45), 0.5, len / 2, yawW), yB - 0.5, yT + 0.1);
+        nW++;
+      }
+      // the urn piers: at the corner over the south steps and halfway along, 1 m over the coping
+      for (const ap of [a0 + 0.7, (a0 + a1) / 2]) {
+        const yC = gAt(ap, cF + 0.6) ?? cuLevel.CT(ap), yT = cuLevel.UP(ap, cF);
+        urnAt(ap, cF + 0.15, yT + 1.0 - yC, 1.15);
+      }
+      haFoot('campus', 'cu03:wall:courtW', 'foot', ...cuXZ(a0, cF), gAt(a0, cF + 0.4) ?? 0, { pts: [cuXZ(a0, cF), cuXZ(a1, cF)] });
+    }
+
+    // Alma Mater's landing, the foot apron and the upper landing in granite (the drape below lays them on the ground)
+    lsFlights.grandA = { a0: K.fA0, a1: K.fA1, c0: -K.cheek, c1: K.cheek };
+    lsFlights.grandB = { a0: K.fB0, a1: K.fB1, c0: -K.cheek, c1: K.cheek };
+    const ya = gAt((K.fA1 + K.fB0) / 2, 0);
+    haAlma = ya === null ? null : [(K.fA1 + K.fB0) / 2, ya];
+    console.log(`[cu03] campus core: ${nT} treads, ${nW} wall pieces, flights ${JSON.stringify(Object.fromEntries(Object.entries(R).map(([k, v]) => [k, v && { n: v.n, rh: +v.rh.toFixed(3), tr: +v.tr.toFixed(3), foot: +v.foot.toFixed(2), head: +v.head.toFixed(2) }])))}`);
+  };
+  if (HA && CU03) cuKit(); else if (HA) haAxis();
   // P1 (second pass): Low's terrace between the head of the steps and Low's own stair is brick with pale granite joint
   // bands (the flat kit's field over its slab, (3) below, which the flag leaves out with the flat axis); on the real ground
   // the terrace rises 0.5 m toward Low, so the field is draped on the drawn ground (a 0.5 m grid, 4 cm over it, its edges
@@ -708,7 +987,7 @@ export async function buildCampus(scene) {
   if (HA) {
     const drape = (mat, a0, a1, c0, c1, dy, tag) => {
       const na = Math.max(1, Math.ceil((a1 - a0) / 0.5)), nc = Math.max(1, Math.ceil((c1 - c0) / 0.5)), P = [], I = [];
-      const at = (a, c) => { const q = relPt(a, c), y = gS(q[0], q[1]); return [q[0], (y === null ? 0 : y) + dy, q[1]]; };
+      const at = (a, c) => { const q = CU03 ? cuXZ(a, c) : relPt(a, c), y = gS(q[0], q[1]); return [q[0], (y === null ? 0 : y) + dy, q[1]]; };
       for (let i = 0; i <= na; i++) for (let j = 0; j <= nc; j++) P.push(...at(a0 + ((a1 - a0) * i) / na, c0 + ((c1 - c0) * j) / nc));
       const id = (i, j) => i * (nc + 1) + j;
       for (let i = 0; i < na; i++) for (let j = 0; j < nc; j++) I.push(id(i, j), id(i, j + 1), id(i + 1, j), id(i + 1, j), id(i, j + 1), id(i + 1, j + 1));
@@ -734,6 +1013,17 @@ export async function buildCampus(scene) {
       for (const [a, c] of [[a0, c0], [a0, c1], [a1, c0], [a1, c1], [(a0 + a1) / 2, (c0 + c1) / 2]]) { const v = at(a, c); haFoot('campus', `drape:${tag}:${a.toFixed(1)},${c.toFixed(1)}`, 'top', v[0], v[2], v[1], { ref: (gS(v[0], v[2]) ?? v[1] - dy) + dy, tol: 0.02, why: 'drape off the ground' }); }
     };
     drape(PAVBRICK, 7.4, 16.4, -29, 29, 0.04, 'lowBrick');
+    // LS02: the grand staircase's landings in granite, as built (the reference views: one stone stair from the lower
+    // plaza's brick to the brick walk before Low's own steps, the inscription landing between its flights, Alma Mater on
+    // the upper landing; the ground the compile left there drew as lawn): the foot apron from the plaza's edge, the landing
+    // between the flights, the landing from the upper flight to the brick walk
+    const gA = lsFlights.grandA, gB = lsFlights.grandB;
+    if ((LS02 || CU03) && gA && gB && gB.a0 > gA.a1) {
+      const lc0 = Math.max(gA.c0, gB.c0), lc1 = Math.min(gA.c1, gB.c1);
+      drape(GRANITE, -13.0, gA.a0 - 0.02, lc0, lc1, 0.055, 'lsFoot');
+      drape(GRANITE, gA.a1 + 0.02, gB.a0 - 0.02, lc0, lc1, 0.055, 'lsLanding');
+      drape(GRANITE, gB.a1 + 0.02, 7.38, lc0, lc1, 0.055, 'lsUpper');
+    }
     for (let k = -7; k <= 7; k++) drape(GRANITE, 7.4, 16.4, k * 4.05 - 0.26, k * 4.05 + 0.26, 0.055, `lowJointC${k}`);
     for (const a of [8.0, 11.9, 15.8]) drape(GRANITE, a - 0.26, a + 0.26, -29, 29, 0.055, `lowJointA${a}`);
     if (TB32) drape(GRANITE, 7.36, 7.74, -29.2, 29.2, 0.055, 'lowBorder');
@@ -741,7 +1031,7 @@ export async function buildCampus(scene) {
   // P1: McKim's balustrades on the real terrace walls (the authority's wall registry: slits the ground's builder faces in
   // masonry): along every run of the McKim core (along -48..+26, across +-75) that drops 1 m or more, a granite plinth,
   // balusters and a rail 0.45 m in from the edge on its upper side, piece by piece on the drawn ground there
-  if (HA) {
+  if (HA && !CU03) {
     try {
       const WR = await haRegistry('walls');
       const bal = (x0, z0, x1, z1, y) => {
@@ -1063,8 +1353,9 @@ export async function buildCampus(scene) {
       // visible inlay, no z-fight) and the underside stays buried.
       stoneB.add(p[0], yApron + 0.02, p[1], CELL, 0.08, CELL, yawAxis);
     }
-    // granite medallions under the fountain pair
-    for (const s of [-1, 1]) {
+    // granite medallions under the fountain pair (not under CU03: the court's paving rings the fountains there, and these
+    // discs, in the pad frame 0.9 m off the basins, covered the squares they cut)
+    if (!CU03) for (const s of [-1, 1]) {
       const p = relPt(-20.5, 23 * s);
       const med = new THREE.Mesh(new THREE.CylinderGeometry(6.1, 6.1, 0.1, 28), PAVSTONE);
       med.position.set(p[0], yApron + 0.045, p[1]);
@@ -1498,7 +1789,7 @@ export async function buildCampus(scene) {
       // only needs one low apron step round it (the old 6.6 m dais read as a
       // packing crate under her)
       let p = relPt(0.35, 0), ly = yApron + 2 * (yTop - yApron) / 3;
-      if (HA && haAlma) { p = relPt(haAlma[0], 0); ly = haAlma[1] - 0.16; haFoot('campus', 'monument:Alma Mater', 'foot', p[0], p[1], ly + 0.16, { r: 1.2 }); }
+      if (HA && haAlma) { p = CU03 ? cuXZ(haAlma[0], 0) : relPt(haAlma[0], 0); ly = haAlma[1] - 0.16; haFoot('campus', 'monument:Alma Mater', 'foot', p[0], p[1], ly + 0.16, { r: 1.2 }); }
       // (AM30: the scan's own pedestal stands on the landing; the apron is the faceted model's alone)
       if (!AM30) granite.add(p[0], ly + 0.08, p[1], 4.7, 0.16, 4.1, yawAxis);
       uniq.add(almaMater(p[0], ly + 0.16, p[1]));
@@ -1513,11 +1804,12 @@ export async function buildCampus(scene) {
   for (const f of C.fountains || []) {
     if (!f.p || f.y === undefined) continue;
     const small = !!f.poly;
-    // the plaza pair snaps onto the paving medallion centers (a=-21, c=±23)
+    // the plaza pair snaps onto the paving medallion centers (a=-21, c=±23; LP27 under CU03: world/campusGround.js's
+    // CU.fountA, CU.fountC in the McKim frame, where the court's paving rings them, world/materials.js)
     let [x, z] = f.p, y = f.y + LIFT;
     if (!small) {
       const side = plazaFi++ === 0 ? -1 : 1;
-      const p = relPt(-21, 23 * side);
+      const p = CU03 ? cuXZ(CU.fountA, CU.fountC * side) : relPt(-21, 23 * side);
       x = p[0]; z = p[1]; y = yApron;
     }
     if (HA) { y = gMin(x, z, small ? 1.5 : 4.0, y); haFoot('campus', `fountain:${x.toFixed(1)},${z.toFixed(1)}`, 'foot', x, z, y, { r: small ? 1.5 : 4.0 }); }
@@ -1530,9 +1822,11 @@ export async function buildCampus(scene) {
     // called "too basic" (review 2026-09-24). The stone is lathed mouldings
     // now and the water is the FW set: rippled pools, a translucent veil of
     // strands running over the lip, foam where it lands, a crowned centre jet.
-    const R = small ? 1.3 : 5.35;
+    // (LP27, 2026-11-03: the plaza pair's basins to the top view's 3.7 m, the pool 3.15 m: at 5.35 m they covered the
+    // court's medallion rings and ran over the lawns round them)
+    const R = small ? 1.3 : CU03 ? 3.15 : 5.35;
     const G = new THREE.Group();
-    const rimH = small ? 0.72 : 0.5, cw = small ? 0.34 : 0.64, seg = small ? 48 : 96;
+    const rimH = small ? 0.72 : 0.5, cw = small ? 0.34 : CU03 ? 0.55 : 0.64, seg = small ? 48 : 96;
     const wl = rimH - (small ? 0.14 : 0.2);                  // the pool's water line
     const part = (geo, mat, py = 0, cast = true) => {
       const m = new THREE.Mesh(geo, mat);

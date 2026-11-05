@@ -7,7 +7,10 @@
 //             Tilden, Breezy Point Tip, Floyd Bennett Field, Jamaica Bay Wildlife Refuge, Canarsie Pier, Plumb Beach,
 //             Frank Charles Park): the unit outline and its land cover (grass, meadow, scrub, wood, wetland, beach)
 //
-//   node tools/pipeline/fetch_osm_extras.mjs [landings] [gateway]
+//   waterfront  the waterfront parks the city's parks file lacks (other jurisdictions: Brooklyn Bridge Park on its piers):
+//             the park outline and its land cover, as gateway
+//
+//   node tools/pipeline/fetch_osm_extras.mjs [landings] [gateway] [waterfront]
 //
 // One OSM API 0.6 `map` call per box (the Overpass mirrors were refusing queries on 2026-10-11); the XML is cached in
 // data/raw/osm_extras/<name>.xml and parsed into data/raw/osm_landings.json and data/raw/osm_gateway.json (lon, lat).
@@ -38,6 +41,10 @@ const GATEWAY = {
   canarsiePier: { unit: /Canarsie Pier/, box: [-73.8930, 40.6250, -73.8800, 40.6330] },
   plumbBeach: { unit: /Plumb Beach/, box: [-73.9300, 40.5780, -73.9050, 40.5870] },
   frankCharles: { unit: /Frank (M\. )?Charles/, box: [-73.8400, 40.6500, -73.8270, 40.6600] },   // OSM: "Frank M. Charles Memorial Park"
+};
+
+const WATERFRONT = {
+  brooklynBridgePark: { unit: /^Brooklyn Bridge Park$/, box: [-74.0010, 40.6930, -73.9880, 40.7050] },
 };
 
 async function osmMap(name, box) {
@@ -270,11 +277,11 @@ async function landings() {
   console.log('wrote data/raw/osm_landings.json');
 }
 
-async function gateway() {
+async function gateway(SET = GATEWAY, pre = 'gateway', outName = 'osm_gateway.json') {
   const COVER = (t) => /^(grass|meadow|recreation_ground|village_green|forest)$/.test(t.landuse || '') || /^(grassland|heath|scrub|wood|wetland|beach|sand)$/.test(t.natural || '') || /^(park|nature_reserve|golf_course)$/.test(t.leisure || '');
   const out = {};
-  for (const [key, G] of Object.entries(GATEWAY)) {
-    const O = parseOsm(await osmMap('gateway_' + key, G.box));
+  for (const [key, G] of Object.entries(SET)) {
+    const O = parseOsm(await osmMap(pre + '_' + key, G.box));
     const all = areasOf(O, (t) => COVER(t) || t.boundary === 'protected_area' || t.boundary === 'national_park');
     const units = all.filter((a) => G.unit.test(a.tags.name || '') && (a.tags.leisure || a.tags.boundary));
     const cover = all.filter((a) => COVER(a.tags) && !G.unit.test(a.tags.name || ''));
@@ -286,10 +293,11 @@ async function gateway() {
     };
     console.log(`  ${key}: ${units.length} unit outline(s) [${units.map((u) => u.tags.name).join('; ')}], ${cover.length} land-cover areas`);
   }
-  fs.writeFileSync(path.join(RAW, 'osm_gateway.json'), JSON.stringify(out));
-  console.log('wrote data/raw/osm_gateway.json');
+  fs.writeFileSync(path.join(RAW, outName), JSON.stringify(out));
+  console.log('wrote data/raw/' + outName);
 }
 
 const which = process.argv.slice(2);
 if (!which.length || which.includes('landings')) await landings();
 if (!which.length || which.includes('gateway')) await gateway();
+if (!which.length || which.includes('waterfront')) await gateway(WATERFRONT, 'waterfront', 'osm_waterfront.json');

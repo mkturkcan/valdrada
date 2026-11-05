@@ -218,6 +218,10 @@ def main():
         if os.path.exists(os.path.join(pub, f)):
             base.append((f, os.path.join(pub, f)))
     base.append(('UNREAL_ENGINE_NOTICE.md', os.path.join(lau, 'UNREAL_ENGINE_NOTICE.md')))
+    # the walkers' own notice (the renderer draws the crowd's bodies since 0.7.0), as the web build ships it
+    peds = os.path.join(a.repo, 'client', 'public', 'models', 'peds24', 'NOTICE.md')
+    if os.path.exists(peds):
+        base.append(('NOTICE_pedestrians.md', peds))
     base.append(('docs/ue-client.md', os.path.join(a.repo, 'docs', 'ue-client.md')))
     py = os.path.join(pub, 'PythonAPI')
     base += [('PythonAPI/' + rel, p) for rel, p in walk(py, lambda r: '__pycache__' in r or r.startswith(('build/', 'dist/', 'tests/')) or '.egg-info' in r)]

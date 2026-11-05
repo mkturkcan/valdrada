@@ -33,6 +33,7 @@ const DEFS = [
   ['w125e', () => import('./w125e.js'), [[2050, -3050, 3750, -1450]]],
   ['hptShore', () => import('./hptShore.js'), [BHPT]],
   ['hptSign', () => import('./hptSign.js'), [BHPT]],
+  ['wfDumbo', () => import('./wfDumbo.js'), [[-2350, 8560, -940, 9150]]],   // WF65: the Brooklyn shore from Pier 1 to the Farragut substation
   ['fk', () => import('./fk/facades.js'), [B125, BHPT], true],
   ['vk', () => import('./vk/viaducts.js'), [B125], true],
   ['sk', () => import('./sk/streetscape.js'), [B125, BHPT], true],

@@ -83,6 +83,11 @@ try {
     if (-not (Test-Path (Join-Path $Core 'app\client\public\tiles'))) { Fail "the city's tiles are missing in $Core\app\client\public\tiles" }
     $log = Join-Path $o.logdir 'core.log'; Set-Content -Path $log -Value $null
     $env:VALDRADA_CELLCACHE = Join-Path $Core 'app\cellcache'
+    # the city's ground as the renderer's blocks have it (the terrain cell list ships with the core; without it, flat)
+    $cells = Join-Path $Core 'app\client\public\data\terrain_cells.json'
+    if (Test-Path $cells) { $env:TERRAIN_P1 = '1'; $env:HHP_P2 = '1'; $env:TERRAIN_P1_CELLS = $cells }
+    $tc = Join-Path $Core 'app\cache\tiles'
+    if (Test-Path $tc) { $env:VALDRADA_TILE_CACHE = $tc }
     $env:ELECTRON_RUN_AS_NODE = $null
     $a = @((Q (Join-Path $Core 'app\tools\core\serve.mjs')), '--port', $o.port, '--host', $o.host, '--res', $o.res, '--quality', $coreQ,
            '--time', $o.time, '--start-lat', $o.lat, '--start-lon', $o.lon, '--seed', $o.seed, '--pedestrians', $o.peds, '--log', (Q $log))

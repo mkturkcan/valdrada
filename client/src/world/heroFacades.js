@@ -821,7 +821,7 @@ export class HeroFacades {
         // docs/notes/wburg-r13.md, and every post-2000 building in
         // the Bedford Ave reference has them. Same geometry, same budget, one
         // style id added; `capH > 12` already restricts it to 4 floors and up.
-        if (!HSKIP.has('balc') && (S === STYLE.POSTWAR_BRICK || (WB13 && S === STYLE.CONDO_NEW)) && i === 0 && !glassy && capH > 12) {
+        if (!HSKIP.has('balc') && !rec.noBalc && (S === STYLE.POSTWAR_BRICK || (WB13 && S === STYLE.CONDO_NEW)) && i === 0 && !glassy && capH > 12) {
           const bayNb = Math.floor((len - 0.44) / ww);
           const sideMb = (len - Math.max(bayNb, 0) * ww) * 0.5;
           for (let m = 2; m * fh < capH - 2.2; m++) {

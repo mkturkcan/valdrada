@@ -125,7 +125,7 @@ export class HeadlessStreamer {
     const nb = fs.readFileSync(file);
     const buf = nb.buffer.slice(nb.byteOffset, nb.byteOffset + nb.byteLength);
     const data = await simTile(key, buf);
-    if (this.withColliders) this._addColliders(key, buf);
+    if (this.withColliders) this._addColliders(key, buf, data);
     if (this.obstaclesDir) this._addObstacles(key);
     this.tiles.set(key, { state: 'ready', data });
     this.terrains.set(key, data.terrain);
@@ -136,8 +136,9 @@ export class HeadlessStreamer {
     this.stats.loaded++; this.stats.bytes += nb.byteLength;
     this.stats.loadMs += performance.now() - t0;
   }
-  // the buildings' footprints as full-height collider prisms (assembleTile registers one per building)
-  _addColliders(key, buf) {
+  // the buildings' footprints as full-height collider prisms (assembleTile registers one per building); on the measured
+  // ground (TERRAIN_P1) each prism stands on the ground beside its footprint, as the renderers draw the building there
+  _addColliders(key, buf, data = null) {
     const tile = parseTile(buf);
     if (!tile.S.bldg || !tile.S.bldgXZ) return;
     const [ox, oz] = tile.header.origin, XZ = tile.S.bldgXZ;
@@ -150,7 +151,13 @@ export class HeadlessStreamer {
         pts[i * 2] = x; pts[i * 2 + 1] = z;
         if (x < minX) minX = x; if (x > maxX) maxX = x; if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
       }
-      COLLIDERS.addPrism(key, { pts, minX, minZ, maxX, maxZ, y0: b.baseY - 2, y1: b.baseY + b.height });
+      let lift = 0;
+      if (HA_P1 && data && data.surfaceY) {
+        let top = -Infinity;
+        for (const i of [0, Math.floor(b.len / 3), Math.floor((2 * b.len) / 3)]) { const y = data.surfaceY(pts[i * 2], pts[i * 2 + 1]); if (y !== null && y > top) top = y; }
+        if (Number.isFinite(top)) lift = Math.max(0, top - b.baseY);
+      }
+      COLLIDERS.addPrism(key, { pts, minX, minZ, maxX, maxZ, y0: b.baseY + lift - 2, y1: b.baseY + lift + b.height });
     }
   }
   _addObstacles(key) {

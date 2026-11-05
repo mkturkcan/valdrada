@@ -19,7 +19,7 @@
   "r.RayTracing.Geometry.StaticMeshes.WPO": 0,
   "r.RayTracing.Geometry.InstancedStaticMeshes.EvaluateWPO": 0,
   "r.RayTracing.Geometry.NaniteProxies.WPO": 0,
-  "r.Nanite.Streaming.StreamingPoolSize": 512,
+  "r.Nanite.Streaming.StreamingPoolSize": 1024,
   "r.Nanite.MaxCandidatePatches": 8388608,
   "r.Nanite.MaxVisiblePatches": 8388608,
   "r.Shadow.Virtual.Nanite.AllowTessellationDirectional": 0,
