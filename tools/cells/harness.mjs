@@ -5,6 +5,7 @@ import { chromium } from 'playwright';
 import { installGuard, watchPage } from '../harness_guard.mjs';
 import { spawn } from 'node:child_process';
 import http from 'node:http';
+import net from 'node:net';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -15,16 +16,32 @@ export const CACHE = process.env.CELLCACHE || '/data0/projectnyc_aux/cellcache';
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const stamp = () => new Date().toTimeString().slice(0, 8);
 
+// (Chrome's restricted ports in the range: a page there fails ERR_UNSAFE_PORT, a bake group's 8 cells lost, g0195 2026-11-05)
+const UNSAFE_PORTS = new Set([6000, 6566, 6665, 6666, 6667, 6668, 6669, 6679, 6697]);
+const portFree = (p) => new Promise((res) => { const s = net.createServer(); s.once('error', () => res(false)); s.listen(p, '127.0.0.1', () => s.close(() => res(true))); });
+// a free port in the tools' range outside Chrome's restricted ones (tools/core's page tools take theirs here too)
+export async function pickPort() {
+  let p;
+  do p = 5400 + Math.floor(Math.random() * 3000); while (UNSAFE_PORTS.has(p) || !(await portFree(p)));
+  return String(p);
+}
+// A port free when asked, outside Chrome's restricted ones, and the server answering on it: eighteen groups starting at
+// once drew the same port (one --strictPort server exits) or waited out a slow start, and the page found nothing there
+// (ERR_CONNECTION_REFUSED, g0041 2026-11-05). Throws when no server came up on eight ports.
 export async function startVite() {
-  const port = String(5400 + Math.floor(Math.random() * 3000));
   const viteBin = path.join(CLIENT, 'node_modules', 'vite', 'bin', 'vite.js');
-  const server = spawn(process.execPath, [viteBin, '--port', port, '--strictPort', '--host', '127.0.0.1'], { cwd: CLIENT, stdio: 'ignore', env: { ...process.env, NYC_NOHMR: '1' } });
-  for (let i = 0; i < 60; i++) {
-    await sleep(500);
-    const ok = await new Promise((res) => { const r = http.get(`http://127.0.0.1:${port}/`, (s) => { s.resume(); res(s.statusCode === 200); }); r.on('error', () => res(false)); });
-    if (ok) break;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const port = await pickPort();
+    const server = spawn(process.execPath, [viteBin, '--port', port, '--strictPort', '--host', '127.0.0.1'], { cwd: CLIENT, stdio: 'ignore', env: { ...process.env, NYC_NOHMR: '1' } });
+    let ok = false;
+    for (let i = 0; i < 120 && !ok && server.exitCode === null; i++) {
+      await sleep(500);
+      ok = await new Promise((res) => { const r = http.get(`http://127.0.0.1:${port}/`, (s) => { s.resume(); res(s.statusCode === 200); }); r.on('error', () => res(false)); });
+    }
+    if (ok) return { port, server, url: `http://127.0.0.1:${port}` };
+    try { server.kill(); } catch { /* */ }
   }
-  return { port, server, url: `http://127.0.0.1:${port}` };
+  throw new Error('startVite: no dev server came up on eight ports');
 }
 export async function startBrowser(W = 1600, H = 900) {
   return chromium.launch({

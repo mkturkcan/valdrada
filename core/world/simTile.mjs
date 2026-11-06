@@ -33,6 +33,7 @@ const warn = (k, e) => { if (!warnOnce.has(k)) { warnOnce.add(k); console.warn(`
 // sampler's answers on a 0.5 m raster over the tile (surfaceY, surfaceInfo's kind and height, roadAt), read back bilinear
 // for heights and nearest for kinds. A tile found there skips its passes, which on the measured ground with the highways take
 // 15 to 45 s a tile; VALDRADA_TILE_CACHE_WRITE=1 writes each tile it lays (tools/core/tile_cache.mjs builds a release's).
+// The raster runs RM past the tile's edges, where its roads overhang the next tile (the streamer asks across an edge).
 let CACHE_SIG;
 async function cacheSig() {
   if (CACHE_SIG !== undefined) return CACHE_SIG;
@@ -41,12 +42,12 @@ async function cacheSig() {
     if (typeof process !== 'undefined' && process.env.VALDRADA_TILE_CACHE) {
       const fs = await import('node:fs/promises'), crypto = await import('node:crypto');
       const cells = process.env.TERRAIN_P1_CELLS ? crypto.createHash('sha1').update(await fs.readFile(process.env.TERRAIN_P1_CELLS)).digest('hex').slice(0, 12) : '';
-      CACHE_SIG = `p1=${HA_P1 ? 1 : 0};hhp=${HHP ? 1 : 0};cells=${cells}`;
+      CACHE_SIG = `p1=${HA_P1 ? 1 : 0};hhp=${HHP ? 1 : 0};cells=${cells};rm=${RM}`;
     }
   } catch (e) { warn('tile cache', e); }
   return CACHE_SIG;
 }
-const RN = 1024, RS = 512 / RN;   // the answers' raster: 0.5 m cells over the tile
+const RS = 0.5, RM = 8, RN = (512 + 2 * RM) / RS;   // the answers' raster: 0.5 m cells over the tile and RM round it
 const KINDS_C = [null, 'sidewalk', 'path', 'brick', 'plaza', 'gravel', 'grass', 'gutter', 'busred', 'asphalt'];
 async function cacheRead(key, compiled, arrayBuf) {
   const sig = await cacheSig();
@@ -55,7 +56,7 @@ async function cacheRead(key, compiled, arrayBuf) {
     const fs = await import('node:fs/promises'), v8 = await import('node:v8'), path = await import('node:path'), zlib = await import('node:zlib');
     const c = v8.deserialize(zlib.inflateSync(await fs.readFile(path.join(process.env.VALDRADA_TILE_CACHE, `${key}.v8z`))));
     if (!c || c.sig !== sig || c.ckey !== tileContentKey(compiled)) return null;
-    const [ox, oz] = c.origin;
+    const ox = c.origin[0] - RM, oz = c.origin[1] - RM;   // (the raster's corner)
     const cell = (x, z) => { const i = Math.floor((x - ox) / RS), j = Math.floor((z - oz) / RS); return i < 0 || j < 0 || i >= RN || j >= RN ? -1 : j * RN + i; };
     // heights in cm over the tile's base (-32768: no answer); bilinear where the four cells answer, else the nearest
     const height = (R, x, z) => {
@@ -85,7 +86,7 @@ async function cacheWrite(key, ckey, data, origin) {
   if (!sig || process.env.VALDRADA_TILE_CACHE_WRITE !== '1') return;
   try {
     const fs = await import('node:fs/promises'), v8 = await import('node:v8'), path = await import('node:path'), zlib = await import('node:zlib');
-    const [ox, oz] = origin;
+    const ox = origin[0] - RM, oz = origin[1] - RM;
     const syF = new Float32Array(RN * RN), iyF = new Float32Array(RN * RN), kind = new Uint8Array(RN * RN), road = new Uint8Array(RN * RN);
     let base = Infinity;
     for (let j = 0; j < RN; j++) for (let i = 0; i < RN; i++) {

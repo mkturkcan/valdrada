@@ -2956,6 +2956,21 @@ export async function assembleTile(key, arrayBuf, ctx) {
     // shader's depth bias (materials.js: the College Walk ribbons run under the grey walk and the lawn beds, Low Plaza's
     // field under its pale panels) has no counterpart in a path tracer, which drew the brick over them. `?brk69=0` none.
     const BRK69 = !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('brk69') === '0');
+    // (globalThis.__HHP_DBG = [x, z]: every drawn ground section's height at that point, the tracer hhp.js dbgHas starts)
+    if (globalThis.__HHP_DBG) {
+      const [qx, qz] = globalThis.__HHP_DBG, lx = qx - ox, lz = qz - oz, hit = {};
+      for (const [name, mid] of sections.concat(RAIL_SECTIONS, APRON_SECTIONS)) {
+        const b = tile.S[name];
+        if (!b) continue;
+        for (let i = 0; i + 8 < b.length; i += 9) {
+          const ax = b[i], az = b[i + 2], bx = b[i + 3], bz = b[i + 5], cx = b[i + 6], cz = b[i + 8], d = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+          if (Math.abs(d) < 1e-12) continue;
+          const u = ((bz - cz) * (lx - cx) + (cx - bx) * (lz - cz)) / d, v = ((cz - az) * (lx - cx) + (ax - cx) * (lz - cz)) / d;
+          if (u >= 0 && v >= 0 && u + v <= 1) (hit[`${name}:${mid}`] = hit[`${name}:${mid}`] || []).push(+(b[i + 1] * u + b[i + 4] * v + b[i + 7] * (1 - u - v)).toFixed(2));
+        }
+      }
+      console.log('[ground dbg] final', JSON.stringify(hit));
+    }
     for (const [name, mid] of sections.concat(RAIL_SECTIONS, APRON_SECTIONS)) {
       const src = tile.S[name];
       if (!src) continue;

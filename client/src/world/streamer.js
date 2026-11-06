@@ -5,7 +5,7 @@ import { assembleTile } from './assemble.js';
 import { HA_P1, haTerrainAt, haFarRelief } from './heightAuthority.js';
 import { haSetSurface, haAnchorBridges } from './haAnchor.js';   // P1 TERRAIN: the re-anchored builders stand on this streamer's surfaces
 import { FAR_UNIFORMS, NEAR_MASK_N } from './materials.js';
-import { TILE, MACRO } from '../shared/geo.js';
+import { TILE, MACRO, tileAsk } from '../shared/geo.js';
 import { buildMacroCrowns } from './towers.js';
 import { NO_TOWER_FX } from './materials.js';
 import { FW14, fw14Uv } from './materials.js';   // FW14: the far city's window grid
@@ -78,22 +78,20 @@ export class Streamer {
   // pavement stack sits 0.145-0.30 m above it, which every caller used to guess
   // with a constant (+0.15 in the player, +0.16 in the ped graph) and so put
   // feet a couple of centimetres off the flags — an AO shadow under every shoe.
+  // (near a tile's edge the tiles across it answer too: shared/geo.js tileAsk)
   surfaceAt(x, z) {
-    const fn = this.surfaces.get(`${Math.floor(x / TILE)}_${Math.floor(z / TILE)}`);
-    return fn ? fn(x, z) : null;
+    return tileAsk(this.surfaces, x, z, (fn) => fn(x, z));
   }
   // …and WHAT that surface is: `{kind, y, road}` or null outside the loaded
   // ring. `road` is true only for asphalt / gutter / bus lane, so a caller can
   // say "not here" instead of only "how high" — the parked fleet uses it to
   // refuse a lawn and the ped graph to walk itself off the carriageway.
   surfaceInfoAt(x, z, tol) {
-    const fn = this.surfInfos.get(`${Math.floor(x / TILE)}_${Math.floor(z / TILE)}`);
-    return fn ? fn(x, z, tol) : null;
+    return tileAsk(this.surfInfos, x, z, (fn) => fn(x, z, tol));
   }
   // true / false where the tile is in, null where it is not
   roadAt(x, z, tol) {
-    const fn = this.roadAts.get(`${Math.floor(x / TILE)}_${Math.floor(z / TILE)}`);
-    return fn ? fn(x, z, tol) : null;
+    return tileAsk(this.roadAts, x, z, (fn) => fn(x, z, tol));
   }
   terrainAt(x, z) {
     if (HA_P1) { const a = haTerrainAt(x, z); if (a !== null) return a; }   // P1 TERRAIN: the region's base (world/heightAuthority.js)

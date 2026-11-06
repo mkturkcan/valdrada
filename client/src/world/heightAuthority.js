@@ -2428,6 +2428,9 @@ export function haGridDraw(tile, ox, oz, terrDraw) {
     if (nin > 0 || cellMin[j * res + i] < Infinity) {
       const lo = HA_BASE + Math.min(0, cellMin[j * res + i] === Infinity ? 0 : cellMin[j * res + i]) - 0.3;
       for (const q of k) terrDraw[q] = Math.min(terrDraw[q], lo);
+      // (a boundary cell at the shore, a corner on the river bed: not drawn, the region's base draws its land; its slope
+      // from the bank down to the bed stood out of the water as a dark triangle off the wall, the FDR at E 71st St)
+      if (Math.min(...k.map((q) => terrDraw[q])) < -0.5) skip[j * res + i] = 1;
     }
   }
   return skip;

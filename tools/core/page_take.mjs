@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { pickPort } from '../cells/harness.mjs';
 import { chromium } from 'playwright';
 import { lensStatsOf } from '../../core/tracks/stats.mjs';
 
@@ -38,7 +39,7 @@ const { project } = await import('../../client/src/shared/geo.js');
 const [sx, sz] = project(P.keys[0].p[0], P.keys[0].p[1]);
 const holdOf = (Q) => ({ duration: 1e6, ease: 0, abs: Q.abs, tension: Q.tension, fov: Q.fov, keys: [Q.keys[0], { p: [Q.keys[0].p[0] + 1e-6, Q.keys[0].p[1] + 1e-6, Q.keys[0].p[2]], look: Q.keys[0].look }] });
 
-const port = opt('port') || String(5400 + Math.floor(Math.random() * 3000));
+const port = opt('port') || await pickPort();   // (free, and outside Chrome's restricted ports: tools/cells/harness.mjs)
 const bdir = path.join(ROOT, 'client');
 const vite = spawn(process.execPath, [path.join(bdir, 'node_modules/vite/bin/vite.js'), '--port', port, '--strictPort', '--host', '127.0.0.1'], { cwd: bdir, stdio: 'ignore', env: { ...process.env, NYC_NOHMR: '1' } });
 log(`vite pid ${vite.pid} on ${port}`);

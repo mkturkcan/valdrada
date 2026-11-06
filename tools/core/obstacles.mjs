@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { pickPort } from '../cells/harness.mjs';
 import { chromium } from 'playwright';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -31,7 +32,7 @@ const holdAt = (Q, K) => ({ duration: 1e6, ease: 0, abs: Q.abs, tension: Q.tensi
 const midKey = (a, b) => ({ p: a.p.map((v, i) => (v + b.p[i]) / 2), look: (a.look || a.p).map((v, i) => (v + (b.look || b.p)[i]) / 2) });
 const query = `?shot=1&record=1&${BASE_FLAGS}&time=${P.time}${P.flags ? '&' + P.flags : ''}&x=${sx.toFixed(1)}&z=${sz.toFixed(1)}&y=${(P.keys[0].p[2] + 40).toFixed(1)}&pc26=0`;
 
-const port = String(5400 + Math.floor(Math.random() * 3000));
+const port = await pickPort();   // (free, and outside Chrome's restricted ports: tools/cells/harness.mjs)
 const bdir = path.join(ROOT, 'client');
 const vite = spawn(process.execPath, [path.join(bdir, 'node_modules/vite/bin/vite.js'), '--port', port, '--strictPort', '--host', '127.0.0.1'], { cwd: bdir, stdio: 'ignore', env: { ...process.env, NYC_NOHMR: '1' } });
 await sleep(4000);

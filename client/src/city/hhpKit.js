@@ -135,10 +135,12 @@ export async function build(group, ctx) {
     c.structs.forEach((q, k) => { if ((q.kind !== 'cover' && q.kind !== 'under')) for (let i = q.i0; i <= q.i1; i++) sOf[i] = k; });
     const underAt = new Uint8Array(c.n);   // (the covered drive: no retaining wall or wall to the ground; the deck over it is the park's)
     const deckRel = new Float32Array(c.n).fill(NaN);   // (the deck's height over the drive along each covered run: one smooth level, the median of the authority's grade over it)
+    // (a run an FDR structure holds (fdrBox.js) is the box's: its deck, walls and portals; hhp.js lifts no ground there)
+    const boxedAt = (i) => BOXES.some((b) => b.c === c && i >= b.i0 - 3 && i <= b.i1 + 3);
     c.structs.forEach((q) => {
       if (q.kind !== 'under') return;
       const i0 = Math.max(0, q.i0 - 3), i1 = Math.min(c.n - 1, q.i1 + 3), r = [];
-      for (let i = i0; i <= i1; i++) { underAt[i] = 1; if (HA_P1) { const g = haGradeAt(c.X[i], c.Z[i]); if (g !== null) r.push(g - c.Y[i]); } }
+      for (let i = i0; i <= i1; i++) { if (boxedAt(i)) continue; underAt[i] = 1; if (HA_P1) { const g = haGradeAt(c.X[i], c.Z[i]); if (g !== null) r.push(g - c.Y[i]); } }
       r.sort((a, b) => a - b);
       const m = r.length ? r[r.length >> 1] : NaN;
       for (let i = i0; i <= i1; i++) deckRel[i] = m;

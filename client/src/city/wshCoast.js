@@ -157,10 +157,22 @@ export function wshCoast(tile, ox, oz) {
       if (under(x, z, y)) { lid = true; break; }
     }
     if (lid) continue;
+    // (the pieces over the authority's water dropped, split to 2 m: where no swept wall clips it, the mapped land ran on
+    // past the shoreline and lay on the river in green triangles, the FDR at E 71st St)
+    const wet = (x, z) => { const q = haInfo(x + ox, z + oz); return !!q && q.tag >= 3; };
+    const dry = (T, d, out) => {
+      const e = Math.max(Math.hypot(T[0][0] - T[1][0], T[0][2] - T[1][2]), Math.hypot(T[1][0] - T[2][0], T[1][2] - T[2][2]), Math.hypot(T[2][0] - T[0][0], T[2][2] - T[0][2]));
+      const w = T.map((v) => wet(v[0], v[2])), wc = wet((T[0][0] + T[1][0] + T[2][0]) / 3, (T[0][2] + T[1][2] + T[2][2]) / 3);
+      if (!w.some(Boolean) && !wc) { out.push(T); return; }
+      if (d >= 6 || e <= 2.0) { if (!wc) out.push(T); return; }
+      const m = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, 0], ab = m(T[0], T[1]), bc = m(T[1], T[2]), ca = m(T[2], T[0]);
+      dry([T[0], ab, ca], d + 1, out); dry([ab, T[1], bc], d + 1, out); dry([ca, bc, T[2]], d + 1, out); dry([ab, bc, ca], d + 1, out);
+    };
     for (let k = 1; k + 1 < poly.length; k++) {
       const tri = up(poly[0], poly[k], poly[k + 1]) ? [poly[0], poly[k], poly[k + 1]] : [poly[0], poly[k + 1], poly[k]];
-      for (const v of tri) strip[NAME[cls]].push(v[0], v[1], v[2]);
-      st.strip++;
+      const tris = [];
+      dry(tri, 0, tris);
+      for (const T of tris) { for (const v of T) strip[NAME[cls]].push(v[0], v[1], v[2]); st.strip++; }
     }
   }
   const SA = Float32Array.from([...strip.grass, ...strip.sidewalk, ...strip.plaza]), SB = SA.length ? index(SA) : null;

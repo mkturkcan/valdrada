@@ -39,10 +39,9 @@ const r4 = (v) => Math.round(v * 1e4) / 1e4;
 // unlabelled; each unlabelled pixel whose point (from the frame's depth) lies on the simulation's ground takes the class of
 // the surface the walkers and the cars use there (the streamer's tile answers, surfaceInfo; perception/segRender.js ids),
 // the measured ground off the streets terrain. A pixel more than GROUND_TOL off that surface keeps no class (a roof, a
-// ledge, a prop). Two of the answers' limits are worked round. A road one tile lays may overhang the next by metres while
-// the streamer asks the point's own tile only, and a cached tile's answers stop at its own edge: within EDGE of a tile's
-// edge the neighbours are asked too, and where none answers, the nearest answer across the edge on the pixel's surface
-// (W 120th St's carriageway was a hole 5 m wide along x = 1024, classed terrain). And the cached tiles' kinds are 0.5 m
+// ledge, a prop). Two of the answers' limits are worked round. A road one tile lays may overhang the next by metres: the
+// streamer asks the tiles across an edge within EDGE of it, and where none answers, the nearest answer across the edge on
+// the pixel's surface stands (W 120th St's carriageway was a hole 5 m wide along x = 1024, classed terrain). And the cached tiles' kinds are 0.5 m
 // cells with interpolated heights, so where the cells round a pixel hold other kinds the cell whose surface the pixel
 // lies on (better by KERB_STEP / 3) gives the kind, and a kerb line follows the step.
 const GROUND_TOL = 0.3, KERB_STEP = 0.06, EDGE = 8;
@@ -56,22 +55,11 @@ export function groundClasses(sem, depth, w, h, camera, depthMax, streamer) {
   const tanX = Math.tan((camera.fov_y_deg * Math.PI) / 360) * (camera.aspect || w / h), tanY = (tanX * h) / w;
   const [px, py, pz] = camera.pos;
   const far = depthMax * 0.999;
-  const fns = streamer.surfInfos;
   const edgeOf = (x, z) => {
     const ix = Math.floor(x / TILE), iz = Math.floor(z / TILE), fx = x - ix * TILE, fz = z - iz * TILE;
     return [ix, iz, fx < EDGE ? -1 : fx > TILE - EDGE ? 1 : 0, fz < EDGE ? -1 : fz > TILE - EDGE ? 1 : 0];
   };
-  const info = (x, z) => {
-    const own = streamer.surfaceInfoAt(x, z, 0.3);
-    if (own || !fns) return own;
-    const [ix, iz, dx, dz] = edgeOf(x, z);
-    for (const [a, b] of [[dx, 0], [0, dz], [dx, dz]]) {
-      if (!a && !b) continue;
-      const fn = fns.get(`${ix + a}_${iz + b}`), t = fn ? fn(x, z, 0.3) : null;
-      if (t) return t;
-    }
-    return null;
-  };
+  const info = (x, z) => streamer.surfaceInfoAt(x, z, 0.3);
   // (no tile answers in an edge's band: the nearest answer across the band, square to the edge, on the pixel's surface)
   const across = (x, z, y) => {
     const [, , dx, dz] = edgeOf(x, z);

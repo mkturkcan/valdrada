@@ -1624,6 +1624,10 @@ AAA_GND = r'''
 if (AaOn > 0.5) {
   float aaFw = max(abs(ddx(P.x)) + abs(ddy(P.x)), abs(ddx(P.z)) + abs(ddy(P.z)));   // the web's gFw: metres a pixel
   float aaHh = max(aaFw * 0.5, 0.0006);
+  // (the asphalt's lines, saw-cut kerfs, sealant bands, the crack net and the cold joints, each fade by its own width in pixels,
+  // whole from 1.8 px and gone under 0.7 px, the web's RS30 rule: box-filtered alone, a 3-5 cm tar snake 25-60 m from the
+  // smoke test's lens still drew as a 2-4 px black stroke down the middle of the street, 2026-11-05)
+  float aaPxw = max(aaFw, 1e-5);
   bool aaOk = UV1.y > 0.5;
   float aaKQ = UV2.x, aaKD = UV2.y, aaKW = UV3.x, aaKA = UV3.y;
   bool aaOk2 = aaOk && aaKW > 0.005;
@@ -1683,9 +1687,9 @@ if (AaOn > 0.5) {
       aaCut = saturate(0.5 - aaSdf / (2.0 * aaHh));
       aaFresh = n.h1(aaCc + 23.0);
       float aaKw = 0.010 + 0.008 * n.vn(aaPq * 9.0 + aaCc);
-      aaKerf = saturate((aaKw - abs(aaSdf)) / aaHh + 0.5) * saturate(aaKw / aaHh);
+      aaKerf = saturate((aaKw - abs(aaSdf)) / aaHh + 0.5) * saturate(aaKw / aaHh) * smoothstep(0.7, 1.8, 2.0 * aaKw / aaPxw);
       // a sealant overband (3.5-5.5 cm, smooth and dark) on a third of the cuts
-      if (n.h1(aaCc + 31.7) < 0.6) { float aaOw = 0.03 + 0.015 * n.h1(aaCc + 2.9); aaSeal = saturate((aaOw - abs(aaSdf)) / aaHh + 0.5) * saturate(aaOw / aaHh); }
+      if (n.h1(aaCc + 31.7) < 0.6) { float aaOw = 0.03 + 0.015 * n.h1(aaCc + 2.9); aaSeal = saturate((aaOw - abs(aaSdf)) / aaHh + 0.5) * saturate(aaOw / aaHh) * smoothstep(0.7, 1.8, 2.0 * aaOw / aaPxw); }
     }
   }
   // the crack net of an old pour: the borders of a warped 2.4-3.4 m cell grid, 1.5-6.5 mm wide (box-filtered)
@@ -1699,15 +1703,15 @@ if (AaOn > 0.5) {
     float aaBd = min(aaDx, aaDy) * aaCz;
     float aaCon = step(n.h1(aaBid + 5.5), lerp(0.55, 0.15, young));
     float aaCw = (0.0015 + 0.005 * n.vn(float2(dot(aaWp, float2(0.7071, 0.7071)) * 1.3, aaBid.x * 0.1 + aaBid.y))) * aaCon;
-    aaCrk = saturate((aaCw - aaBd) / aaHh + 0.5) * saturate(aaCw / aaHh);
+    aaCrk = saturate((aaCw - aaBd) / aaHh + 0.5) * saturate(aaCw / aaHh) * smoothstep(0.7, 1.8, 2.0 * aaCw / aaPxw);
     // sealed runs ("tar snakes"): a third of the old pour's cracked borders under a 2-3.5 cm smooth band of sealant
     float aaSw = (0.014 + 0.010 * n.vn(float2(dot(aaWp, float2(0.7071, -0.7071)) * 0.9, aaBid.y * 0.1 + aaBid.x))) * aaCon * step(n.h1(aaBid + 9.1), 0.55);
-    aaSeal = max(aaSeal, saturate((aaSw - aaBd) / aaHh + 0.5) * saturate(aaSw / aaHh));
+    aaSeal = max(aaSeal, saturate((aaSw - aaBd) / aaHh + 0.5) * saturate(aaSw / aaHh) * smoothstep(0.7, 1.8, 2.0 * aaSw / aaPxw));
     // the cold joint where two pours meet (the lot lottery's borders), opened as a crack
     float2 aaLq = abs(frac(float2(g.x / 82.0, g.y / 76.0) + n.fbm(g * 0.013) * 0.075) - 0.5);
     float aaJd = min((0.5 - aaLq.x) * 82.0, (0.5 - aaLq.y) * 76.0);
     float aaJw = 0.003 + 0.004 * n.vn(g * 0.7 + 3.0);
-    aaCrk = max(aaCrk, saturate((aaJw - aaJd) / aaHh + 0.5) * saturate(aaJw / aaHh));
+    aaCrk = max(aaCrk, saturate((aaJw - aaJd) / aaHh + 0.5) * saturate(aaJw / aaHh) * smoothstep(0.7, 1.8, 2.0 * aaJw / aaPxw));
   }
   // the flags: a crack across one flag in six; gum (GP31's discs 1-3 cm, thicker where people wait), their mean past
   // resolution; the splash band along the kerb

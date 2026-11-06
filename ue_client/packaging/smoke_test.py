@@ -29,9 +29,19 @@ def main():
     bad = 0
     for name, (lat, lon) in {'amsterdam120': (40.80955, -73.95905), 'timessq': (40.7580, -73.9855)}.items():
         here = m.geolocation_to_location(lat, lon)
+        # (over the street: 70 m back along the lane nearest the place and 25 m up, looking along it. The fixed pose 60 m
+        # off both axes at 45 m looked out from under Columbia's lawns, 46.9 m up on the measured ground by Amsterdam
+        # Avenue and 120th Street, and a corner pose over the ground stood inside the blocks. The core answers for the
+        # lanes of the tiles it holds: the place is loaded before its lane is asked)
+        t = time.time()
         pose = Transform(Location(here.x - 60, here.y - 60, 45), Rotation(pitch=-25, yaw=45))
-        world.get_spectator().set_transform(pose)
-        t = time.time(); world.wait_until_loaded(); tl = time.time() - t
+        world.get_spectator().set_transform(pose); world.wait_until_loaded()
+        wp = m.get_waypoint(here, max_distance=150.0)   # (Times Square's point lies in the plaza, 30 m from any lane)
+        if wp:
+            g, f = wp.transform.location, wp.transform.get_forward_vector()
+            pose = Transform(Location(g.x - f.x * 70, g.y - f.y * 70, g.z + 25), Rotation(pitch=-20, yaw=wp.transform.rotation.yaw))
+            world.get_spectator().set_transform(pose); world.wait_until_loaded()
+        tl = time.time() - t
         cams = {k: world.spawn_actor(lib.find(bp), pose) for k, bp in (('rgb', 'sensor.camera.rgb'), ('depth', 'sensor.camera.depth'))}
         got = {k: [] for k in cams}
         for k, c in cams.items():

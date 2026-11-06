@@ -979,6 +979,7 @@ export function hhpPost(tile, ox, oz, terrTile = false) {
     }
   }
   const sunk = terrTile ? blendGround(tile, ox, oz) : clampCorridor(tile, ox, oz);   // (the ground's own sections, before the paving joins them)
+  if (HA_P1) backingUnderPaving(tile, ox, oz);
   dbgHas(tile, ox, oz, 'after blend');
   if (HA_P1 && BOXES.length) { boxGround(tile, ox, oz); dbgHas(tile, ox, oz, 'after box'); }
   if (HA_P1) lawnUnderPaving(tile, ox, oz);
@@ -1057,6 +1058,47 @@ function dropUnderPaving(tile, ox, oz) {
 }
 // natural ground under a chain's paving within a fight's reach of it (-0.12 .. +0.35 m: a kept path's lawn, a regrown
 // sward): its corners there held 0.15 m under the paving
+// The land's backing (heightAuthority.js CRACKS, 0.3 m under the bare earth) never over a chain's paving: where the earth
+// stood 0.3-0.6 m over a road, blendGround cut the base out and the backing stayed over the lanes (the dark patches on the
+// FDR at E 71st St). Its triangles near paving split to 1 m, the pieces over the paving (above its level less 0.1 m, up to
+// 3 m over it: not a deck) cut out at the paving's edge.
+function backingUnderPaving(tile, ox, oz) {
+  const a = tile.S.terrBack;
+  if (!a || a.length < 9) return 0;
+  const over = (x, z, y) => hhpHits(x, z, -0.02).some((h) => y > h.y - 0.1 && y < h.y + 3.0);
+  const fine = [];
+  const sub = (P, d) => {
+    const e = Math.max(Math.hypot(P[0][0] - P[1][0], P[0][2] - P[1][2]), Math.hypot(P[1][0] - P[2][0], P[1][2] - P[2][2]), Math.hypot(P[2][0] - P[0][0], P[2][2] - P[0][2]));
+    const f = P.map((p) => over(p[0] + ox, p[2] + oz, p[1]));
+    const c = [(P[0][0] + P[1][0] + P[2][0]) / 3, (P[0][1] + P[1][1] + P[2][1]) / 3, (P[0][2] + P[1][2] + P[2][2]) / 3];
+    const touch = f.some(Boolean) || over(c[0] + ox, c[2] + oz, c[1]);
+    if (d < 8 && e > 1.0 && touch && !f.every(Boolean)) {
+      const m = (u, v) => [(u[0] + v[0]) / 2, (u[1] + v[1]) / 2, (u[2] + v[2]) / 2];
+      const ab = m(P[0], P[1]), bc = m(P[1], P[2]), ca = m(P[2], P[0]);
+      sub([P[0], ab, ca], d + 1); sub([ab, P[1], bc], d + 1); sub([ca, bc, P[2]], d + 1); sub([ab, bc, ca], d + 1);
+      return;
+    }
+    for (const p of P) fine.push(p[0], p[1], p[2]);
+  };
+  let touched = 0;
+  for (let i = 0; i + 8 < a.length; i += 9) {
+    const P = [[a[i], a[i + 1], a[i + 2]], [a[i + 3], a[i + 4], a[i + 5]], [a[i + 6], a[i + 7], a[i + 8]]];
+    if (fineEmpty((P[0][0] + P[1][0] + P[2][0]) / 3 + ox, (P[0][2] + P[1][2] + P[2][2]) / 3 + oz, 30)) { for (const p of P) fine.push(p[0], p[1], p[2]); continue; }
+    touched++; sub(P, 0);
+  }
+  if (!touched) return 0;
+  const keep = [];
+  let cut = 0;
+  for (let i = 0; i + 8 < fine.length; i += 9) {
+    const cl = clipOff(fine, i, ox, oz, over, 0);
+    if (cl) { cut++; for (const q of cl) keep.push(q); continue; }
+    const cx = (fine[i] + fine[i + 3] + fine[i + 6]) / 3 + ox, cz = (fine[i + 2] + fine[i + 5] + fine[i + 8]) / 3 + oz, cy = (fine[i + 1] + fine[i + 4] + fine[i + 7]) / 3;
+    if (over(cx, cz, cy) && [0, 3, 6].every((q) => over(fine[i + q] + ox, fine[i + q + 2] + oz, fine[i + q + 1]))) { cut++; continue; }
+    for (let k = 0; k < 9; k++) keep.push(fine[i + k]);
+  }
+  tile.S.terrBack = Float32Array.from(keep);
+  return cut;
+}
 function lawnUnderPaving(tile, ox, oz) {
   let n = 0;
   for (const name of ['grass', 'grassU', 'terrP1']) {
@@ -1194,7 +1236,23 @@ function boxGround(tile, ox, oz) {
           const next = []; for (const q of pieces) for (const r of subtractConvex(q, Q)) next.push(r); pieces = next;
         }
       }
-      for (const p of pieces) for (let k = 1; k + 1 < p.length; k++) for (const q of [p[0], p[k], p[k + 1]]) add[kind].push(q[0] - ox, topIn(s, i, q[0], q[1]), q[1] - oz);
+      // (a shore band's pieces over the water dropped, split to 2 m: the band runs from the kerb to the strip's bulkhead,
+      // and where the river comes in nearer than that the verge lay on the water in green triangles, the FDR at E 71st St)
+      const wet = (x, z) => { const q = haInfo(x, z); return !!q && q.tag >= 3; };
+      const dry = (T, d, outT) => {
+        const e = Math.max(Math.hypot(T[0][0] - T[1][0], T[0][1] - T[1][1]), Math.hypot(T[1][0] - T[2][0], T[1][1] - T[2][1]), Math.hypot(T[2][0] - T[0][0], T[2][1] - T[0][1]));
+        const w = T.map((q) => wet(q[0], q[1]));
+        if (w.every(Boolean) && e <= 2.0) return;
+        if (!w.some(Boolean) && !wet((T[0][0] + T[1][0] + T[2][0]) / 3, (T[0][1] + T[1][1] + T[2][1]) / 3)) { outT.push(T); return; }
+        if (d >= 6 || e <= 2.0) { if (!wet((T[0][0] + T[1][0] + T[2][0]) / 3, (T[0][1] + T[1][1] + T[2][1]) / 3)) outT.push(T); return; }
+        const m = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], ab = m(T[0], T[1]), bc = m(T[1], T[2]), ca = m(T[2], T[0]);
+        dry([T[0], ab, ca], d + 1, outT); dry([ab, T[1], bc], d + 1, outT); dry([ca, bc, T[2]], d + 1, outT); dry([ab, bc, ca], d + 1, outT);
+      };
+      for (const p of pieces) for (let k = 1; k + 1 < p.length; k++) {
+        const tris = [];
+        if (s.kind === 'shore') dry([p[0], p[k], p[k + 1]], 0, tris); else tris.push([p[0], p[k], p[k + 1]]);
+        for (const T of tris) for (const q of T) add[kind].push(q[0] - ox, topIn(s, i, q[0], q[1]), q[1] - oz);
+      }
     }
   }
   tile.__boxTop = add;   // (laid after the terrain's ground clamp, hhpAfterClamp: the deck stands over the drives by design)
@@ -1275,7 +1333,13 @@ function liftCoveredDecks(tile, ox, oz) {
   // pieces included)
   if (!HHP_CH.some((c) => c.structs.some((q) => q.kind === 'under'))) return 0;
   // (a drive under another carriageway (the stack at E 61st St) has that carriageway's deck over it, not a park deck)
-  const underAt = (x, z) => { const hs = hhpHits(x, z, 0); return hs.find((h) => h.c.structs.some((q) => q.kind === 'under' && h.i >= q.i0 - 5 && h.i <= q.i1 + 5) && !hhpHits(x, z, 2).some((o) => o.c !== h.c && o.y > h.y + 2)); };
+  // (the covered run as the kit takes it, 3 stations past each end, where deckRelAt has its level: with 5 here a piece two
+  // stations further was lifted with no level for some corners, and hung from the deck to the drive in shards, E 71st St)
+  // (and not where an FDR structure (fdrBox.js) holds the drive: its deck and portals are the box's; the run under the River
+  // Campus and NewYork-Presbyterian lies inside the park box FS 1400-1754, and the ground lifted past the box's end hung
+  // 3 m over its deck, pulled down under its lawn in shards)
+  const boxed = (h) => BOXES.some((b) => b.c === h.c && h.i >= b.i0 - 3 && h.i <= b.i1 + 3);
+  const underAt = (x, z) => { const hs = hhpHits(x, z, 0); return hs.find((h) => h.c.structs.some((q) => q.kind === 'under' && h.i >= q.i0 - 3 && h.i <= q.i1 + 3) && !boxed(h) && !hhpHits(x, z, 2).some((o) => o.c !== h.c && o.y > h.y + 2)); };
   let n = 0;
   for (const name of HA_GROUND.concat(['terrP1'])) {
     if (name === 'asphalt' || name.startsWith('paint')) continue;
@@ -1287,7 +1351,18 @@ function liftCoveredDecks(tile, ox, oz) {
     // stays; the kit's walls close the edge from the deck down to the ground beside it)
     // (the deck's level: one smooth level over each covered run, the drive's plus the median of the authority's grade over
     // it, the same the kit's edge walls and coping take)
-    const lift = (arr) => { for (let k = 0; k + 2 < arr.length; k += 3) { const h = underAt(arr[k] + ox, arr[k + 2] + oz) || hhpHits(arr[k] + ox, arr[k + 2] + oz, 0.3).find((q) => deckRelAt(q.c, q.i) > 3); const r = h ? deckRelAt(h.c, h.i) : NaN; if (Number.isFinite(r) && r > 3) arr[k + 1] = h.c.Y[h.i] + (h.c.Y[Math.min(h.c.n - 1, h.i + 1)] - h.c.Y[h.i]) * h.t + r - (name === 'terrP1' ? 0.15 : 0); } return arr; };
+    // (each corner to the deck over its own station; a corner with no level there takes its triangle's other corners' mean,
+    // so a lifted piece is lifted whole and never stretches from the deck down to the drive)
+    const lift = (arr) => {
+      for (let t = 0; t + 8 < arr.length; t += 9) {
+        const ys = [0, 3, 6].map((k) => { const h = underAt(arr[t + k] + ox, arr[t + k + 2] + oz) || hhpHits(arr[t + k] + ox, arr[t + k + 2] + oz, 0.3).find((q) => deckRelAt(q.c, q.i) > 3 && !boxed(q)); const r = h ? deckRelAt(h.c, h.i) : NaN; return Number.isFinite(r) && r > 3 ? h.c.Y[h.i] + (h.c.Y[Math.min(h.c.n - 1, h.i + 1)] - h.c.Y[h.i]) * h.t + r - (name === 'terrP1' ? 0.15 : 0) : NaN; });
+        const ok = ys.filter(Number.isFinite);
+        if (!ok.length) continue;
+        const m = ok.reduce((a, b) => a + b, 0) / ok.length;
+        [0, 3, 6].forEach((k, j) => { arr[t + k + 1] = Number.isFinite(ys[j]) ? ys[j] : m; });
+      }
+      return arr;
+    };
     for (let i = 0; i + 8 < a.length; i += 9) {
       const cx = (a[i] + a[i + 3] + a[i + 6]) / 3, cz = (a[i + 2] + a[i + 5] + a[i + 8]) / 3;
       const near = (C && C.has(`${Math.round(cx * 100)},${Math.round(cz * 100)}`)) || name === 'terrP1';
@@ -1348,6 +1423,9 @@ function regrowGone(tile, ox, oz) {
     }
     // (every piece comes back, 0.10 m under the grade and under any ground drawn over it: no sliver of hole, no fight)
     const cx = (P[0][0] + P[1][0] + P[2][0]) / 3, cz = (P[0][2] + P[1][2] + P[2][2]) / 3;
+    // (but none over the water: a compiled road at the bank came back past the river wall as lawn on the river, E 71st St)
+    const qw = haInfo(cx + ox, cz + oz);
+    if (qw && qw.tag >= 3) return;
     // (under a chain's paving: base 0.15 m under that paving, never a lawn a few cm under it)
     const hs = hhpHits(cx + ox, cz + oz, 0.1);
     const dst = !hs.length && covered(cx, cz) === null ? outG : out;

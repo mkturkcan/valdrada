@@ -16,6 +16,22 @@ export function unproject(x, z) {
   return [ x / M_PER_DEG_LON + LON0, -z / M_PER_DEG_LAT + LAT0 ];
 }
 export const tileId = (x, z) => `${Math.floor(x / TILE)}_${Math.floor(z / TILE)}`;
+// A tile's answer at (x, z) from a map of tile key -> sampler, the point's own tile first. A road one tile lays may overhang
+// the next by metres (W 120th St's carriageway, 5 m past x = 1024), so within TILE_EDGE of the own tile's edge the tiles
+// across that edge are asked where it has no answer (null, or a roadAt's false); none answering, the own answer stands.
+export const TILE_EDGE = 8;
+export function tileAsk(map, x, z, ask) {
+  const ix = Math.floor(x / TILE), iz = Math.floor(z / TILE), fn = map.get(`${ix}_${iz}`), own = fn ? ask(fn) : null;
+  if (own !== null && own !== false) return own;
+  const fx = x - ix * TILE, fz = z - iz * TILE;
+  const dx = fx < TILE_EDGE ? -1 : fx > TILE - TILE_EDGE ? 1 : 0, dz = fz < TILE_EDGE ? -1 : fz > TILE - TILE_EDGE ? 1 : 0;
+  if (!dx && !dz) return own;
+  for (const [a, b] of dx && dz ? [[dx, 0], [0, dz], [dx, dz]] : [[dx, dz]]) {
+    const g = map.get(`${ix + a}_${iz + b}`), t = g ? ask(g) : null;
+    if (t !== null && t !== false) return t;
+  }
+  return own;
+}
 export const macroId = (x, z) => `${Math.floor(x / MACRO)}_${Math.floor(z / MACRO)}`;
 
 // Furniture kind ids (compiler writes, runtime instancing reads)

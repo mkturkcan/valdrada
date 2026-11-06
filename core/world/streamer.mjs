@@ -8,7 +8,7 @@
 // it holds.
 import fs from 'node:fs';
 import path from 'node:path';
-import { TILE } from '../../client/src/shared/geo.js';
+import { TILE, tileAsk } from '../../client/src/shared/geo.js';
 import { parseTile, buildingsOf } from '../../client/src/world/tiledata.js';
 import { COLLIDERS } from '../../client/src/city/colliders.js';
 import { simTile } from './simTile.mjs';
@@ -72,9 +72,10 @@ export class HeadlessStreamer {
     for (const [key, t] of this.tiles) if (t.state === 'ready' && t.data) add(key, t.data);
   }
   _key(x, z) { return `${Math.floor(x / TILE)}_${Math.floor(z / TILE)}`; }
-  surfaceAt(x, z) { const fn = this.surfaces.get(this._key(x, z)); return fn ? fn(x, z) : null; }
-  surfaceInfoAt(x, z, tol) { const fn = this.surfInfos.get(this._key(x, z)); return fn ? fn(x, z, tol) : null; }
-  roadAt(x, z, tol) { const fn = this.roadAts.get(this._key(x, z)); return fn ? fn(x, z, tol) : null; }
+  // (near a tile's edge the tiles across it answer too: client/src/shared/geo.js tileAsk)
+  surfaceAt(x, z) { return tileAsk(this.surfaces, x, z, (fn) => fn(x, z)); }
+  surfaceInfoAt(x, z, tol) { return tileAsk(this.surfInfos, x, z, (fn) => fn(x, z, tol)); }
+  roadAt(x, z, tol) { return tileAsk(this.roadAts, x, z, (fn) => fn(x, z, tol)); }
   terrainAt(x, z) {
     if (HA_P1) { const a = haTerrainAt(x, z); if (a !== null) return a; }   // P1 TERRAIN: the region's base (client/src/world/heightAuthority.js)
     const t = this.terrains.get(this._key(x, z));
