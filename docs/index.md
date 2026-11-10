@@ -5,21 +5,69 @@ hide:
   - toc
 ---
 
-# Valdrada { .visually-hidden }
-
-![A simulator frame at W 125th St and Lenox Ave in Harlem, with its semantic segmentation and depth](assets/figures/hero.jpg){ .hero }
-
-<p class="lead">Valdrada is a city-scale digital twin of New York City
-compiled from public municipal records. It
-renders the five boroughs in real time, simulates traffic and pedestrians on the city's own
-street network, and returns pixel-exact ground truth through a Python API modelled on CARLA.</p>
+<div class="vd-hero" markdown>
+<div class="vd-hero__body" markdown>
+<img class="vd-hero__mark" src="assets/figures/logo.svg" alt="">
+<h1 class="vd-hero__title">Valdrada</h1>
+<p class="vd-hero__tag">A digital twin simulator of New York City</p>
+<p class="vd-hero__lead">Valdrada is an explicit world model of New York City, compiled from public municipal records.
+Its state is the city as typed records: the 1,085,937 buildings of the five boroughs, the streets, lanes and signals,
+and the vehicles and pedestrians that move on them. It renders that state in real time in the browser and in Unreal
+Engine 5, returns pixel-exact ground truth through a Python API modelled on CARLA, and supplies the control channels
+that sim-to-real video models condition on.</p>
 
 [Quick start](quickstart.md){ .md-button .md-button--primary }
 [Tutorials](tutorials/index.md){ .md-button }
 [Python API](api/python_api.md){ .md-button }
-[Download for Windows](https://github.com/mkturkcan/valdrada/releases){ .md-button }
+[Download](https://github.com/mkturkcan/valdrada/releases){ .md-button }
 [Demo in the browser](https://huggingface.co/spaces/mehmetkeremturkcan/valdrada){ .md-button }
 [Compiled city](https://huggingface.co/datasets/mehmetkeremturkcan/valdrada){ .md-button }
+</div>
+<img class="vd-hero__shot" src="assets/figures/hero_state.jpg" alt="A simulator frame at W 125th St and Lenox Ave in Harlem, with its semantic segmentation and depth">
+</div>
+
+## An explicit world model
+
+A neural world model learns the state of its world and the rules that advance it as one latent representation, from
+which it predicts the next observation; that state cannot be read out or edited. Valdrada takes the other approach. Its
+state is explicit and persistent, off-screen entities included. A building carries its footprint, height, floor count,
+use and wall material from the city's footprint, tax-lot and facade inspection records; a lane carries its width,
+direction and speed limit from the street centreline database; a vehicle carries its pose, speed and route on the lane
+graph, and a pedestrian its route on the sidewalk graph. The rules that advance the state, signal phases with amber,
+car following by the Intelligent Driver Model, lane changes and pedestrian routing, are code that can be read and changed. Every rendered pixel traces back to a record,
+so the semantic labels, instance masks, boxes and depth of a frame are exact rather than estimated.
+
+Recent work on world models separates the evolution of an explicit, persistent world state from the generation of
+observations[^pwm]. Valdrada is the explicit side of that division for a real city at its full extent: the same state
+can be observed through the three.js renderer, through Unreal Engine 5 or Blender Cycles, and through a generative model.
+
+## Sim-to-real with world foundation models
+
+<figure markdown="span">
+  <video class="vd-video" autoplay muted loop playsinline poster="assets/figures/controls.jpg">
+    <source src="assets/figures/controls.mp4" type="video/mp4">
+  </video>
+  <figcaption>A drive up Amsterdam Avenue below West 120th Street recorded with the Unreal Engine 5 client through the
+  Python API: the RGB frame (top left), metric depth shown as inverse depth (top right), semantic segmentation in
+  Cityscapes colours (bottom left) and an edge map computed from the RGB frame (bottom right), all from one pose per
+  step. 121 frames at 30 frames per second.</figcaption>
+</figure>
+
+Generative video models can take over the appearance of a simulated frame while the simulator keeps the geometry, the
+motion and the labels. NVIDIA's Cosmos 3 Sim-Transfer model generates photorealistic video conditioned on
+simulator-rendered depth, segmentation, edge or blur control videos and a text prompt[^cosmos3], and the Cosmos-Transfer1
+report notes that depth and segmentation are freely available from a computer-graphics simulator[^ct1]. Valdrada renders
+these channels from the same state as each RGB frame, in both of its renderers, at the 121 frames and 30 frames per
+second of a Sim-Transfer request. Since the generated video follows the control geometry, the simulator's boxes,
+instance masks and depth label it as well, and one recorded drive can be re-rendered under the appearance a prompt
+describes.
+
+```python
+world.apply_settings(valdrada.WorldSettings(synchronous_mode=True, fixed_delta_seconds=1 / 30))
+lib = world.get_blueprint_library()
+cameras = {kind: world.spawn_actor(lib.find(f"sensor.camera.{kind}"), pose)
+           for kind in ("rgb", "depth", "semantic_segmentation")}
+```
 
 ## How it works
 
@@ -121,7 +169,13 @@ Valdrada, the compiled city or imagery rendered with it, please cite Valdrada it
   author  = {Turkcan, Mehmet Kerem},
   title   = {{Valdrada}: a real-data, real-time digital twin of New York City},
   year    = {2026},
-  version = {0.6.1},
+  version = {0.7.1},
   url     = {https://github.com/mkturkcan/valdrada}
 }
 ```
+
+[^pwm]: Z.-H. Huang, G. Lin, J. Lin, Y.-C. Huang, R. Yu, M. Niu, S. Yang, Y.-L. Liu, Y.-Y. Chuang, K. Zhang and Z. Wang.
+    Programmable World Model. arXiv:2609.10540, 2026.
+[^cosmos3]: NVIDIA. Cosmos3-Nano-Sim-Transfer, model card, 2026.
+    [huggingface.co/nvidia/Cosmos3-Nano-Sim-Transfer](https://huggingface.co/nvidia/Cosmos3-Nano-Sim-Transfer).
+[^ct1]: NVIDIA. Cosmos-Transfer1: Conditional World Generation with Adaptive Multimodal Control. arXiv:2503.14492, 2025.

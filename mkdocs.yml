@@ -1,8 +1,9 @@
 site_name: Valdrada
 site_url: https://mkturkcan.github.io/valdrada/
 site_description: >-
-  A real-time digital twin of New York City compiled from public records, with simulated traffic,
-  pixel-exact ground truth and a Python API.
+  A digital twin simulator of New York City and an explicit world model of it, compiled from public records:
+  real-time rendering in the browser and Unreal Engine 5, simulated traffic and pedestrians, pixel-exact ground truth,
+  sim-to-real control channels and a Python API.
 site_author: M. K. Turkcan
 repo_url: https://github.com/mkturkcan/valdrada
 repo_name: mkturkcan/valdrada
@@ -53,8 +54,8 @@ theme:
     - search.suggest
     - search.highlight
     - toc.follow
+  logo: assets/figures/logo.svg
   icon:
-    logo: material/city-variant-outline
     repo: fontawesome/brands/github
   favicon: assets/figures/favicon.svg
 
