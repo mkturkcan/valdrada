@@ -157,8 +157,8 @@ FIGS.pipeline = () => {
   const c3 = card(crop(f(RAW, 'lenox_oblique_rgb.png'), [0, 0, IMG_W, IMG_H]), 'Real-time rendering',
     'The WebGL2 client streams the tiles, dresses every facade and moves vehicles and pedestrians on the lane and sidewalk graphs.');
   const c4 = card(crop(f(RAW, 'lenox_oblique_semantic.png'), [0, 0, IMG_W, IMG_H], bx.svg), 'Ground truth',
-    'Every frame comes with semantic and instance masks, metric depth and object boxes.');
-  return doc(W, H, `${head('From public records to pixel-exact ground truth',
+    'Semantic and instance masks, metric depth and object boxes, rendered with each frame.');
+  return doc(W, H, `${head('From public records to ground truth',
       'One block of Harlem, at W 125th St and Lenox Ave, at each stage of the pipeline.')}
     <div style="position:absolute;left:96px;right:96px;top:330px;display:flex;align-items:flex-start;justify-content:space-between">${c1}${arrow}${c2}${arrow}${c3}${arrow}${c4}</div>`,
   `.card{width:505px}.arrow{height:388px;display:grid;place-items:center;width:44px;opacity:0.95}
@@ -254,8 +254,8 @@ FIGS.coverage = () => {
   return doc(W, H, `<div class="panel" style="position:absolute;left:84px;top:60px;width:${mapW}px;height:${mapH}px;background:#090d13">
       <img src="${f(MAPS, 'citymap.png')}" style="position:absolute;inset:0;width:100%;height:100%">${overlay}</div>
     <div style="position:absolute;left:${84 + mapW + 100}px;right:96px;top:84px">
-      <h1>The whole city, streamed</h1>
-      <div class="sub" style="max-width:none;font-size:22px">Every building of the five boroughs, shaded by height on its street network. The client streams full-detail tiles around the camera (yellow) and coarser far-field tiles beyond them (blue).</div>
+      <h1>The five boroughs, streamed</h1>
+      <div class="sub" style="max-width:none;font-size:22px">The buildings of the five boroughs, shaded by height on their street network. The client streams full-detail tiles around the camera (yellow) and coarser far-field tiles beyond them (blue).</div>
       <div style="display:flex;gap:44px;align-items:flex-end;margin-top:40px">
         <div style="flex:1">
           <div style="font-size:17px;font-weight:600;color:var(--soft)">Building height</div>
@@ -273,9 +273,11 @@ FIGS.social = () => {
   const W = 1280, H = 640;
   return doc(W, H, `<img src="${f(RAW, 'g_fifth_rgb.png')}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 64%">
     <div style="position:absolute;inset:0;background:linear-gradient(90deg,rgba(4,7,11,0.94) 0%,rgba(4,7,11,0.72) 40%,rgba(4,7,11,0.05) 72%)"></div>
-    <div style="position:absolute;left:68px;top:196px;width:720px">
+    <div style="position:absolute;left:68px;top:150px;width:720px">
+      <img src="${pathToFileURL(path.join(repo, 'docs', 'assets', 'figures', 'logo.svg')).href}" style="width:92px;height:92px;display:block;margin:0 0 18px -4px">
       <div style="font-size:82px;font-weight:700;letter-spacing:-0.035em">Valdrada</div>
-      <div style="font-size:24px;line-height:1.45;color:#d9e2ea;margin-top:22px">A real-time digital twin of New York City built from public records, with simulated traffic, pixel-exact ground truth and a Python API.</div></div>`);
+      <div style="font-size:30px;line-height:1.3;font-weight:600;letter-spacing:-0.01em;color:#f7c325;margin-top:10px">A digital twin simulator of New York City</div>
+      <div style="font-size:22px;line-height:1.45;color:#d9e2ea;margin-top:16px">An explicit world model compiled from public records, with simulated traffic and pedestrians, ground truth and a Python API.</div></div>`);
 };
 
 // ---------------------------------------------------------------- render

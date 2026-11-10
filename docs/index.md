@@ -13,7 +13,7 @@ hide:
 <p class="vd-hero__lead">Valdrada is an explicit world model of New York City, compiled from public municipal records.
 Its state is the city as typed records: the 1,085,937 buildings of the five boroughs, the streets, lanes and signals,
 and the vehicles and pedestrians that move on them. It renders that state in real time in the browser and in Unreal
-Engine 5, returns pixel-exact ground truth through a Python API modelled on CARLA, and supplies the control channels
+Engine 5, returns ground truth rendered from that state through a Python API modelled on CARLA, and supplies the control channels
 that sim-to-real video models condition on.</p>
 
 [Quick start](quickstart.md){ .md-button .md-button--primary }
@@ -34,12 +34,13 @@ state is explicit and persistent, off-screen entities included. A building carri
 use and wall material from the city's footprint, tax-lot and facade inspection records; a lane carries its width,
 direction and speed limit from the street centreline database; a vehicle carries its pose, speed and route on the lane
 graph, and a pedestrian its route on the sidewalk graph. The rules that advance the state, signal phases with amber,
-car following by the Intelligent Driver Model, lane changes and pedestrian routing, are code that can be read and changed. Every rendered pixel traces back to a record,
-so the semantic labels, instance masks, boxes and depth of a frame are exact rather than estimated.
+car following by the Intelligent Driver Model, lane changes and pedestrian routing, are code that can be read and changed. The semantic labels, instance masks, boxes
+and depth of a frame are rendered from the same records as its image rather than estimated from it.
 
 Recent work on world models separates the evolution of an explicit, persistent world state from the generation of
-observations[^pwm]. Valdrada is the explicit side of that division for a real city at its full extent: the same state
-can be observed through the three.js renderer, through Unreal Engine 5 or Blender Cycles, and through a generative model.
+observations[^pwm]. Valdrada is the explicit side of that division for the five boroughs of New York City: the same
+state can be observed through the three.js renderer, through Unreal Engine 5 or Blender Cycles, and through a generative
+model.
 
 ## Sim-to-real with world foundation models
 
@@ -49,7 +50,7 @@ can be observed through the three.js renderer, through Unreal Engine 5 or Blende
   </video>
   <figcaption>A drive up Amsterdam Avenue below West 120th Street recorded with the Unreal Engine 5 client through the
   Python API: the RGB frame (top left), metric depth shown as inverse depth (top right), semantic segmentation in
-  Cityscapes colours (bottom left) and an edge map computed from the RGB frame (bottom right), all from one pose per
+  Cityscapes colours (bottom left) and an edge map computed from the RGB frame (bottom right), from one pose per
   step. 121 frames at 30 frames per second.</figcaption>
 </figure>
 
@@ -57,10 +58,24 @@ Generative video models can take over the appearance of a simulated frame while 
 motion and the labels. NVIDIA's Cosmos 3 Sim-Transfer model generates photorealistic video conditioned on
 simulator-rendered depth, segmentation, edge or blur control videos and a text prompt[^cosmos3], and the Cosmos-Transfer1
 report notes that depth and segmentation are freely available from a computer-graphics simulator[^ct1]. Valdrada renders
-these channels from the same state as each RGB frame, in both of its renderers, at the 121 frames and 30 frames per
-second of a Sim-Transfer request. Since the generated video follows the control geometry, the simulator's boxes,
-instance masks and depth label it as well, and one recorded drive can be re-rendered under the appearance a prompt
-describes.
+these channels from the same state as each RGB frame, in both of its renderers.
+
+<figure markdown="span">
+  <video class="vd-video" autoplay muted loop playsinline poster="assets/figures/sim2real.jpg">
+    <source src="assets/figures/sim2real.mp4" type="video/mp4">
+  </video>
+  <figcaption>The same drive through Cosmos3-Nano-Sim-Transfer: the Valdrada frame (top left) and the model's output
+  conditioned on Valdrada's depth (top right), on its semantic segmentation (bottom left) and on edges computed from its
+  RGB frame (bottom right), one control at a time, with one structured caption of the scene. 121 frames at 30 frames per
+  second and 832 × 480, four sampling steps, seed 2025; about one minute of generation per video on one NVIDIA RTX 6000
+  Ada GPU.</figcaption>
+</figure>
+
+The generated videos follow the layout and motion of their controls: the sedan ahead, the kerb, the street tree with its
+fence and the pedestrians on the sidewalk keep their places, so the simulator's boxes, instance masks and depth label the
+generated frames to the extent that the frames follow their control. The controls constrain different parts of the image.
+The edge-conditioned video keeps the stone retaining wall on the left, which the depth-conditioned video turns into a
+building facade, and the segmentation-conditioned video adds a lane marking that the simulated road does not have.
 
 ```python
 world.apply_settings(valdrada.WorldSettings(synchronous_mode=True, fixed_delta_seconds=1 / 30))
@@ -75,7 +90,7 @@ cameras = {kind: world.spawn_actor(lib.find(f"sensor.camera.{kind}"), pose)
   ![Public records, the compiled city, the real-time render and its ground truth for one block of Harlem](assets/figures/pipeline.jpg)
 </figure>
 
-Every element of the city traces back to a record. Building footprints come from NYC Building Footprints and are
+The city is compiled from public records. Building footprints come from NYC Building Footprints and are
 joined to the tax-lot database (PLUTO) for floors, use and year of construction, and to the facade inspection filings
 for the wall material. Each building is classified into a facade typology and dressed procedurally: windows on the
 recorded floor count, cornices, storefronts, fire escapes, stoops and rooftop equipment. Streets come from the city's
@@ -83,10 +98,10 @@ centreline database with their recorded widths, lane counts, directions and spee
 kerbs, crosswalks, lane paint, bus lanes, and the lane and sidewalk graphs that traffic and pedestrians move on.
 
 The compiler is a Node.js pipeline and the renderer is three.js on WebGL2, so nothing needs an engine build. Changing
-how the city looks or behaves is an edit to a JavaScript module and a page reload, and the whole city can be
+how the city looks or behaves is an edit to a JavaScript module and a page reload, and the city can be
 recompiled from the public records ([Building from source](building.md)).
 
-## Ground truth for every frame
+## Ground truth
 
 <figure markdown="span">
   ![RGB, semantic segmentation, instance segmentation with visible and amodal boxes, and depth for one step at W 120th St and Amsterdam Ave](assets/figures/sensors.jpg)
@@ -97,20 +112,20 @@ with visible and amodal boxes, occlusion ratios and 3D poses, and metric depth. 
 scene state as the image, so they need no annotation. The Python package writes COCO detection files directly, and the
 [tutorials](tutorials/index.md) go from a first connection to a recorded dataset.
 
-## The whole city, streamed
+## The five boroughs, streamed
 
 <figure markdown="span">
-  ![Every building of the five boroughs shaded by height, with the tile grid and the streaming radii around a camera in Harlem](assets/figures/coverage.jpg)
+  ![The buildings of the five boroughs shaded by height, with the tile grid and the streaming radii around a camera in Harlem](assets/figures/coverage.jpg)
 </figure>
 
-The compiled city holds every building of the five boroughs, 1,085,937 in 3,532 tiles of 512 m. The client keeps full
-detail around the camera and draws coarser far-field tiles beyond it, so any street of the city can be rendered on a
+The compiled city holds the buildings of the five boroughs, 1,085,937 in 3,532 tiles of 512 m. The client keeps the
+highest level of detail around the camera and draws coarser far-field tiles beyond it, so the city can be rendered on a
 laptop GPU.
 
 ## Areas modelled in detail
 
-Some areas go beyond the compiled records. On 125th Street, from Twelfth Avenue to the Harlem River, every frontage is
-built from a per-building specification (storeys, bays, materials, storefronts and signs) with a facade kit and a
+Some areas go beyond the compiled records. On 125th Street, from Twelfth Avenue to the Harlem River, the frontages are
+built from per-building specifications (storeys, bays, materials, storefronts and signs) with a facade kit and a
 library of 35 CC0 material sets; the street surface, furniture and street life are laid out along the corridor. The
 Riverside Drive viaduct follows its published 1900 design, and the Manhattan Valley viaduct, the 1 train's 125th Street
 station, the Park Avenue Viaduct and the bridge approaches at the Harlem River are modelled to their documented
@@ -119,22 +134,22 @@ water bodies, paths and landmarks from OpenStreetMap; tree crowns are segmented 
 NAIP near-infrared imagery, and the resulting 16,951 trees are assigned to 33 species groups fitted to the park's
 published composition. Towers over 45 m are rebuilt near the camera by a tower kit on the facade shader's grid, among
 them 111 West 57th with its ten setbacks and fluted piers. The Metropolitan Museum of Art, the American Museum of
-Natural History with the Rose Center and the Gilder Center, and the Guggenheim are modelled whole on their footprints,
+Natural History with the Rose Center and the Gilder Center, and the Guggenheim are modelled individually on their footprints,
 and the Statue of Liberty is a scan fitted to the Historic American Engineering Record's drawings (HAER NY-138).
 
 ## Offline rendering
 
 A recorded take can be exported to OpenUSD and rendered in Blender Cycles or Unreal Engine 5.
-`client/tools/ar34/export/harvest.mjs` boots the page as the film recorder does and writes every visible mesh,
-instance set and camera sample of the take; `usd_write.py` turns this into USD layers. `blender_take.py` renders the
+`client/tools/ar34/export/harvest.mjs` boots the page as the film recorder does and writes the visible meshes,
+instance sets and camera samples of the take; `usd_write.py` turns this into USD layers. `blender_take.py` renders the
 frames in Cycles with the web client's materials rebuilt as node groups, baked facade windows with interiors,
 film-detail street trees and physical light; `ue_take.py` renders the same USD with Unreal's Lumen and Movie Render
 Queue, with master materials per family, CC0 layered materials, Nanite foliage and a cinematic preset.
 [One city, three renderers](architecture.md) describes the design, and the guides for
 [Blender Cycles](blender-cycles.md) and [Unreal Engine 5](unreal.md) take one shot through each renderer. For Unreal the
-whole city can also be built once, every 128 m cell as a table of kit instances and its own meshes in 1 km block
+city can also be built once, each 128 m cell as a table of kit instances and its own meshes in 1 km block
 packages over a shared material library, so that a shot is a cut of that build and needs only its take and its render
-([The whole city](unreal.md#the-whole-city)).
+([Building the city in Unreal](unreal.md#the-whole-city)).
 
 ## Architecture
 
