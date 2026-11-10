@@ -179,7 +179,7 @@ FIGS.sensors = () => {
   const cbar = `<div style="position:absolute;right:18px;bottom:18px;width:420px;background:rgba(6,9,14,0.76);border:1px solid rgba(255,255,255,0.14);border-radius:10px;padding:12px 16px 10px">
       <div style="height:12px;border-radius:3px;background:${turbo}"></div>
       <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:14px;color:#dfe7ef"><span>near</span><span>far</span></div></div>`;
-  return doc(W, H, `${head('Pixel-exact ground truth, every frame',
+  return doc(W, H, `${head('Ground truth from the scene state',
       'One synchronous step at W 120th St and Amsterdam Ave. The labels are rendered from the same scene state as the image, so they need no annotation.')}
     <div style="position:absolute;left:96px;right:96px;top:330px;display:grid;grid-template-columns:1fr 1fr;gap:24px">
       ${panel('RGB', crop(f(RAW, 'sensors_rgb.png'), C))}

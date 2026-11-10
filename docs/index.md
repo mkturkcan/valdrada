@@ -77,6 +77,41 @@ generated frames to the extent that the frames follow their control. The control
 The edge-conditioned video keeps the stone retaining wall on the left, which the depth-conditioned video turns into a
 building facade, and the segmentation-conditioned video adds a lane marking that the simulated road does not have.
 
+### One drive, many appearances
+
+A recorded drive fixes the controls; the caption sets the appearance. In each loop below the top left tile is the
+Valdrada frame, the top right tile is Cosmos 3 conditioned on edges computed from that frame with a caption of the scene
+in daylight, and the two bottom tiles are Cosmos 3 conditioned on Valdrada's depth with captions for another time of day
+or weather. Depth carries the geometry and the motion but no lighting, so the light, the weather and the content of
+signs and billboards come from the model; the street, the buildings' masses and the traffic come from the simulation.
+
+<figure markdown="span">
+  <video class="vd-video" autoplay muted loop playsinline preload="auto" poster="assets/figures/cosmos_tsq.jpg">
+    <source src="assets/figures/cosmos_tsq.mp4" type="video/mp4">
+  </video>
+  <figcaption>Seventh Avenue through Times Square, driving south. Valdrada (top left); edges, daylight (top right);
+  depth, blue hour (bottom left); depth, night after rain (bottom right).</figcaption>
+</figure>
+
+<figure markdown="span">
+  <video class="vd-video" autoplay muted loop playsinline preload="auto" poster="assets/figures/cosmos_park.jpg">
+    <source src="assets/figures/cosmos_park.mp4" type="video/mp4">
+  </video>
+  <figcaption>Park Avenue toward the
+  Helmsley Building, driving south behind a taxi. Valdrada (top left); edges, daylight (top right); depth, snowfall
+  (bottom left); depth, golden hour (bottom right).</figcaption>
+</figure>
+
+<figure markdown="span">
+  <video class="vd-video" autoplay muted loop playsinline preload="auto" poster="assets/figures/cosmos_harlem.jpg">
+    <source src="assets/figures/cosmos_harlem.mp4" type="video/mp4">
+  </video>
+  <figcaption>A residential street in Harlem near Lenox
+  Avenue and West 125th Street. Valdrada (top left); edges, daylight (top right); depth, golden hour (bottom left); depth,
+  rainy evening (bottom right). Each video: Cosmos3-Nano-Sim-Transfer, 121 frames at 30 frames per second, 832 × 480,
+  four sampling steps, seed 2025.</figcaption>
+</figure>
+
 ```python
 world.apply_settings(valdrada.WorldSettings(synchronous_mode=True, fixed_delta_seconds=1 / 30))
 lib = world.get_blueprint_library()
