@@ -364,7 +364,7 @@ if (theirs.length) log(`${theirs.length} cells are being baked by another run: w
 // ---------------------------------------------------------------- the sink: each page POSTs its cells' manifests and buffers
 // into its own folder (<run>/<page>/: the texture files are numbered per page)
 const run = `${name}-${Date.now().toString(36)}`;
-const runRoot = path.join('/data0/projectnyc_aux/tmp/cells', run);
+const runRoot = path.join(process.env.CELLTMP || '/data0/projectnyc_aux/tmp/cells', run);
 await fsp.mkdir(runRoot, { recursive: true });
 const sink = http.createServer((req, res) => {
   const cors = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Private-Network': 'true' };
