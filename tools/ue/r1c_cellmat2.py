@@ -20,7 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 EXPORT = os.path.abspath(os.path.join(HERE, '..', '..', 'client', 'tools', 'ar34', 'export'))
 PROJECT = os.path.join(EXPORT, 'ue_project', 'BoundlessUE.uproject')
 UE_ROOT = os.environ.get('UE_ROOT', '/data0/projectnyc_aux/ue/UE_5.8')
-CELLCACHE = '/data0/projectnyc_aux/cellcache'
+CELLCACHE = os.environ.get('CELLCACHE', '/data0/projectnyc_aux/cellcache')
 VERSION = 9   # (WHITE06 2026-10-26: a binding rule, no master change: white_flat below) (9: WINFAR, the kit cladding's knee under 0.42; 8: S125, the dresser's roof decks too; 7: S125, the anti-tiling, tone and weathering; 6: GB43 KIT, the kit instances' custom data; 2: the facade kit's per-vertex tint, FkOn; 3: the vertex colour as RGB; 4: the vertex alpha as opacity, UseVCA;
 # 5: the take's night (MPC_r1c.Night, keyed in the take's sequence by r1c_actors.py) for what three.js switches by ENV.night:
 # night-only parts, the room fills' night dimming, the kit interiors' light share and their own light by day and night, the
